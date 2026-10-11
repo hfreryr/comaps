@@ -1,0 +1,26 @@
+# Données brutes et résultats volumineux — ne jamais les enregistrer dans le dépôt
+data/
+*.parquet
+*.pmtiles
+*.osm.pbf
+*.duckdb
+*.duckdb.wal
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Node (prototypes design)
+node_modules/
+dist/
+build/
+.svelte-kit/
+
+# Système
+.DS_Store
+Thumbs.db
