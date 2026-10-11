@@ -1,6 +1,8 @@
-# Projet carte libre *(nom provisoire)*
+# A designer for CoMaps
 
-> ⚠️ Le nom « CoMaps » est déjà utilisé par une app libre existante ([comaps.app](https://www.comaps.app)). Ce dépôt sera renommé.
+Projet indépendant au service de l'app libre [CoMaps](https://www.comaps.app). Nous ne sommes pas l'équipe CoMaps.
+
+**Ville pilote : Paris** (vérifications terrain d'abord sur un arrondissement).
 
 Rendre les cartes libres basées sur OpenStreetMap (OSM) **aussi fiables et aussi agréables** que Google Maps.
 
@@ -23,7 +25,7 @@ Concevoir et tester une expérience à la hauteur de Google Maps, d'abord sur le
 | Étape | Objectif | Réussite si… |
 |---|---|---|
 | 0. Installation | Dépôt prêt | Premier script exécuté |
-| 1. Cadrage | Choisir une ville | Périmètre écrit ici |
+| 1. Cadrage | Ville : Paris ✅ — choisir l'arrondissement de test | Périmètre écrit ici |
 | 2. Détection | Lister les lieux fermés selon Overture mais présents dans OSM | Liste reproductible + carte |
 | 3. Mesure | Vérifier 30 à 50 cas sur le terrain | Taux de fiabilité chiffré |
 | 4. Prototype itinéraire | Maquette interactive | Testée par 5 personnes face à Google Maps |

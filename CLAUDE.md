@@ -13,6 +13,9 @@ Rendre les cartes libres basées sur OpenStreetMap (OSM) aussi fiables et agréa
 1. **`pipeline/`** (Python) — détecter les lieux OSM obsolètes, d'abord les commerces fermés, en comparant avec Overture Maps (`operating_status`) via DuckDB.
 2. **`design/`** — prototypes d'interface, d'abord le parcours « faire un itinéraire », destinés à être proposés à l'app libre CoMaps.
 
+Ville pilote : **Paris** ; vérifications terrain sur un arrondissement.
+Nom du projet : **A designer for CoMaps** — projet indépendant, ne jamais se présenter comme l'équipe CoMaps.
+
 Voir `README.md` pour la feuille de route.
 
 ## Règles non négociables
