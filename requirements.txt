@@ -1,0 +1,5 @@
+duckdb>=1.5
+osmium>=4
+shapely>=2
+rapidfuzz>=3
+pytest

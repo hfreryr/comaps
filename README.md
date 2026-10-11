@@ -24,9 +24,9 @@ Concevoir et tester une expérience à la hauteur de Google Maps, d'abord sur le
 
 | Étape | Objectif | Réussite si… |
 |---|---|---|
-| 0. Installation | Dépôt prêt | Premier script exécuté |
-| 1. Cadrage | Ville : Paris ✅ — choisir l'arrondissement de test | Périmètre écrit ici |
-| 2. Détection | Lister les lieux fermés selon Overture mais présents dans OSM | Liste reproductible + carte |
+| 0. Installation ✅ | Dépôt prêt | Premier script exécuté |
+| 1. Cadrage | Ville : Paris ✅ — 6e arrondissement ✅ | Périmètre écrit ici |
+| 2. Détection ✅ | Lister les lieux OSM peut-être fermés (voir `pipeline/README.md`) | Liste reproductible + carte |
 | 3. Mesure | Vérifier 30 à 50 cas sur le terrain | Taux de fiabilité chiffré |
 | 4. Prototype itinéraire | Maquette interactive | Testée par 5 personnes face à Google Maps |
 | 5. Contribution CoMaps | Proposer une amélioration codée | Réponse de l'équipe CoMaps |
