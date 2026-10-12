@@ -15,6 +15,10 @@ const TYPES = {
   hospital: 'Hôpital', doctors: 'Médecin', church: 'Église', place_of_worship: 'Lieu de culte',
   attraction: 'Lieu touristique', monument: 'Monument', florist: 'Fleuriste', butcher: 'Boucherie',
   cheese: 'Fromagerie', wine: 'Caviste', ice_cream: 'Glacier', marketplace: 'Marché',
+  fast_food: 'Restauration rapide', supermarket: 'Supermarché', grocery: 'Épicerie',
+  clothing_store: 'Vêtements', jewelry: 'Bijouterie', shoes: 'Chaussures', art_gallery: "Galerie d'art",
+  subway: 'Station de métro', halt: 'Gare', hostel: 'Auberge de jeunesse', dentist: 'Dentiste',
+  beauty: 'Institut de beauté', optician: 'Opticien', gift: 'Cadeaux', toys: 'Jouets',
   house: 'Adresse', street: 'Rue', residential: 'Rue', city: 'Ville', suburb: 'Quartier'
 };
 
@@ -60,7 +64,11 @@ export async function details(place, signal) {
   if (!res.ok) return {};
   const data = await res.json();
   const t = data.elements?.[0]?.tags || {};
+  const street = [t['addr:housenumber'], t['addr:street']].filter(Boolean).join(' ');
   return {
+    name: t.name,
+    address: street ? [street, t['addr:postcode']].filter(Boolean).join(', ') : null,
+    cuisine: t.cuisine,
     hours: t.opening_hours,
     phone: t.phone || t['contact:phone'],
     website: t.website || t['contact:website'],

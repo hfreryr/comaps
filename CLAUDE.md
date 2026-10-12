@@ -10,11 +10,12 @@
 ## Le projet
 Rendre les cartes libres basées sur OpenStreetMap (OSM) aussi fiables et agréables que Google Maps. Deux chantiers :
 
-1. **`pipeline/`** (Python) — détecter les lieux OSM obsolètes, d'abord les commerces fermés, en comparant avec Overture Maps (`operating_status`) via DuckDB.
-2. **`design/`** — prototypes d'interface, d'abord le parcours « faire un itinéraire », destinés à être proposés à l'app libre CoMaps.
+1. **`app/`** (SvelteKit statique + MapLibre) — notre propre app web grand public, concurrente de Google Maps, branchée sur des moteurs libres existants (OpenFreeMap, Photon, puis Valhalla et Transitous). Public : le grand public inquiet de sa dépendance aux GAFAM, pas les militants du libre. Promesse : aussi bien que Google Maps, sans vous pister.
+2. **`pipeline/`** (Python) — détecter les lieux OSM obsolètes (commerces fermés) en confrontant OSM à Overture Maps via DuckDB. Constat : `operating_status` d'Overture est quasi vide à Paris ; on s'appuie sur le score d'existence et l'absence.
 
-Ville pilote : **Paris** ; vérifications terrain sur un arrondissement.
-Nom du projet : **A designer for CoMaps** — projet indépendant, ne jamais se présenter comme l'équipe CoMaps.
+Ville pilote : **Paris** (pipeline : 6e arrondissement).
+Nom de code : **Projet Paris** (nom définitif en cours de choix ; finalistes Ruella, Clairue, Venelle).
+Ne jamais se présenter comme lié à CoMaps ou à Cartes.app.
 
 Voir `README.md` pour la feuille de route.
 
@@ -36,5 +37,7 @@ Voir `README.md` pour la feuille de route.
 - LLM local de 7-8B si un jour nécessaire (extraction d'horaires) ; le vrai goulot sera Playwright, pas le modèle.
 
 ## Design
+- Références visuelles : Google Maps et Plans d'Apple (sobriété, carte calme, lieux colorés par famille). S'en inspirer, ne jamais copier leurs icônes, logos ou éléments propres.
+- Police système du téléphone ; aucune ressource chargée chez Google (pas de Google Fonts).
 - Test du couloir : quelqu'un qui n'a jamais entendu parler d'OSM doit comprendre en 5 secondes.
 - La frugalité n'excuse jamais une expérience médiocre.

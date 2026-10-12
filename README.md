@@ -1,6 +1,6 @@
-# A designer for CoMaps
+# Projet Paris *(nom de code)*
 
-Projet indépendant au service de l'app libre [CoMaps](https://www.comaps.app). Nous ne sommes pas l'équipe CoMaps.
+Une carte grand public, aussi agréable que Google Maps, qui ne vous piste pas. Bâtie sur OpenStreetMap et des moteurs libres.
 
 **Ville pilote : Paris** (vérifications terrain d'abord sur un arrondissement).
 
