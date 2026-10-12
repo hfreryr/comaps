@@ -1,0 +1,133 @@
+// Import des lieux enregistrés dans Google Maps, depuis l'export Google Takeout
+// (« Maps (vos adresses) »). Le fichier est lu sur le téléphone : rien n'est envoyé,
+// sauf, pour les lieux dont l'export ne donne pas la position, leur nom au moteur de recherche
+// (comme si on les tapait dans la barre de recherche).
+//
+// Formats acceptés : l'archive .zip telle que Google la fournit, ou les fichiers qu'elle contient
+// (« Lieux enregistrés.json » / « Saved Places.json », « Adresses avec libellé.json » /
+// « Labeled places.json », listes « Enregistrées/*.csv »).
+
+/** Lit une archive .zip (méthodes « stockée » et « deflate ») : [{ name, text() }] */
+async function unzip(buf) {
+  const v = new DataView(buf);
+  let eocd = -1;
+  for (let i = buf.byteLength - 22; i >= Math.max(0, buf.byteLength - 70000); i--) {
+    if (v.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  }
+  if (eocd < 0) throw new Error('zip');
+  const count = v.getUint16(eocd + 10, true);
+  let p = v.getUint32(eocd + 16, true);
+  const out = [];
+  const dec = new TextDecoder();
+  for (let n = 0; n < count; n++) {
+    const method = v.getUint16(p + 10, true);
+    const size = v.getUint32(p + 20, true);
+    const nameLen = v.getUint16(p + 28, true), extra = v.getUint16(p + 30, true), comment = v.getUint16(p + 32, true);
+    const local = v.getUint32(p + 42, true);
+    const name = dec.decode(new Uint8Array(buf, p + 46, nameLen));
+    p += 46 + nameLen + extra + comment;
+    const start = local + 30 + v.getUint16(local + 26, true) + v.getUint16(local + 28, true);
+    const data = new Uint8Array(buf, start, size);
+    out.push({
+      name,
+      text: async () => {
+        if (method === 0) return dec.decode(data);
+        if (method !== 8) throw new Error('zip-method');
+        const s = new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+        return await new Response(s).text();
+      }
+    });
+  }
+  return out;
+}
+
+// Coordonnées cachées dans une adresse Google Maps (…!3d48.85!4d2.33… ou …@48.85,2.33…).
+function coordsFromUrl(url = '') {
+  let m = /!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/.exec(url) || /@(-?\d+\.\d+),(-?\d+\.\d+)/.exec(url)
+    || /[?&](?:q|query|ll)=(-?\d+\.\d+),\s*(-?\d+\.\d+)/.exec(url);
+  return m ? { lat: Number(m[1]), lon: Number(m[2]) } : null;
+}
+
+function fromGeoJSON(j) {
+  const places = [];
+  for (const f of j.features || []) {
+    const pr = f.properties || {};
+    const loc = pr.location || pr.Location || {};
+    const geo = loc['Geo Coordinates'] || {};
+    let lat = Number(geo.Latitude), lon = Number(geo.Longitude);
+    const c = f.geometry?.coordinates;
+    if ((!lat || !lon) && Array.isArray(c) && (c[0] || c[1])) { lon = Number(c[0]); lat = Number(c[1]); }
+    const url = pr.google_maps_url || pr['Google Maps URL'] || '';
+    if (!lat || !lon) ({ lat, lon } = coordsFromUrl(url) || {});
+    const label = pr.name || pr.Title || '';
+    places.push({
+      name: loc.name || loc['Business Name'] || label || loc.address || loc.Address || '',
+      address: loc.address || loc.Address || pr.address || '',
+      label,                       // « Home », « Work », « Domicile »… dans les adresses avec libellé
+      lat, lon
+    });
+  }
+  return places;
+}
+
+function parseCsv(text) {
+  const rows = [];
+  let row = [], cell = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (q) {
+      if (ch === '"' && text[i + 1] === '"') { cell += '"'; i++; }
+      else if (ch === '"') q = false;
+      else cell += ch;
+    } else if (ch === '"') q = true;
+    else if (ch === ',') { row.push(cell); cell = ''; }
+    else if (ch === '\n' || ch === '\r') {
+      if (ch === '\r' && text[i + 1] === '\n') i++;
+      row.push(cell); rows.push(row); row = []; cell = '';
+    } else cell += ch;
+  }
+  if (cell || row.length) { row.push(cell); rows.push(row); }
+  return rows.filter((r) => r.some((c) => c.trim()));
+}
+
+function fromCsv(text) {
+  const [head, ...rows] = parseCsv(text.replace(/^﻿/, ''));
+  if (!head) return [];
+  const col = (re) => head.findIndex((h) => re.test(h.trim()));
+  const iT = col(/^(title|titre)$/i), iU = col(/^url$/i);
+  if (iT < 0) return [];
+  return rows.map((r) => ({ name: r[iT] || '', address: '', label: '', ...(coordsFromUrl(r[iU]) || {}) })).filter((p) => p.name);
+}
+
+const HOME = /^(home|domicile|maison)$/i;
+const WORK = /^(work|travail|bureau)$/i;
+
+/**
+ * Lit un fichier choisi par l'utilisateur.
+ * @returns {Promise<{ places: Array<{name,address,lat?,lon?}>, home?: object, work?: object }>}
+ */
+export async function readGoogleExport(file) {
+  const buf = await file.arrayBuffer();
+  const u8 = new Uint8Array(buf, 0, 4);
+  const files = u8[0] === 0x50 && u8[1] === 0x4b
+    ? (await unzip(buf)).filter((f) => /\.(json|csv)$/i.test(f.name) && /maps|adresses|places|lieux|enregistr|saved/i.test(f.name))
+    : [{ name: file.name, text: async () => new TextDecoder().decode(buf) }];
+  const all = [];
+  for (const f of files) {
+    const text = await f.text().catch(() => '');
+    if (/\.csv$/i.test(f.name)) all.push(...fromCsv(text));
+    else { try { all.push(...fromGeoJSON(JSON.parse(text))); } catch { /* fichier ignoré */ } }
+  }
+  const out = { places: [] };
+  const seen = new Set();
+  for (const p of all) {
+    if (!p.name && !p.address) continue;
+    if (HOME.test(p.label)) { out.home = { ...p, name: p.address || p.name }; continue; }
+    if (WORK.test(p.label)) { out.work = { ...p, name: p.address || p.name }; continue; }
+    const k = `${p.name}|${p.lat?.toFixed?.(4)}`;
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.places.push(p);
+  }
+  return out;
+}

@@ -9,34 +9,54 @@
   import { wikiInfo } from '#lib/placeinfo.js';
   import { mapStyle, provideImage, osmRef, FAMILIES, DARK_LAND } from '#lib/mapstyle.js';
   import { streetRoute, transitRoutes, departures, trafficEstimate, MODE_NAMES, fmtDuration, fmtTime, fmtWait, fmtDistance } from '#lib/routing.js';
+  import { stationExits, bestExit, exitLabel, sortExits } from '#lib/exits.js';
+  import { readGoogleExport } from '#lib/importgoogle.js';
 
-  const CATEGORIES = [
-    { label: 'Restaurants', classes: ['restaurant', 'fast_food'], family: 'food' },
-    { label: 'Cafés', classes: ['cafe'], family: 'cafe' },
-    { label: 'Boulangeries', classes: ['bakery', 'pastry'], family: 'bakery' },
-    { label: 'Pharmacies', classes: ['pharmacy'], family: 'health' },
-    { label: 'Courses', classes: ['supermarket', 'convenience', 'grocery'], family: 'shop' },
-    { label: 'Musées', classes: ['museum', 'art_gallery', 'gallery'], family: 'culture' },
-    { label: 'Bars', classes: ['bar', 'pub', 'beer'], family: 'bar' }
+  // Raccourcis de catégories. « key » ne change jamais ; l'intitulé et l'ordre sont personnalisables.
+  const ALL_CATEGORIES = [
+    { key: 'resto', label: 'Restaurants', classes: ['restaurant', 'fast_food'], family: 'food' },
+    { key: 'cafe', label: 'Cafés', classes: ['cafe'], family: 'cafe' },
+    { key: 'metro', label: 'Métro', transit: true, color: '#2B4793' },
+    { key: 'pharmacie', label: 'Pharmacies', classes: ['pharmacy'], family: 'health' },
+    { key: 'courses', label: 'Courses', classes: ['supermarket', 'convenience', 'grocery'], family: 'shop' },
+    { key: 'distributeur', label: 'Distributeurs', classes: ['atm'], family: 'money' },
+    { key: 'boulangerie', label: 'Boulangeries', classes: ['bakery', 'pastry'], family: 'bakery' },
+    { key: 'bar', label: 'Bars', classes: ['bar', 'pub', 'beer'], family: 'bar' },
+    { key: 'musee', label: 'Musées', classes: ['museum', 'art_gallery', 'gallery'], family: 'culture' },
+    { key: 'banque', label: 'Banques', classes: ['bank'], family: 'money' },
+    { key: 'essence', label: 'Stations-service', classes: ['fuel'], family: 'fuel' }
   ];
-  // Taper un type de lieu (« pharmacie », « resto près de moi ») propose la liste triée par proximité.
+  // Taper un type de lieu (« pharmacie », « métro le plus proche ») propose la liste triée par proximité.
   const CATEGORY_WORDS = {
-    Restaurants: ['restaurant', 'restaurants', 'resto', 'restos', 'manger', 'dejeuner', 'diner', 'brasserie', 'brasseries'],
-    'Cafés': ['cafe', 'cafes', 'coffee', 'cafeteria'],
-    Boulangeries: ['boulangerie', 'boulangeries', 'boulanger', 'pain', 'patisserie', 'patisseries', 'viennoiseries'],
-    Pharmacies: ['pharmacie', 'pharmacies', 'pharma', 'medicament', 'medicaments'],
-    Courses: ['courses', 'supermarche', 'supermarches', 'epicerie', 'epiceries', 'superette', 'supermarket', 'magasin alimentaire'],
-    'Musées': ['musee', 'musees', 'expo', 'expos', 'exposition', 'expositions', 'galerie', 'galeries'],
-    Bars: ['bar', 'bars', 'boire', 'verre', 'pub', 'pubs', 'apero']
+    resto: ['restaurant', 'restaurants', 'resto', 'restos', 'manger', 'dejeuner', 'diner', 'brasserie', 'brasseries'],
+    cafe: ['cafe', 'cafes', 'coffee', 'cafeteria'],
+    metro: ['metro', 'metros', 'station', 'stations', 'rer', 'subway', 'transport', 'transports', 'arret'],
+    pharmacie: ['pharmacie', 'pharmacies', 'pharma', 'medicament', 'medicaments'],
+    courses: ['courses', 'supermarche', 'supermarches', 'epicerie', 'epiceries', 'superette', 'supermarket', 'magasin', 'alimentaire'],
+    distributeur: ['distributeur', 'distributeurs', 'dab', 'atm', 'retirer', 'retrait', 'argent', 'liquide', 'cash', 'billets', 'billet'],
+    boulangerie: ['boulangerie', 'boulangeries', 'boulanger', 'pain', 'patisserie', 'patisseries', 'viennoiseries'],
+    bar: ['bar', 'bars', 'boire', 'verre', 'pub', 'pubs', 'apero'],
+    musee: ['musee', 'musees', 'expo', 'expos', 'exposition', 'expositions', 'galerie', 'galeries'],
+    banque: ['banque', 'banques', 'agence', 'agences', 'bancaire'],
+    essence: ['essence', 'carburant', 'gazole', 'diesel', 'fuel', 'pompe', 'station', 'service', 'stations', 'services']
   };
+  // Onglets personnalisés : [{ key, label?, hidden? }] dans l'ordre choisi, gardés sur l'appareil.
+  const CHIPS_KEY = 'onglets';
+  function loadChipPrefs() {
+    let saved = [];
+    try { saved = JSON.parse(localStorage.getItem(CHIPS_KEY) || '[]'); } catch { /* rien */ }
+    const known = saved.filter((p) => ALL_CATEGORIES.some((c) => c.key === p.key));
+    // une catégorie ajoutée après coup apparaît à la fin
+    return [...known, ...ALL_CATEGORIES.filter((c) => !known.some((p) => p.key === c.key)).map((c) => ({ key: c.key }))];
+  }
   const FILLER = new Set(['proche', 'proches', 'pres', 'de', 'd', 'moi', 'ici', 'ouvert', 'ouverte', 'ouverts', 'ouvertes',
     'autour', 'la', 'le', 'les', 'plus', 'un', 'une', 'des', 'du', 'a', 'cote', 'maintenant', 'pas', 'loin', 'nearby', 'near', 'me']);
   const norm = (t) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
   function categoryFor(q) {
     const words = norm(q).split(' ').filter(Boolean);
     if (!words.length) return null;
-    for (const c of CATEGORIES) {
-      const kws = CATEGORY_WORDS[c.label];
+    for (const c of chipList.length ? [...chipList, ...ALL_CATEGORIES.filter((a) => !chipList.some((x) => x.key === a.key))] : ALL_CATEGORIES) {
+      const kws = CATEGORY_WORDS[c.key];
       if (words.some((w) => kws.includes(w)) && words.every((w) => kws.includes(w) || FILLER.has(w))) return c;
     }
     return null;
@@ -87,6 +107,32 @@
   let favorites = $state(loadList(FAVS_KEY, 200));
   const isFav = $derived(!!place && favorites.some((f) => sameSpot(f, place)));
 
+  // Maison et Travail : raccourcis gardés sur l'appareil.
+  const SHORTCUTS_KEY = 'maison-travail';
+  let shortcuts = $state(loadObj(SHORTCUTS_KEY));
+  let assigning = $state(null);      // 'home' | 'work' : la prochaine adresse choisie devient ce raccourci
+  const SHORT_NAMES = { home: 'Maison', work: 'Travail' };
+  const placeShortcut = $derived(place ? ['home', 'work'].find((k) => shortcuts[k] && sameSpot(shortcuts[k], place)) : null);
+
+  // Onglets de catégories
+  let chipPrefs = $state(loadChipPrefs());
+  const chipList = $derived(chipPrefs.filter((p) => !p.hidden).map((p) => {
+    const c = ALL_CATEGORIES.find((x) => x.key === p.key);
+    return { ...c, label: p.label?.trim() || c.label };
+  }));
+  let editChips = $state(false);
+  let importOpen = $state(false);
+  let importing = $state('');        // message de progression de l'import
+  let exits = $state(null);          // sorties de la station ouverte : { status, data? }
+  let allExits = $state(false);
+  let legExits = $state({});         // sortie conseillée par étape du trajet en transport
+  // Promesse affichée à la première ouverture (« ni compte, ni pistage »).
+  let showPromise = $state((() => { try { return !localStorage.getItem('promesse-vue'); } catch { return false; } })());
+  function closePromise() {
+    showPromise = false;
+    try { localStorage.setItem('promesse-vue', '1'); } catch { /* rien */ }
+  }
+
   // ——— Itinéraire ———
   let directions = $state(false);
   let from = $state(null);           // { label, lat, lon, isMe? }
@@ -105,7 +151,7 @@
   const week = $derived(showWeek && info?.hours ? hoursTable(info.hours, place.lat, place.lon) : null);
   const activeQuery = $derived(editing ? fieldQuery : query);
   const catHit = $derived(editing ? null : categoryFor(query));
-  const showList = $derived(editing ? true : focused && (query.trim().length >= 2 || (!query.trim() && (recents.length > 0 || favorites.length > 0))));
+  const showList = $derived(editing ? true : focused && (query.trim().length >= 2 || !query.trim()));
   const isAddress = $derived(place?.type === 'Adresse');
   const title = $derived(isAddress ? place.name.split(',')[0] : place?.name);
   const address = $derived(isAddress ? '' : (info?.address && info.address.includes(' ') ? info.address : '') || place?.address || '');
@@ -179,7 +225,7 @@
       paint: { 'text-color': dark ? '#F08AB4' : '#A82C5F', 'text-halo-color': dark ? 'rgba(22,24,28,0.9)' : '#FFFFFF', 'text-halo-width': 1.6 } });
     // Après un changement de style : on remet l'état en cours (trajet, catégorie, mode transports).
     if (directions) { drawRoute(); dimPlaces(true); }
-    if (category) map.setFilter('poi-hit', ['match', ['get', 'subclass'], category.classes, true, false]);
+    if (category) map.setFilter('poi-hit', hitFilter(category));
     if (mapMode === 'transit') for (const id of ['transit-case', 'transit-line', 'transit-label']) map.setLayoutProperty(id, 'visibility', 'visible');
   }
 
@@ -346,6 +392,102 @@
     try { return JSON.parse(localStorage.getItem(key) || '[]').slice(0, max); } catch { return []; }
   }
   function loadRecents() { return loadList(RECENTS_KEY, 8); }
+  function loadObj(key) {
+    try { return JSON.parse(localStorage.getItem(key) || '{}') || {}; } catch { return {}; }
+  }
+  function saveFavorites() {
+    try { localStorage.setItem(FAVS_KEY, JSON.stringify(favorites)); } catch { /* navigation privée */ }
+  }
+  function setShortcut(which, p) {
+    shortcuts = { ...shortcuts, [which]: p ? { id: p.id, name: p.name, type: p.type, address: p.address || '', lat: p.lat, lon: p.lon, osmType: p.osmType, osmId: p.osmId } : undefined };
+    try { localStorage.setItem(SHORTCUTS_KEY, JSON.stringify(shortcuts)); } catch { /* rien */ }
+  }
+  // Toucher « Maison » : itinéraire direct. S'il n'est pas encore défini, on le demande.
+  function useShortcut(which) {
+    const p = shortcuts[which];
+    if (!p) {
+      assigning = which;
+      query = '';
+      say(which === 'home' ? 'Tapez l\'adresse de votre maison' : 'Tapez l\'adresse de votre travail');
+      setTimeout(() => document.getElementById('search')?.focus(), 50);
+      return;
+    }
+    if (editing) { pickResult({ ...p }); return; }
+    focused = false;
+    document.activeElement?.blur();
+    clearCategory();
+    openPlace({ ...p, name: p.name || SHORT_NAMES[which] });
+    startDirections();
+  }
+
+  // ——— Import des lieux enregistrés dans Google Maps ———
+  async function importFile(e) {
+    const file = e.currentTarget.files?.[0];
+    e.currentTarget.value = '';
+    if (!file) return;
+    importing = 'Lecture du fichier…';
+    try {
+      const { places, home, work } = await readGoogleExport(file);
+      let added = 0, missed = 0;
+      const todo = places.filter((p) => !favorites.some((f) => f.name === p.name && (!p.lat || Math.abs(f.lat - p.lat) < 0.0003)));
+      const kept = [];
+      for (const [i, p] of todo.entries()) {
+        let { lat, lon } = p;
+        if (!lat || !lon) {
+          // L'export n'a pas toujours la position : on cherche le lieu par son nom, comme dans la barre de recherche.
+          importing = `Recherche des lieux sans position… ${i + 1} / ${todo.length}`;
+          const r = (await search(p.address || p.name, PARIS).catch(() => []))[0];
+          if (!r) { missed++; continue; }
+          ({ lat, lon } = r);
+        }
+        kept.push({ id: `g${lat},${lon}`, name: p.name || p.address, type: 'Importé de Google Maps', address: p.address || '', lat, lon });
+        added++;
+      }
+      favorites = [...kept, ...favorites];
+      saveFavorites();
+      let extra = '';
+      for (const [k, v] of [['home', home], ['work', work]]) {
+        if (!v || shortcuts[k]) continue;
+        let { lat, lon } = v;
+        if (!lat || !lon) { const r = (await search(v.address || v.name, PARIS).catch(() => []))[0]; if (!r) continue; ({ lat, lon } = r); }
+        setShortcut(k, { id: `${k}${lat}`, name: v.address || v.name, type: SHORT_NAMES[k], address: v.address || '', lat, lon });
+        extra += ` · ${SHORT_NAMES[k]} défini`;
+      }
+      importing = '';
+      importOpen = false;
+      if (!added && !extra) say(places.length ? 'Ces lieux sont déjà dans vos favoris.' : 'Aucun lieu trouvé dans ce fichier. Choisissez l\'archive Takeout de Google Maps.');
+      else say(`${added} lieu${added > 1 ? 'x' : ''} importé${added > 1 ? 's' : ''}${extra}${missed ? ` · ${missed} introuvable${missed > 1 ? 's' : ''}` : ''}`);
+    } catch {
+      importing = '';
+      say('Ce fichier n\'a pas pu être lu. Choisissez l\'archive .zip envoyée par Google.');
+    }
+  }
+
+  // ——— Onglets personnalisés ———
+  function saveChips() {
+    try { localStorage.setItem(CHIPS_KEY, JSON.stringify(chipPrefs)); } catch { /* rien */ }
+  }
+  function moveChip(i, d) {
+    const j = i + d;
+    if (j < 0 || j >= chipPrefs.length) return;
+    const next = [...chipPrefs];
+    [next[i], next[j]] = [next[j], next[i]];
+    chipPrefs = next;
+    saveChips();
+  }
+  function toggleChip(i) {
+    chipPrefs = chipPrefs.map((p, k) => (k === i ? { ...p, hidden: !p.hidden } : p));
+    saveChips();
+  }
+  function renameChip(i, label) {
+    chipPrefs = chipPrefs.map((p, k) => (k === i ? { ...p, label } : p));
+    saveChips();
+  }
+  function resetChips() {
+    chipPrefs = ALL_CATEGORIES.map((c) => ({ key: c.key }));
+    saveChips();
+  }
+  const catOf = (key) => ALL_CATEGORIES.find((c) => c.key === key);
   // Un même lieu : même identifiant OSM, ou même nom au même endroit (à ~20 m près).
   function sameSpot(a, b) {
     if (a.osmType && b.osmType) return a.osmType === b.osmType && String(a.osmId) === String(b.osmId);
@@ -362,7 +504,7 @@
       favorites = [keep, ...favorites];
       say('Ajouté à vos favoris · gardé sur cet appareil uniquement');
     }
-    try { localStorage.setItem(FAVS_KEY, JSON.stringify(favorites)); } catch { /* navigation privée */ }
+    saveFavorites();
   }
   // Les favoris apparaissent aussi sur la carte (pastille rose à cœur).
   $effect(() => {
@@ -392,7 +534,16 @@
     document.activeElement?.blur();
     placeMarker(p.lon, p.lat);
     frame(p.lon, p.lat);
-    if (STATION_TYPES.includes(p.type)) loadDepartures(p);
+    exits = null;
+    allExits = false;
+    if (STATION_TYPES.includes(p.type)) {
+      loadDepartures(p);
+      if (p.type !== 'Entrée de métro') {
+        exits = { status: 'loading' };
+        stationExits(p.lat, p.lon).then((d) => { if (place?.id === p.id) exits = { status: 'ok', data: sortExits(d) }; })
+          .catch(() => { if (place?.id === p.id) exits = { status: 'error' }; });
+      }
+    }
     try { info = await details(p); } catch { info = {}; }
     if (place?.id !== p.id) return;
     // Lien partagé : on ne connaissait que l'identifiant du lieu, on récupère son nom.
@@ -459,33 +610,53 @@
   let hoursIndex = null;
   const loadHours = () => (hoursIndex ??= fetch(new URL('data/hours.json', location.href)).then((r) => r.json()).catch(() => ({ v: [], k: {} })));
 
+  const hitFilter = (c) => (c.transit ? ['==', ['get', 'subclass'], '__none__'] : ['match', ['get', 'subclass'], c.classes, true, false]);
+
   async function pickCategory(c) {
-    if (category?.label === c.label) return clearCategory();
+    if (category?.key === c.key) return clearCategory();
     category = c;
     closePlace();
     nearby = [];
     nearbyDone = false;
-    map.setFilter('poi-hit', ['match', ['get', 'subclass'], c.classes, true, false]);
+    map.setFilter('poi-hit', hitFilter(c));
     // « Le plus proche de vous » : depuis votre position si elle est connue (ou déjà autorisée), sinon depuis le centre de la carte.
     let origin = me;
     if (!origin) {
       const perm = await navigator.permissions?.query({ name: 'geolocation' }).catch(() => null);
       if (perm?.state === 'granted') origin = await getPosition().catch(() => null);
     }
-    if (category?.label !== c.label) return; // (l'état est une copie : on compare les noms)
+    if (category?.key !== c.key) return; // (l'état est une copie : on compare les clés)
     nearbyFromMe = !!origin;
     const hoursP = loadHours();
     const collect = async () => {
       const o = origin || { lat: map.getCenter().lat, lon: map.getCenter().lng };
       const seen = new Set();
-      const list = map.querySourceFeatures('omt', { sourceLayer: 'poi',
-          filter: ['all', ['has', 'name'], ['match', ['get', 'subclass'], c.classes, true, false]] })
-        .filter((f) => !seen.has(f.id) && seen.add(f.id))
+      const filter = c.transit
+        ? ['all', ['has', 'name'], ['==', ['get', 'class'], 'railway'], ['match', ['get', 'subclass'], ['subway', 'station', 'halt'], true, false]]
+        : ['all', ['has', 'name'], ['match', ['get', 'subclass'], c.classes, true, false]];
+      // Une station a souvent plusieurs points (un par ligne) : on n'en garde qu'un par nom.
+      const keyOf = (f) => (c.transit ? f.properties.name : f.id);
+      const list = map.querySourceFeatures('omt', { sourceLayer: 'poi', filter })
         .map((f) => ({ f, d: dist(o.lat, o.lon, f.geometry.coordinates[1], f.geometry.coordinates[0]) }))
         .sort((a, b) => a.d - b.d)
-        .slice(0, 25);
+        .filter(({ f }) => !seen.has(keyOf(f)) && seen.add(keyOf(f)))
+        .slice(0, c.transit ? 8 : 25);
+      if (c.transit) {
+        nearby = list.map((n) => ({ ...n, deps: { status: 'loading' } }));
+        nearbyDone = true;
+        // Prochains passages des stations les plus proches, directement dans la liste.
+        list.slice(0, 5).forEach((n, i) => {
+          const [lon, lat] = n.f.geometry.coordinates;
+          departures(n.f.properties.name, lat, lon)
+            .then((d) => d?.lines.length ? { status: 'ok', data: d } : { status: 'none' })
+            .catch(() => ({ status: 'error' }))
+            .then((deps) => { if (category?.key === c.key && nearby[i]?.f.id === n.f.id) nearby[i] = { ...nearby[i], deps }; });
+        });
+        for (let i = 5; i < nearby.length; i++) nearby[i] = { ...nearby[i], deps: null };
+        return;
+      }
       const hours = await hoursP;
-      if (category?.label !== c.label) return; // (l'état est une copie : on compare les noms)
+      if (category?.key !== c.key) return;
       nearby = list.map((n) => {
         const h = hours.v[hours.k[String(n.f.id)]];
         return { ...n, st: h ? hoursStatus(h, n.f.geometry.coordinates[1], n.f.geometry.coordinates[0]) : null };
@@ -494,7 +665,7 @@
     };
     const target = origin ? [origin.lon, origin.lat] : null;
     if (target || map.getZoom() < 15) {
-      map.flyTo({ center: target || map.getCenter(), zoom: Math.max(15.5, map.getZoom()), duration: 700 });
+      map.flyTo({ center: target || map.getCenter(), zoom: Math.max(c.transit ? 15 : 15.5, map.getZoom()), duration: 700 });
       // Si la carte est déjà au bon endroit, elle ne bouge pas : on n'attend pas indéfiniment.
       let done = false;
       const once = () => { if (!done) { done = true; collect(); } };
@@ -506,7 +677,7 @@
   function clearCategory() {
     category = null;
     nearby = [];
-    map.setFilter('poi-hit', ['==', ['get', 'subclass'], '__none__']);
+    map?.setFilter('poi-hit', ['==', ['get', 'subclass'], '__none__']);
   }
 
   function dist(lat1, lon1, lat2, lon2) {
@@ -544,7 +715,13 @@
       return;
     }
     clearCategory();
-    query = r.name;
+    if (assigning) {
+      const which = assigning;
+      assigning = null;
+      setShortcut(which, r);
+      say(`${SHORT_NAMES[which]} : ${r.name}`);
+      query = '';
+    } else query = r.name;
     openPlace(r);
   }
 
@@ -582,7 +759,7 @@
       if (perm?.state === 'denied') return;
       let firstTime = false;
       try { firstTime = !localStorage.getItem('position-expliquee'); localStorage.setItem('position-expliquee', '1'); } catch { /* rien */ }
-      if (firstTime && perm?.state !== 'granted') say('Votre position reste sur votre téléphone.');
+      if (firstTime && perm?.state !== 'granted' && !showPromise) say('Votre position reste sur votre téléphone.');
       const p = await getPosition();
       if (!place && !category && !directions) map.flyTo({ center: [p.lon, p.lat], zoom: 15.5, duration: 900 });
     } catch { /* on reste sur Paris */ }
@@ -717,7 +894,24 @@
 
   const host = (url) => { try { return new URL(href(url)).hostname.replace(/^www\./, ''); } catch { return url; } };
   const href = (url) => (/^https?:\/\//.test(url) ? url : `https://${url}`);
-  const famColor = (c) => FAMILIES[c.family].color;
+  const famColor = (c) => c.color || FAMILIES[c.family].color;
+
+  // Sortie conseillée à la descente du métro ou du RER : l'entrée la plus proche de l'étape suivante.
+  $effect(() => {
+    const r = routes.transit;
+    if (mode !== 'transit' || r?.status !== 'ok' || !r.data[picked]) return;
+    const it = r.data[picked];
+    it.legs.forEach((leg, i) => {
+      if (!['SUBWAY', 'METRO', 'REGIONAL_RAIL', 'SUBURBAN'].includes(leg.mode) || !leg.toPos) return;
+      const nextLeg = it.legs[i + 1];
+      if (nextLeg && nextLeg.mode !== 'WALK') return;      // correspondance sans sortir
+      const k = `${picked}|${i}|${leg.to}`;
+      if (legExits[k] !== undefined) return;
+      legExits[k] = null;
+      const goal = nextLeg?.coords?.length ? { lon: nextLeg.coords.at(-1)[0], lat: nextLeg.coords.at(-1)[1] } : to;
+      bestExit(leg.toPos, goal).then((e) => { legExits[k] = e || false; }).catch(() => { legExits[k] = false; });
+    });
+  });
 </script>
 
 {#snippet modeIcon(id)}
@@ -744,6 +938,21 @@
           <span class="r-text"><span class="r-name">Votre position</span><span class="r-meta">Utiliser la localisation du téléphone</span></span>
         </button>
       </li>
+    {/if}
+    {#if activeQuery.trim().length < 2}
+      <li class="shortcuts">
+        {#each ['home', 'work'] as k}
+          <button onmousedown={(e) => { e.preventDefault(); useShortcut(k); }} class:unset={!shortcuts[k]}>
+            <span class="sc-icon" aria-hidden="true">{#if k === 'home'}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.5 12 5l8 6.5M6.5 10v9.5h11V10" /><path d="M10.2 19.5v-4.8h3.6v4.8" /></svg>{:else}<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="7.5" width="17" height="12" rx="2.5" /><path d="M9 7.5V6a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 6v1.5M3.5 12.5h17" /></svg>{/if}</span>
+            <span class="r-text"><span class="r-name">{SHORT_NAMES[k]}</span>
+              <span class="r-meta">{shortcuts[k] ? (shortcuts[k].name || '').split(',')[0] : 'Ajouter'}</span></span>
+          </button>
+        {/each}
+      </li>
+    {/if}
+    {#if assigning && activeQuery.trim().length < 2}
+      <li class="note">Tapez l'adresse de votre {assigning === 'home' ? 'maison' : 'travail'}, puis choisissez-la dans la liste.
+        <button class="link" onmousedown={(e) => { e.preventDefault(); assigning = null; }}>Annuler</button></li>
     {/if}
     {#if activeQuery.trim().length < 2 && favorites.length}
       <li class="note recents-head"><span>Favoris</span></li>
@@ -807,6 +1016,13 @@
     {/if}
     {#if searchError}<li class="note">{searchError}</li>{/if}
     {#if searching && !results.length}<li class="note">Recherche…</li>{/if}
+    {#if !editing && activeQuery.trim().length < 2}
+      <li class="list-foot">
+        <button class="link" onmousedown={(e) => { e.preventDefault(); importOpen = true; focused = false; document.activeElement?.blur(); }}>Importer vos lieux depuis Google Maps</button>
+        <button class="link" onmousedown={(e) => { e.preventDefault(); editChips = true; focused = false; document.activeElement?.blur(); }}>Personnaliser les raccourcis</button>
+        <span class="privacy-line">Ni compte, ni pistage : rien sur vous n'est collecté.</span>
+      </li>
+    {/if}
   </ul>
 {/snippet}
 
@@ -830,11 +1046,14 @@
 
       {#if !showList}
         <nav class="chips" aria-label="Catégories">
-          {#each CATEGORIES as c}
-            <button class="chip" class:on={category?.label === c.label} onclick={() => pickCategory(c)} style:--fam={famColor(c)} aria-pressed={category?.label === c.label}>
+          {#each chipList as c (c.key)}
+            <button class="chip" class:on={category?.key === c.key} onclick={() => pickCategory(c)} style:--fam={famColor(c)} aria-pressed={category?.key === c.key}>
               <span class="chip-dot" aria-hidden="true"></span>{c.label}
             </button>
           {/each}
+          <button class="chip edit" onclick={() => (editChips = true)} aria-label="Personnaliser les raccourcis">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4" /></svg>
+          </button>
         </nav>
       {/if}
     </header>
@@ -906,8 +1125,59 @@
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 4 4 11l7 2 2 7z" class="solid" /></svg>
   </button>
   {#if toast}<p class="toast" role="status">{toast}</p>{/if}
+  {#if showPromise && !place && !category && !directions && !importOpen && !editChips}
+    <div class="promise" role="note">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2.5" /><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" /></svg>
+      <p><strong>Une carte qui ne vous piste pas.</strong> Ni compte, ni publicité, rien sur vous n'est collecté. Vos favoris restent sur votre téléphone.</p>
+      <button onclick={closePromise}>Compris</button>
+    </div>
+  {/if}
 
-  {#if directions && !editing}
+  {#if importOpen && !directions}
+    <section class="sheet" aria-label="Importer vos lieux" use:draggable={{ key: 'import', onDismiss: () => (importOpen = false) }}>
+      <button class="grip" aria-label="Agrandir la fiche"></button>
+      <button class="close" onclick={() => (importOpen = false)} aria-label="Fermer">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" /></svg>
+      </button>
+      <h1>Vos lieux Google Maps</h1>
+      <p class="kind">Récupérez vos lieux enregistrés, votre maison et votre travail.</p>
+      <ol class="howto">
+        <li>Ouvrez <a href="https://takeout.google.com/" target="_blank" rel="noopener">takeout.google.com</a>, touchez « Tout désélectionner », puis cochez seulement <strong>Maps (vos adresses)</strong>.</li>
+        <li>Touchez « Étape suivante » puis « Créer une exportation ». Google vous envoie un lien par e-mail, souvent en quelques minutes.</li>
+        <li>Téléchargez le fichier .zip, puis choisissez-le ici.</li>
+      </ol>
+      <label class="action primary import-btn">
+        <input type="file" accept=".zip,.json,.csv,application/zip,application/json,text/csv" onchange={importFile} hidden />
+        {importing || 'Choisir le fichier'}
+      </label>
+      <p class="credit">Le fichier est lu sur votre téléphone : il n'est envoyé nulle part. Vos lieux restent sur cet appareil.</p>
+    </section>
+  {:else if editChips && !directions}
+    <section class="sheet" aria-label="Personnaliser les raccourcis" use:draggable={{ key: 'chips', onDismiss: () => (editChips = false) }}>
+      <button class="grip" aria-label="Agrandir la fiche"></button>
+      <button class="close" onclick={() => (editChips = false)} aria-label="Fermer">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" /></svg>
+      </button>
+      <h1>Raccourcis</h1>
+      <p class="kind">Choisissez ceux qui s'affichent, leur ordre et leur nom.</p>
+      <ul class="chip-edit">
+        {#each chipPrefs as pr, i (pr.key)}
+          {@const c = catOf(pr.key)}
+          <li class:off={pr.hidden}>
+            <button class="ce-toggle" onclick={() => toggleChip(i)} role="switch" aria-checked={!pr.hidden} aria-label={`Afficher ${c.label}`}
+              style:--fam={famColor(c)}><span></span></button>
+            <input value={pr.label ?? ''} placeholder={c.label} aria-label={`Nom du raccourci ${c.label}`}
+              onchange={(e) => renameChip(i, e.currentTarget.value)} maxlength="20" />
+            <button class="icon-btn" onclick={() => moveChip(i, -1)} disabled={i === 0} aria-label={`Monter ${c.label}`}>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 14 5-5 5 5" /></svg></button>
+            <button class="icon-btn" onclick={() => moveChip(i, 1)} disabled={i === chipPrefs.length - 1} aria-label={`Descendre ${c.label}`}>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5" /></svg></button>
+          </li>
+        {/each}
+      </ul>
+      <button class="link more" onclick={resetChips}>Revenir aux raccourcis d'origine</button>
+    </section>
+  {:else if directions && !editing}
     <section class="sheet" aria-label="Itinéraire" use:draggable={{ key: `${from?.lat},${to?.lat}` }}>
       <button class="grip" aria-label="Agrandir la fiche"></button>
       {#if !from}
@@ -927,6 +1197,9 @@
         <div class="summary">
           <p class="big">{fmtDuration(r.duration)}</p>
           <p class="sub">{fmtDistance(r.distance)} · arrivée vers {arrival(r.duration)}</p>
+          {#if mode === 'bike'}
+            <p class="traffic-note">Itinéraire adapté aux vélos : pistes cyclables et rues calmes en priorité.</p>
+          {/if}
           {#if mode === 'car'}
             <p class="traffic-note">{r.traffic ? `Estimation avec le ${r.traffic}` : 'Estimation sur route fluide'}, d'après les capteurs de la Ville de Paris. Pas de trafic en temps réel : nous ne suivons pas les téléphones.</p>
           {/if}
@@ -966,7 +1239,7 @@
               </button>
               {#if picked === i}
                 <ol class="legs">
-                  {#each it.legs as leg}
+                  {#each it.legs as leg, li}
                     {#if leg.mode === 'WALK'}
                       <li class="leg walk">
                         <span class="leg-time">{fmtTime(leg.start)}</span>
@@ -987,6 +1260,9 @@
                             {MODE_NAMES[leg.mode] || ''} direction {leg.headsign}
                           </span>
                           <span class="leg-meta">{leg.stops ? `${leg.stops + 1} arrêts · ` : ''}{fmtDuration(leg.duration)}{leg.realTime ? ' · temps réel' : ''}</span>
+                          {#if legExits[`${i}|${li}|${leg.to}`]}
+                            <span class="leg-exit"><span class="exit-sq" aria-hidden="true"></span>Descendre à {leg.to} · {exitLabel(legExits[`${i}|${li}|${leg.to}`])}</span>
+                          {/if}
                         </span>
                       </li>
                     {/if}
@@ -1088,6 +1364,18 @@
           {/if}
         </div>
       {/if}
+      {#if exits?.status === 'ok' && exits.data.length}
+        <div class="exits">
+          <h2>Sorties</h2>
+          <ul>
+            {#each allExits ? exits.data : exits.data.slice(0, 4) as e}
+              <li><span class="exit-sq" aria-hidden="true"></span><span>{exitLabel(e)}</span>
+                {#if e.wheelchair}<span class="exit-tag">accessible</span>{:else if e.escalator}<span class="exit-tag">escalier mécanique</span>{/if}</li>
+            {/each}
+          </ul>
+          {#if exits.data.length > 4 && !allExits}<button class="link more" onclick={() => (allExits = true)}>Toutes les sorties ({exits.data.length})</button>{/if}
+        </div>
+      {/if}
 
       <ul class="rows">
         {#if address}
@@ -1114,7 +1402,7 @@
         {:else if info?.expectsHours && !isStation}
           <li class="row muted">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></svg>
-            <span>Horaires non renseignés</span>
+            <span>Horaires non renseignés<small class="why">Personne ne les a encore ajoutés à la carte collaborative que nous utilisons (OpenStreetMap).</small></span>
           </li>
         {/if}
         {#if info?.phone}
@@ -1127,6 +1415,19 @@
           <li class="row">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M3.5 12h17M12 3.5c2.5 2.6 3.6 5.4 3.6 8.5s-1.1 5.9-3.6 8.5M12 3.5C9.5 6.1 8.4 8.9 8.4 12s1.1 5.9 3.6 8.5" /></svg>
             <a class="row-link" href={href(info.website)} target="_blank" rel="noopener">{host(info.website)}</a>
+          </li>
+        {/if}
+        {#if !isStation}
+          <li class="row sc-row">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.5 12 5l8 6.5M6.5 10v9.5h11V10" /><path d="M10.2 19.5v-4.8h3.6v4.8" /></svg>
+            {#if placeShortcut}
+              <span>Votre {SHORT_NAMES[placeShortcut].toLowerCase()}</span>
+              <button class="link" onclick={() => { setShortcut(placeShortcut, null); say('Raccourci retiré'); }}>Retirer</button>
+            {:else}
+              <span>Définir comme</span>
+              <button class="link" onclick={() => { setShortcut('home', place); say('Maison enregistrée · gardée sur cet appareil'); }}>Maison</button>
+              <button class="link" onclick={() => { setShortcut('work', place); say('Travail enregistré · gardé sur cet appareil'); }}>Travail</button>
+            {/if}
           </li>
         {/if}
         {#each info?.practical || [] as d}
@@ -1152,16 +1453,34 @@
       <button class="close" onclick={clearCategory} aria-label="Fermer la liste">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" /></svg>
       </button>
-      <h1>{category.label}</h1>
+      <h1>{chipList.find((c) => c.key === category.key)?.label || category.label}</h1>
       <p class="kind">{nearby.length ? (nearbyFromMe ? 'Les plus proches de vous' : 'Autour du centre de la carte') : nearbyDone ? 'Aucun dans cette zone. Déplacez la carte pour chercher ailleurs.' : 'Recherche…'}</p>
       <ul class="nearby">
-        {#each nearby as { f, d, st } (f.id)}
+        {#each nearby as { f, d, st, deps: sd } (f.id)}
           <li>
             <button onclick={() => openFeature(f)}>
               <span class="n-dot" style:--fam={famColor(category)} aria-hidden="true"></span>
               <span class="r-text">
                 <span class="r-name">{f.properties.name}</span>
+                {#if category.transit}
+                  {#if sd?.status === 'ok'}
+                    {#each sd.data.lines.slice(0, 4) as l}
+                      <span class="n-dep">
+                        <span class="badge small" class:round={l.mode === 'SUBWAY' || l.mode === 'METRO'} style:background={l.color} style:color={l.textColor}>{l.line}</span>
+                        <span class="n-dir">{l.headsign}</span>
+                        <span class="n-time">{fmtWait(l.times[0], now)}</span>
+                      </span>
+                    {/each}
+                  {:else if sd?.status === 'loading'}
+                    <span class="r-meta">Prochains passages…</span>
+                  {:else if sd?.status === 'none'}
+                    <span class="r-meta">Aucun passage dans l'heure</span>
+                  {:else}
+                    <span class="r-meta">{typeLabel('', f.properties.subclass) || 'Station'} · touchez pour les horaires</span>
+                  {/if}
+                {:else}
                 <span class="r-meta">{typeLabel('', f.properties.subclass) || category.label}{#if st?.open != null}{' · '}<span class:is-open={st.open} class:is-closed={!st.open}>{st.label}</span>{/if}</span>
+                {/if}
               </span>
               <span class="n-dist">{fmtDistance(d)}</span>
             </button>
@@ -1522,6 +1841,59 @@
   .leg-meta { font-size: 13.5px; color: var(--muted); display: flex; align-items: center; flex-wrap: wrap; }
   .credit { font-size: 12.5px; color: var(--muted); margin: 12px 0 0; }
   .credit a { color: inherit; }
+
+  /* ——— Retours des tests : raccourcis, métro, sorties, import, promesse ——— */
+  .shortcuts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 6px 12px 8px; }
+  .results .shortcuts button {
+    grid-template-columns: 36px 1fr; gap: 10px; padding: 8px 10px; border-radius: 14px; background: var(--fill); min-width: 0;
+  }
+  .sc-icon { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: var(--accent-btn); color: #fff; }
+  .sc-icon svg { width: 19px; height: 19px; }
+  .shortcuts .unset .sc-icon { background: var(--card); color: var(--accent); }
+  .shortcuts .unset .r-meta { color: var(--accent); }
+  .list-foot { display: grid; justify-items: start; gap: 2px; padding: 10px 16px 6px 48px; border-top: 1px solid var(--line); margin-top: 6px; }
+  .results .list-foot .link { font-size: 14.5px; }
+  .privacy-line { font-size: 12.5px; color: var(--muted); padding-top: 6px; }
+  .chip.edit { padding: 0 12px; color: var(--muted); }
+  .chip.edit svg { width: 17px; height: 17px; }
+  .badge.small.round { width: 20px; min-width: 20px; height: 20px; }
+  .n-dep { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 6px; font-size: 13.5px; margin-top: 3px; }
+  .n-dir { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .n-time { font-weight: 600; color: var(--open); font-variant-numeric: tabular-nums; }
+  .exit-sq { display: inline-block; width: 12px; height: 12px; border-radius: 3px; background: #2E8B57; flex: none; margin-right: 6px; vertical-align: -1px; }
+  .leg-exit { font-size: 13.5px; color: var(--ink); margin-top: 4px; display: flex; align-items: center; }
+  .exits { margin: 18px 0 4px; }
+  .exits h2 { font-size: 15px; font-weight: 700; margin: 0 0 6px; }
+  .exits ul { list-style: none; margin: 0; padding: 0; }
+  .exits li { display: flex; align-items: center; min-height: 40px; border-bottom: 1px solid var(--line); font-size: 14.5px; gap: 2px; }
+  .exit-tag { margin-left: auto; font-size: 12px; color: var(--muted); padding-left: 8px; white-space: nowrap; }
+  .why { display: block; font-size: 13px; color: var(--muted); margin-top: 2px; line-height: 1.35; }
+  .row.muted > span { padding: 10px 0; }
+  .sc-row { grid-template-columns: 24px auto auto auto 1fr; gap: 12px; }
+  .sc-row > svg { color: var(--muted); }
+  .sc-row > span { color: var(--muted); }
+  .howto { margin: 14px 0 16px; padding-left: 20px; display: grid; gap: 10px; font-size: 15px; line-height: 1.45; }
+  .howto a { color: var(--accent); }
+  .import-btn { display: flex; justify-content: center; align-items: center; min-height: 48px; border-radius: 14px; cursor: pointer; font-weight: 600; }
+  .chip-edit { list-style: none; margin: 12px 0 8px; padding: 0; }
+  .chip-edit li { display: grid; grid-template-columns: 44px 1fr 40px 40px; align-items: center; gap: 4px; border-bottom: 1px solid var(--line); min-height: 52px; }
+  .chip-edit input { border: 0; background: none; font: inherit; font-size: 16px; color: var(--ink); padding: 10px 0; min-width: 0; }
+  .chip-edit input::placeholder { color: var(--ink); }
+  .chip-edit li.off input, .chip-edit li.off input::placeholder { color: var(--faint); }
+  .chip-edit .icon-btn { width: 40px; height: 40px; }
+  .chip-edit .icon-btn:disabled { opacity: 0.25; }
+  .ce-toggle { width: 38px; height: 24px; border-radius: 12px; border: 0; background: var(--fam); position: relative; cursor: pointer; padding: 0; }
+  .ce-toggle span { position: absolute; top: 3px; left: 17px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: left 0.15s; }
+  li.off .ce-toggle { background: var(--line); }
+  li.off .ce-toggle span { left: 3px; }
+  .promise {
+    position: absolute; z-index: 4; left: 12px; right: 12px; bottom: calc(112px + env(safe-area-inset-bottom)); max-width: 420px;
+    display: grid; grid-template-columns: 26px 1fr; gap: 6px 12px; align-items: start;
+    padding: 14px 16px; background: var(--card); border-radius: 18px; box-shadow: var(--shadow-float); font-size: 14.5px; line-height: 1.4;
+  }
+  .promise svg { width: 24px; height: 24px; color: var(--accent); margin-top: 1px; }
+  .promise p { margin: 0; }
+  .promise button { grid-column: 2; justify-self: end; border: 0; background: var(--accent-btn); color: #fff; font-weight: 600; border-radius: 16px; padding: 7px 16px; cursor: pointer; }
 
   /* ——— Grand écran : panneaux à gauche ——— */
   @media (min-width: 768px) {

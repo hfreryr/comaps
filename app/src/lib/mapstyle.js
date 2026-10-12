@@ -45,7 +45,9 @@ export const FAMILIES = {
   sight:   { color: '#12919E', icon: 'star',     classes: ['attraction', 'monument', 'castle', 'viewpoint', 'memorial', 'place_of_worship', 'church', 'cathedral'] },
   nature:  { color: '#3E8E52', icon: 'tree',     classes: ['park', 'garden', 'playground', 'zoo', 'nature_reserve'] },
   health:  { color: '#D84A45', icon: 'cross',    classes: ['pharmacy', 'hospital', 'doctors', 'dentist', 'clinic', 'veterinary'] },
-  stay:    { color: '#9A55A0', icon: 'bed',      classes: ['hotel', 'hostel', 'guest_house', 'lodging', 'motel'] }
+  stay:    { color: '#9A55A0', icon: 'bed',      classes: ['hotel', 'hostel', 'guest_house', 'lodging', 'motel'] },
+  money:   { color: '#4F7A6B', icon: 'note',     classes: ['atm', 'bank', 'bureau_de_change'] },
+  fuel:    { color: '#4F6FA0', icon: 'pump',     classes: ['fuel'] }
 };
 export const FAV_COLOR = '#D63A7A';
 const OTHER = { color: '#7D838A', icon: 'dot' };
@@ -68,7 +70,7 @@ const POI_ICON = matchBy('subclass', (f) => `poi-${f.icon}`, 'poi-dot');
 const POI_TEXT = matchBy('subclass', (f) => darken(f.color), darken(OTHER.color));
 // Priorité d'affichage quand les lieux se chevauchent : manger et boire d'abord, puis culture,
 // santé, hébergement, nature, commerces (comme les cartes de référence en ville).
-const PRIORITY = { food: 0, cafe: 0, bar: 0.5, bakery: 0.5, culture: 1, sight: 1, health: 2, stay: 2.5, nature: 3, shop: 4 };
+const PRIORITY = { food: 0, cafe: 0, bar: 0.5, bakery: 0.5, culture: 1, sight: 1, health: 2, stay: 2.5, nature: 3, shop: 4, money: 4.5, fuel: 4.5 };
 const POI_PRI = (() => {
   const m = ['match', ['get', 'subclass']];
   for (const [k, f] of Object.entries(FAMILIES)) m.push(f.classes, PRIORITY[k] ?? 5);
@@ -244,12 +246,20 @@ function lightStyle(base) {
                   'text-anchor': 'left', 'text-offset': [1.05, 0], 'text-max-width': 8, 'text-optional': true, 'symbol-sort-key': ['get', 'rank'] },
         paint: { 'text-color': '#5F656C', 'text-halo-color': C.halo, 'text-halo-width': 1.6 } },
       // Stations de métro et RER : pastille « M », nom à partir du zoom 14,5.
-      { id: 'metro', type: 'symbol', source: 'omt', 'source-layer': 'poi', minzoom: 13.8,
+      // Toujours affichées (icône prioritaire) : c'est ce qu'on cherche en premier en ville.
+      { id: 'metro', type: 'symbol', source: 'omt', 'source-layer': 'poi', minzoom: 13,
         filter: ['all', ['==', ['get', 'class'], 'railway'], ['match', ['get', 'subclass'], ['subway', 'station', 'halt'], true, false]],
-        layout: { 'icon-image': 'metro', 'icon-size': zoom([13.8, 0.7, 16, 1]),
+        layout: { 'icon-image': 'metro', 'icon-size': zoom([13, 0.62, 16, 1]), 'icon-allow-overlap': true, 'icon-padding': 0,
                   'text-field': ['step', ['zoom'], '', 14.5, NAME], 'text-font': FONT.semibold,
                   'text-size': 12, 'text-anchor': 'left', 'text-offset': [1.0, 0], 'text-optional': true },
         paint: { 'text-color': '#2B4793', 'text-halo-color': C.halo, 'text-halo-width': 1.6 } },
+
+      // Sorties de métro : petit carré vert, nom de la sortie de très près.
+      { id: 'exit', type: 'symbol', source: 'omt', 'source-layer': 'poi', minzoom: 17,
+        filter: ['==', ['get', 'subclass'], 'subway_entrance'],
+        layout: { 'icon-image': 'exit', 'icon-size': 1, 'text-field': ['step', ['zoom'], '', 18, NAME], 'text-font': FONT.regular,
+                  'text-size': 10.5, 'text-anchor': 'left', 'text-offset': [0.9, 0], 'text-max-width': 9, 'text-optional': true },
+        paint: { 'text-color': '#2E6B4A', 'text-halo-color': C.halo, 'text-halo-width': 1.4 } },
 
       { id: 'place-small', type: 'symbol', source: 'omt', 'source-layer': 'place', minzoom: 12, maxzoom: 17,
         filter: ['match', ['get', 'class'], ['suburb', 'quarter', 'neighbourhood'], true, false],
@@ -310,6 +320,8 @@ const GLYPHS = {
   bed: 'M3 6h2v6.5h6V9h6.5a3.5 3.5 0 0 1 3.5 3.5V19h-2v-2.5H5V19H3zM8 8.4a1.9 1.9 0 1 1 0 3.8 1.9 1.9 0 0 1 0-3.8z',
   train: 'M7.5 3h9A2.5 2.5 0 0 1 19 5.5v9a2.5 2.5 0 0 1-2.5 2.5h-9A2.5 2.5 0 0 1 5 14.5v-9A2.5 2.5 0 0 1 7.5 3zM7 6v4h10V6zm1.8 6.3a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 0 0 0-2.4zm6.4 0a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 0 0 0-2.4zM8 18h2l-1.5 3H6.5zm6 0h2l1.5 3h-2z',
   heart: 'M12 20.3l-1.3-1.2C6 14.9 3 12.2 3 8.9 3 6.2 5.1 4 7.8 4c1.5 0 3 .7 4.2 1.9C13.2 4.7 14.7 4 16.2 4 18.9 4 21 6.2 21 8.9c0 3.3-3 6-7.7 10.2z',
+  note: 'M3 7h18v10H3zM12 9.3a2.7 2.7 0 1 0 0 5.4 2.7 2.7 0 0 0 0-5.4zM5 9v1.6h1.6V9zm12.4 4.4V15H19v-1.6z',
+  pump: 'M5 4h8.5v16H5zM7 6v4h4.5V6zM14.5 8.3h1.3l2.7 2.7v6.2a2 2 0 0 1-4 0v-3h1.5v3a.5.5 0 0 0 1 0v-5.6l-1.8-1.8h-.7z',
   dot: 'M12 8.2a3.8 3.8 0 1 1 0 7.6 3.8 3.8 0 0 1 0-7.6z'
 };
 
@@ -389,6 +401,15 @@ export function provideImage(map, id) {
   if (id === 'metro') {
     const { data, pixelRatio } = metroImage();
     return map.addImage(id, data, { pixelRatio });
+  }
+  if (id === 'exit') {            // sortie de métro : petit carré vert à flèche blanche
+    const c = document.createElement('canvas'); c.width = c.height = 28;
+    const g = c.getContext('2d');
+    g.fillStyle = '#FFFFFF'; g.beginPath(); g.roundRect(1, 1, 26, 26, 6); g.fill();
+    g.fillStyle = '#2E8B57'; g.beginPath(); g.roundRect(3, 3, 22, 22, 5); g.fill();
+    g.strokeStyle = '#FFFFFF'; g.lineWidth = 2.6; g.lineCap = 'round'; g.lineJoin = 'round';
+    g.beginPath(); g.moveTo(9, 19); g.lineTo(19, 9); g.moveTo(12, 9); g.lineTo(19, 9); g.lineTo(19, 16); g.stroke();
+    return map.addImage(id, g.getImageData(0, 0, 28, 28), { pixelRatio: 2 });
   }
   if (id === 'fav') {             // lieux enregistrés : pastille rose à cœur blanc
     const { data, pixelRatio } = poiImage(FAV_COLOR, 'heart', 20);

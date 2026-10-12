@@ -4,7 +4,9 @@
                                      musées, parcs, gares) et adresses (restaurants, cafés, boutiques…),
                                      chacun avec un zoom d'apparition (« z ») qui garde la carte lisible ;
   static/data/transit-lines.geojson  lignes de métro, RER et tram, à leurs couleurs officielles ;
-  static/data/hours.json             horaires des restaurants, cafés, boulangeries, pharmacies… (listes).
+  static/data/hours.json             horaires des restaurants, cafés, boulangeries, pharmacies… (listes) ;
+  static/data/exits.json             sorties de métro et de RER (numéro, nom, accès), pour la fiche station
+                                     et la « sortie conseillée » des trajets.
 
 La notoriété est estimée par le nombre de traductions du nom (name:xx) dans OSM
 (le Louvre en a plus de cent, un square de quartier aucune), la présence d'une fiche Wikidata
@@ -337,6 +339,33 @@ class Hours(osmium.SimpleHandler):
         self._add(w.id, 2, w.tags)
 
 
+class Exits(osmium.SimpleHandler):
+    """Sorties de métro et de RER : [lat, lon, numéro, nom, 1 si accessible en fauteuil, 1 si escalier mécanique]."""
+    def __init__(self):
+        super().__init__()
+        self.items = []
+
+    def node(self, n):
+        t = n.tags
+        if t.get("railway") not in ("subway_entrance", "train_station_entrance"):
+            return
+        name = t.get("name") or t.get("addr:street") or ""
+        ref = t.get("ref") or ""
+        if not (name or ref):
+            return
+        esc = 1 if t.get("conveying") in ("yes", "forward", "backward", "reversible") or t.get("entrance") == "escalator" else 0
+        self.items.append([round(n.location.lat, 5), round(n.location.lon, 5), ref, name,
+                           1 if t.get("wheelchair") == "yes" else 0, esc])
+
+
+def build_exits(pbf):
+    ex = Exits()
+    ex.apply_file(str(pbf))
+    ex.items.sort()
+    (OUT / "exits.json").write_text(json.dumps(ex.items, ensure_ascii=False, separators=(",", ":")))
+    print(f"{len(ex.items)} sorties de métro et de RER ({sum(1 for i in ex.items if i[2])} numérotées)")
+
+
 def main(pbf):
     OUT.mkdir(parents=True, exist_ok=True)
 
@@ -389,6 +418,8 @@ def main(pbf):
     (OUT / "transit-lines.geojson").write_text(json.dumps({"type": "FeatureCollection", "features": lines},
                                                           separators=(",", ":")))
     print(f"{len(lines)} lignes : {[(l['properties']['mode'], l['properties']['ref'], l['properties']['colour']) for l in lines]}")
+
+    build_exits(pbf)
 
 
 if __name__ == "__main__":

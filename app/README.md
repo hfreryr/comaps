@@ -40,3 +40,12 @@ python app/scripts/build_overlays.py data/paris.osm.pbf
 | Police de l'interface | Police système du téléphone | Aucun appel à Google Fonts |
 
 Aucune donnée personnelle collectée. La position de l'utilisateur ne quitte pas son appareil.
+
+## Retours des premiers tests (12/10/2026)
+- **Métro** : raccourci « Métro » (stations les plus proches, prochains passages directement dans la liste) ; la recherche comprend « métro », « station », « métro le plus proche » ; les stations restent toujours visibles sur la carte dès le zoom 13.
+- **Distributeurs, Banques, Stations-service** : nouveaux raccourcis et pictogrammes.
+- **Sorties de métro** : fiche station (« Sorties ») et « sortie conseillée » dans les trajets en transport. Index `static/data/exits.json` construit depuis OSM par `scripts/build_overlays.py`. La place dans la rame n'existe dans aucune source ouverte connue : non affichée.
+- **Maison / Travail** : raccourcis en tête de la recherche (itinéraire en un geste), définissables depuis la fiche d'un lieu.
+- **Import Google Maps** : archive Google Takeout « Maps (vos adresses) » lue sur le téléphone (`src/lib/importgoogle.js`), lieux enregistrés → favoris, adresses « Domicile / Travail » → raccourcis.
+- **Raccourcis personnalisables** : affichage, ordre et nom, gardés sur l'appareil.
+- **Promesse visible** à la première ouverture et en bas de la recherche ; explication sous « Horaires non renseignés » ; libellé vélo explicite.
