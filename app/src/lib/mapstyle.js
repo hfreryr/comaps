@@ -8,15 +8,15 @@ export const C = {
   landAlt: '#F1EEE8',      // zones commerciales et équipements
   pedestrian: '#FBFAF7',
   building: '#E8E5DF',
-  buildingEdge: '#DCD8D1',
+  buildingEdge: '#E3DFD9',
   building3d: '#EAE6E0',
   park: '#D4EBCB',
   wood: '#C7E3BC',
   water: '#ABD4F2',
   waterLabel: '#4A84B5',
   road: '#FFFFFF',
-  roadCase: '#E4E0D9',
-  majorCase: '#DAD4CB',
+  roadCase: '#EEEBE6',
+  majorCase: '#E9E5DF',
   highway: '#FAD98A',
   highwayCase: '#EDC060',
   path: '#D3CEC6',
@@ -76,7 +76,7 @@ const fade = (from, to) => ['interpolate', ['linear'], ['zoom'], from, 0, to, 1]
 
 function roadPair(id, classes, { color, casing, widths, minzoom = 0, caseFade }) {
   const filter = ['all', ['match', ['get', 'class'], classes, true, false], ['!=', ['get', 'brunnel'], 'tunnel']];
-  const caseWidths = widths.map((v, i) => (i % 2 ? v + 1.6 : v));
+  const caseWidths = widths.map((v, i) => (i % 2 ? v + 0.9 : v));
   return [
     { id: `${id}-case`, type: 'line', source: 'omt', 'source-layer': 'transportation', filter, minzoom,
       layout: { 'line-cap': 'round', 'line-join': 'round' },
@@ -117,7 +117,7 @@ export function mapStyle(base = '') {
       { id: 'building', type: 'fill', source: 'omt', 'source-layer': 'building', minzoom: 14,
         paint: { 'fill-color': C.building, 'fill-outline-color': C.buildingEdge, 'fill-opacity': fade(14, 15) } },
       { id: 'building-edge', type: 'line', source: 'omt', 'source-layer': 'building', minzoom: 16,
-        paint: { 'line-color': C.buildingEdge, 'line-width': 0.6, 'line-opacity': fade(16, 17) } },
+        paint: { 'line-color': C.buildingEdge, 'line-width': 0.5, 'line-opacity': ['interpolate', ['linear'], ['zoom'], 16, 0, 17, 0.6] } },
 
       { id: 'pedestrian-street', type: 'line', source: 'omt', 'source-layer': 'transportation', minzoom: 14.5,
         filter: ['all', ['==', ['geometry-type'], 'LineString'], ['==', ['get', 'subclass'], 'pedestrian']],
