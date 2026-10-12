@@ -356,8 +356,12 @@ export function lineBadge(mode, ref, colour) {
   ctx.beginPath(); ctx.roundRect(x, y, W, H, r); ctx.fillStyle = colour; ctx.fill();
   const n = parseInt(colour.slice(1), 16), lum = (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
   ctx.fillStyle = lum > 0.62 ? '#1C1D1F' : '#FFFFFF';
-  ctx.font = font; ctx.textAlign = 'center';   // (redimensionner le canevas efface la police) ctx.textBaseline = 'middle';
-  ctx.fillText(label, x + W / 2, y + H / 2 + s * 0.6);
+  ctx.font = font;   // redimensionner le canevas efface la police : on la remet
+  ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+  // centrage optique : on centre la hauteur réelle des chiffres, pas la boîte de la police
+  const m = ctx.measureText(label);
+  const asc = m.actualBoundingBoxAscent || fontPx * 0.72, desc = m.actualBoundingBoxDescent || 0;
+  ctx.fillText(label, x + W / 2, y + H / 2 + (asc - desc) / 2);
   return { data: ctx.getImageData(0, 0, c.width, c.height), pixelRatio: s };
 }
 
