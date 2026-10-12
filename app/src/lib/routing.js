@@ -68,11 +68,15 @@ export function decodePolyline(str, precision = 6) {
   return coords;
 }
 
-/** À pied ou à vélo. @returns {{duration:number, distance:number, coords:number[][], steps:{text:string, distance:number}[]}} */
-export async function streetRoute(from, to, mode, signal) {
+/**
+ * À pied, à vélo ou en voiture, avec un arrêt intermédiaire facultatif (`via`).
+ * @returns {{duration:number, distance:number, coords:number[][], steps:{text:string, distance:number, stop?:boolean}[]}}
+ */
+export async function streetRoute(from, to, mode, signal, via = null) {
   const costing = mode === 'bike' ? 'bicycle' : mode === 'car' ? 'auto' : 'pedestrian';
+  const pts = via ? [from, via, to] : [from, to];
   const body = {
-    locations: [{ lat: from.lat, lon: from.lon }, { lat: to.lat, lon: to.lon }],
+    locations: pts.map((p) => ({ lat: p.lat, lon: p.lon, type: 'break' })),
     costing,
     costing_options: mode === 'bike' ? { bicycle: { bicycle_type: 'City', use_roads: 0.25 } } : {},
     language: 'fr-FR',
@@ -82,13 +86,14 @@ export async function streetRoute(from, to, mode, signal) {
   const res = await fetch(url, { signal });
   if (!res.ok) throw new Error(res.status === 400 ? 'no-route' : `valhalla-${res.status}`);
   const { trip } = await res.json();
-  const leg = trip.legs[0];
-  return {
-    duration: trip.summary.time,
-    distance: trip.summary.length * 1000,
-    coords: smooth(decodePolyline(leg.shape, 6), mode === 'walk' ? 7 : 4),
-    steps: simplifySteps(leg.maneuvers)
-  };
+  const coords = [];
+  const steps = [];
+  trip.legs.forEach((leg, i) => {
+    coords.push(...smooth(decodePolyline(leg.shape, 6), mode === 'walk' ? 7 : 4));
+    steps.push(...simplifySteps(leg.maneuvers));
+    if (i < trip.legs.length - 1) steps.push({ text: `Arrêt : ${via.label}`, distance: 0, stop: true });
+  });
+  return { duration: trip.summary.time, distance: trip.summary.length * 1000, coords, steps };
 }
 
 // Des consignes à l'échelle de la rue, pas du trottoir : les petits tronçons sans nom
@@ -191,6 +196,40 @@ export async function transitRoutes(from, to, signal, when = new Date()) {
     else if (g.next.length < 3 && +it.board.start !== +g.board.start) g.next.push(it.board.start);
   }
   return [...groups.values()].sort((a, b) => a.end - b.end).slice(0, 4);
+}
+
+/**
+ * Transports en commun avec un arrêt intermédiaire : départ → arrêt, puis arrêt → arrivée en partant
+ * à l'heure où l'on y arrive (1 min plus tard). Transitous ne sait pas passer par un point : on enchaîne.
+ * Un tronçon sans transport utile se fait à pied.
+ */
+export async function transitWithStop(from, via, to, signal, when = new Date()) {
+  const segment = async (a, b, t) => {
+    const list = await transitRoutes(a, b, signal, t).catch((e) => { if (e.name === 'AbortError') throw e; return []; });
+    if (list.length) return list;
+    const w = await streetRoute(a, b, 'walk', signal);
+    const start = new Date(t), end = new Date(+t + w.duration * 1000);
+    return [{ duration: w.duration, start, end, board: null, next: [],
+      legs: [{ mode: 'WALK', from: a.label || 'Départ', to: b.label, start, end, duration: w.duration, distance: w.distance, coords: w.coords }] }];
+  };
+  const firsts = (await segment(from, via, when)).slice(0, 3);
+  const out = [];
+  const seen = new Set();
+  for (const f of firsts) {
+    const s = (await segment(via, to, new Date(+f.end + 60000)))[0];
+    if (!s) continue;
+    const it = {
+      start: f.start, end: s.end, duration: (s.end - f.start) / 1000, next: [],
+      legs: [...f.legs, { mode: 'STOP', from: via.label, start: f.end, end: s.start, duration: (s.start - f.end) / 1000, coords: [] }, ...s.legs]
+    };
+    it.board = it.legs.find((l) => l.mode !== 'WALK' && l.mode !== 'STOP') || null;
+    if (!it.board) continue;
+    const key = it.legs.map((l) => `${l.mode}:${l.line || ''}`).join('>') + +it.end;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(it);
+  }
+  return out.sort((a, b) => a.end - b.end);
 }
 
 // ——— Prochains passages à une station ———

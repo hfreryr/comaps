@@ -49,3 +49,6 @@ Aucune donnée personnelle collectée. La position de l'utilisateur ne quitte pa
 - **Import Google Maps** : archive Google Takeout « Maps (vos adresses) » lue sur le téléphone (`src/lib/importgoogle.js`), lieux enregistrés → favoris, adresses « Domicile / Travail » → raccourcis.
 - **Raccourcis personnalisables** : affichage, ordre et nom, gardés sur l'appareil.
 - **Promesse visible** à la première ouverture et en bas de la recherche ; explication sous « Horaires non renseignés » ; libellé vélo explicite.
+- **Fiches dans l'ordre de l'utile** : station → prochains passages et sorties avant la photo ; commerce → horaires, téléphone, site avant le texte Wikipédia ; monument → photo et histoire d'abord.
+- **59 raccourcis de catégories** (11 affichés d'origine, les autres activables dans « Personnaliser les raccourcis ») : fleuristes, cimetières, piscines, toilettes, cavistes, coiffeurs, vétérinaires, bornes de recharge… Les lieux de la carte sont complétés par la recherche Photon par catégorie (`include=osm.shop.florist`) pour les lieux hors de la vue ; tous sont posés sur la carte.
+- **Arrêt intermédiaire** dans les itinéraires (« Ajouter un arrêt ») : à pied, vélo, voiture via Valhalla (plusieurs points) ; en transport, deux recherches Transitous enchaînées (`transitWithStop`).

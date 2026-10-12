@@ -79,7 +79,7 @@ const POI_PRI = (() => {
 })();
 const POI_SORT = ['+', POI_PRI, ['/', ['min', ['get', 'rank'], 999], 1000]];
 
-function darken(hex, k = 0.78) {
+export function darken(hex, k = 0.78) {
   const n = parseInt(hex.slice(1), 16);
   const c = [n >> 16, (n >> 8) & 255, n & 255].map((v) => Math.round(v * k));
   return `#${c.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
@@ -322,6 +322,22 @@ const GLYPHS = {
   heart: 'M12 20.3l-1.3-1.2C6 14.9 3 12.2 3 8.9 3 6.2 5.1 4 7.8 4c1.5 0 3 .7 4.2 1.9C13.2 4.7 14.7 4 16.2 4 18.9 4 21 6.2 21 8.9c0 3.3-3 6-7.7 10.2z',
   note: 'M3 7h18v10H3zM12 9.3a2.7 2.7 0 1 0 0 5.4 2.7 2.7 0 0 0 0-5.4zM5 9v1.6h1.6V9zm12.4 4.4V15H19v-1.6z',
   pump: 'M5 4h8.5v16H5zM7 6v4h4.5V6zM14.5 8.3h1.3l2.7 2.7v6.2a2 2 0 0 1-4 0v-3h1.5v3a.5.5 0 0 0 1 0v-5.6l-1.8-1.8h-.7z',
+  flower: 'M12 3.2a2.7 2.7 0 0 1 2.5 3.7 2.7 2.7 0 1 1 1 5 2.7 2.7 0 1 1-7 0 2.7 2.7 0 1 1 1-5A2.7 2.7 0 0 1 12 3.2zM11.2 14h1.6v7h-1.6zM12.8 18.2c.6-1.6 2-2.6 3.9-2.6-.3 1.8-1.8 3-3.9 3z',
+  book: 'M3.5 5H9a3 3 0 0 1 2.2 1v13A3 3 0 0 0 9 18H3.5zM20.5 5H15a3 3 0 0 0-2.2 1v13A3 3 0 0 1 15 18h5.5z',
+  scissors: 'M7 3.5a3 3 0 1 1 0 6 3 3 0 0 1 0-6zm0 1.7a1.3 1.3 0 1 0 0 2.6 1.3 1.3 0 0 0 0-2.6zM7 14.5a3 3 0 1 1 0 6 3 3 0 0 1 0-6zm0 1.7a1.3 1.3 0 1 0 0 2.6 1.3 1.3 0 0 0 0-2.6zM9.4 8.6 20.5 17.4l-1.3 1.3-10.6-8.3zM12.6 12.9l6.6-7.6 1.3 1.3-6.4 7.4z',
+  envelope: 'M3 6h18v12H3zM5 8v.4l7 4.8 7-4.8V8l-7 4.6z',
+  bike: 'M6 11a4 4 0 1 1 0 8 4 4 0 0 1 0-8zm0 1.6a2.4 2.4 0 1 0 0 4.8 2.4 2.4 0 0 0 0-4.8zM18 11a4 4 0 1 1 0 8 4 4 0 0 1 0-8zm0 1.6a2.4 2.4 0 1 0 0 4.8 2.4 2.4 0 0 0 0-4.8zM9.5 6h4v1.6h-1.4l1.4 3.4-1.5.6-.5-1.3-2.7 4.5-1.4-.8L10.6 8.6 9.5 7.6z',
+  drop: 'M12 3s6 6.6 6 11a6 6 0 0 1-12 0c0-4.4 6-11 6-11z',
+  paw: 'M8.2 5.5a1.8 2.2 0 1 1 0 4.4 1.8 2.2 0 0 1 0-4.4zm7.6 0a1.8 2.2 0 1 1 0 4.4 1.8 2.2 0 0 1 0-4.4zM4.9 10a1.7 2 0 1 1 0 4 1.7 2 0 0 1 0-4zm14.2 0a1.7 2 0 1 1 0 4 1.7 2 0 0 1 0-4zM12 11.8c2.6 0 5 3.4 5 5.4 0 1.6-1.4 2.2-2.6 2.2-1 0-1.6-.5-2.4-.5s-1.4.5-2.4.5C8.4 19.4 7 18.8 7 17.2c0-2 2.4-5.4 5-5.4z',
+  bolt: 'M13.5 2.5 5 13.5h5.5l-1 8L19 10h-5.6z',
+  parking: 'M7 3.5h6a5 5 0 0 1 0 10h-3v7H7zm3 3v4h3a2 2 0 0 0 0-4z',
+  ticket: 'M3 7h18v3a2 2 0 0 0 0 4v3H3v-3a2 2 0 0 0 0-4zM14 8.6v1.6h1.6V8.6zm0 3.2v1.6h1.6v-1.6zm0 3.2v1.6h1.6V15z',
+  shield: 'M12 3 19 5.8V11c0 4.6-3 8.3-7 10-4-1.7-7-5.4-7-10V5.8z',
+  wrench: 'M15.5 3a5 5 0 0 0-4.8 6.4L3.5 16.6a2 2 0 0 0 2.9 2.9l7.2-7.2A5 5 0 0 0 20.8 8l-3 3-2.8-.8-.8-2.8 3-3A5 5 0 0 0 15.5 3z',
+  phone: 'M8 2.5h8A1.5 1.5 0 0 1 17.5 4v16a1.5 1.5 0 0 1-1.5 1.5H8A1.5 1.5 0 0 1 6.5 20V4A1.5 1.5 0 0 1 8 2.5zM8.2 5v12.5h7.6V5zm3.8 13.6a.9.9 0 1 0 0 1.8.9.9 0 0 0 0-1.8z',
+  music: 'M9 5.5 19 3v12.5a2.8 2.4 0 1 1-1.8-2.2V7.4L10.8 9v8.5A2.8 2.4 0 1 1 9 15.3z',
+  dumbbell: 'M3 10h2V8h2.5v8H5v-2H3zM21 10h-2V8h-2.5v8H19v-2h2zM8.7 11h6.6v2H8.7z',
+  laptop: 'M5 5h14v10H5zM6.6 6.6v6.8h10.8V6.6zM2.5 16.5h19L20 19H4z',
   dot: 'M12 8.2a3.8 3.8 0 1 1 0 7.6 3.8 3.8 0 0 1 0-7.6z'
 };
 
@@ -413,6 +429,11 @@ export function provideImage(map, id) {
   }
   if (id === 'fav') {             // lieux enregistrés : pastille rose à cœur blanc
     const { data, pixelRatio } = poiImage(FAV_COLOR, 'heart', 20);
+    return map.addImage(id, data, { pixelRatio });
+  }
+  if (id.startsWith('cat|')) {        // raccourci de catégorie : pictogramme et couleur propres
+    const [, glyph, colour] = id.split('|');
+    const { data, pixelRatio } = poiImage(colour, glyph);
     return map.addImage(id, data, { pixelRatio });
   }
   if (id.startsWith('tl|')) {

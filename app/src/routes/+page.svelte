@@ -3,44 +3,142 @@
   import * as maplibregl from 'maplibre-gl';
   import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
   import 'maplibre-gl/dist/maplibre-gl.css';
-  import { search, details, reverse, reverseAddress, typeLabel, PARIS } from '#lib/places.js';
+  import { search, searchCategory, details, reverse, reverseAddress, typeLabel, PARIS } from '#lib/places.js';
   import { hoursStatus, hoursTable } from '#lib/hours.js';
   import { draggable } from '#lib/sheet.js';
   import { wikiInfo } from '#lib/placeinfo.js';
-  import { mapStyle, provideImage, osmRef, FAMILIES, DARK_LAND } from '#lib/mapstyle.js';
-  import { streetRoute, transitRoutes, departures, trafficEstimate, MODE_NAMES, fmtDuration, fmtTime, fmtWait, fmtDistance } from '#lib/routing.js';
+  import { mapStyle, provideImage, osmRef, FAMILIES, DARK_LAND, darken } from '#lib/mapstyle.js';
+  import { streetRoute, transitRoutes, transitWithStop, departures, trafficEstimate, MODE_NAMES, fmtDuration, fmtTime, fmtWait, fmtDistance } from '#lib/routing.js';
   import { stationExits, bestExit, exitLabel, sortExits } from '#lib/exits.js';
   import { readGoogleExport } from '#lib/importgoogle.js';
   import { placeForExit, placeForTransfer, placeLabel } from '#lib/rame.js';
 
-  // Raccourcis de catégories. « key » ne change jamais ; l'intitulé et l'ordre sont personnalisables.
+  // Raccourcis de catégories. « key » ne change jamais ; intitulé, ordre et affichage sont personnalisables.
+  // on : affiché d'origine (les autres s'ajoutent dans « Personnaliser les raccourcis ») ;
+  // classes : sous-classes des lieux de la carte ; inc : catégories Photon pour compléter avec les lieux hors de la vue.
   const ALL_CATEGORIES = [
-    { key: 'resto', label: 'Restaurants', classes: ['restaurant', 'fast_food'], family: 'food' },
-    { key: 'cafe', label: 'Cafés', classes: ['cafe'], family: 'cafe' },
-    { key: 'metro', label: 'Métro', transit: true, color: '#2B4793' },
-    { key: 'pharmacie', label: 'Pharmacies', classes: ['pharmacy'], family: 'health' },
-    { key: 'courses', label: 'Courses', classes: ['supermarket', 'convenience', 'grocery'], family: 'shop' },
-    { key: 'distributeur', label: 'Distributeurs', classes: ['atm'], family: 'money' },
-    { key: 'boulangerie', label: 'Boulangeries', classes: ['bakery', 'pastry'], family: 'bakery' },
-    { key: 'bar', label: 'Bars', classes: ['bar', 'pub', 'beer'], family: 'bar' },
-    { key: 'musee', label: 'Musées', classes: ['museum', 'art_gallery', 'gallery'], family: 'culture' },
-    { key: 'banque', label: 'Banques', classes: ['bank'], family: 'money' },
-    { key: 'essence', label: 'Stations-service', classes: ['fuel'], family: 'fuel' }
+    { key: "resto", label: "Restaurants", classes: ["restaurant", "fast_food"], inc: ["osm.amenity.restaurant"], family: "food", on: true },
+    { key: "cafe", label: "Cafés", classes: ["cafe"], inc: ["osm.amenity.cafe"], family: "cafe", on: true },
+    { key: 'metro', label: 'Métro', transit: true, color: '#2B4793', icon: 'train', on: true },
+    { key: "pharmacie", label: "Pharmacies", classes: ["pharmacy"], inc: ["osm.amenity.pharmacy"], family: "health", on: true },
+    { key: "courses", label: "Courses", classes: ["supermarket", "convenience", "grocery"], inc: ["osm.shop.supermarket", "osm.shop.convenience"], family: "shop", on: true },
+    { key: "distributeur", label: "Distributeurs", classes: ["atm"], inc: ["osm.amenity.atm"], family: "money", on: true, unnamed: "Distributeur de billets" },
+    { key: "boulangerie", label: "Boulangeries", classes: ["bakery", "pastry"], inc: ["osm.shop.bakery", "osm.shop.pastry"], family: "bakery", on: true },
+    { key: "bar", label: "Bars", classes: ["bar", "pub", "beer"], inc: ["osm.amenity.bar", "osm.amenity.pub"], family: "bar", on: true },
+    { key: "musee", label: "Musées", classes: ["museum", "art_gallery", "gallery"], inc: ["osm.tourism.museum", "osm.tourism.gallery"], family: "culture", on: true },
+    { key: "banque", label: "Banques", classes: ["bank"], inc: ["osm.amenity.bank"], family: "money", on: true },
+    { key: "essence", label: "Stations-service", classes: ["fuel"], inc: ["osm.amenity.fuel"], family: "fuel", on: true },
+    { key: "fleuriste", label: "Fleuristes", classes: ["florist"], inc: ["osm.shop.florist"], color: "#C9497E", icon: "flower", on: false },
+    { key: "cimetiere", label: "Cimetières", classes: ["cemetery", "grave_yard"], inc: ["osm.landuse.cemetery", "osm.amenity.grave_yard"], color: "#6E8B74", icon: "tree", on: false },
+    { key: "parc", label: "Parcs et jardins", classes: ["park", "garden"], inc: ["osm.leisure.park", "osm.leisure.garden"], family: "nature", on: false },
+    { key: "jeux", label: "Aires de jeux", classes: ["playground"], inc: ["osm.leisure.playground"], family: "nature", on: false },
+    { key: "glacier", label: "Glaciers", classes: ["ice_cream"], inc: ["osm.amenity.ice_cream"], family: "food", icon: "cup", on: false },
+    { key: "rapide", label: "Restauration rapide", classes: ["fast_food"], inc: ["osm.amenity.fast_food"], family: "food", on: false },
+    { key: "caviste", label: "Cavistes", classes: ["wine", "alcohol", "beverages"], inc: ["osm.shop.wine", "osm.shop.alcohol"], family: "bar", on: false },
+    { key: "chocolat", label: "Chocolatiers", classes: ["chocolate", "confectionery"], inc: ["osm.shop.chocolate", "osm.shop.confectionery"], family: "bakery", on: false },
+    { key: "fromagerie", label: "Fromageries", classes: ["cheese"], inc: ["osm.shop.cheese"], family: "shop", on: false },
+    { key: "boucherie", label: "Boucheries", classes: ["butcher"], inc: ["osm.shop.butcher"], family: "shop", on: false },
+    { key: "primeur", label: "Primeurs", classes: ["greengrocer"], inc: ["osm.shop.greengrocer"], family: "shop", on: false },
+    { key: "traiteur", label: "Traiteurs", classes: ["deli"], inc: ["osm.shop.deli"], family: "shop", on: false },
+    { key: "marche", label: "Marchés", classes: ["marketplace"], inc: ["osm.amenity.marketplace"], family: "shop", on: false },
+    { key: "librairie", label: "Librairies", classes: ["books"], inc: ["osm.shop.books"], color: "#4169D8", icon: "book", on: false },
+    { key: "presse", label: "Tabac et presse", classes: ["tobacco", "newsagent", "kiosk"], inc: ["osm.shop.tobacco", "osm.shop.newsagent", "osm.shop.kiosk"], color: "#4169D8", icon: "book", on: false },
+    { key: "vetements", label: "Vêtements", classes: ["clothes", "bag", "shoes"], inc: ["osm.shop.clothes", "osm.shop.shoes"], family: "shop", on: false },
+    { key: "coiffeur", label: "Coiffeurs", classes: ["hairdresser"], inc: ["osm.shop.hairdresser"], color: "#A0569F", icon: "scissors", on: false },
+    { key: "beaute", label: "Beauté et parfumerie", classes: ["beauty", "cosmetics", "perfumery"], inc: ["osm.shop.beauty", "osm.shop.cosmetics", "osm.shop.perfumery"], color: "#A0569F", icon: "flower", on: false },
+    { key: "opticien", label: "Opticiens", classes: ["optician"], inc: ["osm.shop.optician"], family: "shop", on: false },
+    { key: "laverie", label: "Laveries et pressings", classes: ["laundry", "dry_cleaning"], inc: ["osm.shop.laundry", "osm.shop.dry_cleaning"], color: "#5F7D95", icon: "drop", on: false },
+    { key: "velo", label: "Vélos", classes: ["bicycle_rental", "bicycle"], inc: ["osm.amenity.bicycle_rental", "osm.shop.bicycle"], color: "#1E8E3E", icon: "bike", on: false },
+    { key: "poste", label: "La Poste", classes: ["post_office"], inc: ["osm.amenity.post_office"], color: "#C7972B", icon: "envelope", on: false },
+    { key: "cinema", label: "Cinémas", classes: ["cinema"], inc: ["osm.amenity.cinema"], family: "culture", icon: "ticket", on: false },
+    { key: "theatre", label: "Théâtres", classes: ["theatre"], inc: ["osm.amenity.theatre"], family: "culture", icon: "ticket", on: false },
+    { key: "bibliotheque", label: "Bibliothèques", classes: ["library"], inc: ["osm.amenity.library"], family: "culture", icon: "book", on: false },
+    { key: "monument", label: "Monuments", classes: ["attraction", "monument", "viewpoint", "castle", "memorial"], inc: ["osm.tourism.attraction", "osm.historic.monument"], family: "sight", on: false },
+    { key: "culte", label: "Lieux de culte", classes: ["place_of_worship"], inc: ["osm.amenity.place_of_worship"], family: "sight", by: "class", on: false },
+    { key: "hopital", label: "Hôpitaux", classes: ["hospital", "clinic"], inc: ["osm.amenity.hospital", "osm.amenity.clinic"], family: "health", on: false },
+    { key: "medecin", label: "Médecins et dentistes", classes: ["doctors", "dentist"], inc: ["osm.amenity.doctors", "osm.amenity.dentist"], family: "health", on: false },
+    { key: "veto", label: "Vétérinaires", classes: ["veterinary"], inc: ["osm.amenity.veterinary"], color: "#8A6B4E", icon: "paw", on: false },
+    { key: "animalerie", label: "Animaleries", classes: ["pet"], inc: ["osm.shop.pet"], color: "#8A6B4E", icon: "paw", on: false },
+    { key: "sport", label: "Salles de sport", classes: ["sports_centre", "fitness_centre", "yoga", "climbing"], inc: ["osm.leisure.fitness_centre", "osm.leisure.sports_centre"], color: "#E0662F", icon: "dumbbell", on: false },
+    { key: "piscine", label: "Piscines", classes: ["swimming_pool", "swimming", "water_park"], inc: ["osm.leisure.swimming_pool", "osm.leisure.sports_centre"], q: "piscine", color: "#2C86C9", icon: "drop", on: false },
+    { key: "hotel", label: "Hôtels", classes: ["hotel", "hostel", "guest_house"], inc: ["osm.tourism.hotel", "osm.tourism.hostel"], family: "stay", on: false },
+    { key: "toilettes", label: "Toilettes", classes: ["toilets"], inc: ["osm.amenity.toilets"], color: "#5F7D95", icon: "drop", on: false, unnamed: "Toilettes publiques" },
+    { key: "eau", label: "Points d'eau", classes: ["drinking_water"], inc: ["osm.amenity.drinking_water"], color: "#2C86C9", icon: "drop", on: false, unnamed: "Point d'eau potable" },
+    { key: "recharge", label: "Bornes de recharge", classes: ["charging_station"], inc: ["osm.amenity.charging_station"], color: "#1E8E3E", icon: "bolt", on: false, unnamed: "Borne de recharge" },
+    { key: "parking", label: "Parkings", classes: ["parking"], inc: ["osm.amenity.parking"], color: "#3F63B5", icon: "parking", on: false, unnamed: "Parking" },
+    { key: "police", label: "Police", classes: ["police"], inc: ["osm.amenity.police"], color: "#2D3E73", icon: "shield", on: false },
+    { key: "mairie", label: "Mairies", classes: ["townhall"], inc: ["osm.amenity.townhall"], color: "#2D3E73", icon: "columns", on: false },
+    { key: "bricolage", label: "Bricolage", classes: ["hardware", "doityourself", "paint"], inc: ["osm.shop.hardware", "osm.shop.doityourself"], color: "#7A6A58", icon: "wrench", on: false },
+    { key: "telephone", label: "Téléphonie et informatique", classes: ["mobile_phone", "computer", "electronics"], inc: ["osm.shop.mobile_phone", "osm.shop.computer", "osm.shop.electronics"], color: "#4169D8", icon: "phone", on: false },
+    { key: "jouets", label: "Jouets", classes: ["toys"], inc: ["osm.shop.toys"], color: "#4169D8", icon: "bag", on: false },
+    { key: "papeterie", label: "Papeterie et reprographie", classes: ["stationery", "copyshop"], inc: ["osm.shop.stationery", "osm.shop.copyshop"], color: "#4169D8", icon: "book", on: false },
+    { key: "musique", label: "Musique", classes: ["musical_instrument", "music"], inc: ["osm.shop.musical_instrument", "osm.shop.music"], color: "#4169D8", icon: "music", on: false },
+    { key: "nuit", label: "Boîtes de nuit", classes: ["nightclub"], inc: ["osm.amenity.nightclub"], family: "bar", on: false },
+    { key: "escape", label: "Escape games", classes: ["escape_game"], inc: ["osm.leisure.escape_game"], color: "#E0662F", icon: "ticket", on: false },
+    { key: "coworking", label: "Coworking", classes: ["coworking"], inc: ["osm.office.coworking", "osm.amenity.coworking_space"], color: "#5F7D95", icon: "laptop", on: false },
   ];
-  // Taper un type de lieu (« pharmacie », « métro le plus proche ») propose la liste triée par proximité.
-  const CATEGORY_WORDS = {
-    resto: ['restaurant', 'restaurants', 'resto', 'restos', 'manger', 'dejeuner', 'diner', 'brasserie', 'brasseries'],
-    cafe: ['cafe', 'cafes', 'coffee', 'cafeteria'],
-    metro: ['metro', 'metros', 'station', 'stations', 'rer', 'subway', 'transport', 'transports', 'arret'],
-    pharmacie: ['pharmacie', 'pharmacies', 'pharma', 'medicament', 'medicaments'],
-    courses: ['courses', 'supermarche', 'supermarches', 'epicerie', 'epiceries', 'superette', 'supermarket', 'magasin', 'alimentaire'],
-    distributeur: ['distributeur', 'distributeurs', 'dab', 'atm', 'retirer', 'retrait', 'argent', 'liquide', 'cash', 'billets', 'billet'],
-    boulangerie: ['boulangerie', 'boulangeries', 'boulanger', 'pain', 'patisserie', 'patisseries', 'viennoiseries'],
-    bar: ['bar', 'bars', 'boire', 'verre', 'pub', 'pubs', 'apero'],
-    musee: ['musee', 'musees', 'expo', 'expos', 'exposition', 'expositions', 'galerie', 'galeries'],
-    banque: ['banque', 'banques', 'agence', 'agences', 'bancaire'],
-    essence: ['essence', 'carburant', 'gazole', 'diesel', 'fuel', 'pompe', 'station', 'service', 'stations', 'services']
-  };
+  // Taper un type de lieu (« pharmacie », « métro le plus proche », « fleuriste ») propose la liste triée par proximité.
+  const CATEGORY_WORDS = Object.fromEntries(Object.entries({
+    resto: "restaurant restaurants resto restos manger dejeuner diner brasserie brasseries",
+    cafe: "cafe cafes coffee cafeteria",
+    metro: "metro metros station stations rer subway transport transports arret",
+    pharmacie: "pharmacie pharmacies pharma medicament medicaments",
+    courses: "courses supermarche supermarches epicerie epiceries superette supermarket magasin alimentaire",
+    distributeur: "distributeur distributeurs dab atm retirer retrait argent liquide cash billets billet",
+    boulangerie: "boulangerie boulangeries boulanger pain patisserie patisseries viennoiseries",
+    bar: "bar bars boire verre pub pubs apero",
+    musee: "musee musees expo expos exposition expositions galerie galeries",
+    banque: "banque banques agence agences bancaire",
+    essence: "essence carburant gazole diesel fuel pompe station service stations services",
+    fleuriste: "fleur fleurs fleuriste fleuristes bouquet",
+    cimetiere: "cimetiere cimetieres tombe",
+    parc: "parc parcs jardin jardins square squares espace vert",
+    jeux: "aire aires jeux enfants toboggan",
+    glacier: "glace glaces glacier glaciers",
+    rapide: "fast food rapide kebab burger burgers snack sandwich",
+    caviste: "caviste cavistes vin vins cave",
+    chocolat: "chocolat chocolats chocolatier chocolatiers confiserie bonbons",
+    fromagerie: "fromage fromages fromagerie fromageries",
+    boucherie: "boucher boucherie boucheries viande charcuterie",
+    primeur: "primeur primeurs fruits legumes",
+    traiteur: "traiteur traiteurs",
+    marche: "marche marches",
+    librairie: "livre livres librairie librairies bd",
+    presse: "tabac tabacs presse journal journaux kiosque cigarettes",
+    vetements: "vetements vetement habits chaussures mode boutique boutiques",
+    coiffeur: "coiffeur coiffeurs coiffure barbier barber",
+    beaute: "beaute institut parfum parfumerie cosmetiques manucure",
+    opticien: "opticien opticiens lunettes",
+    laverie: "laverie laveries pressing linge",
+    velo: "velo velos velib bicyclette",
+    poste: "poste postes colis courrier lettre",
+    cinema: "cinema cinemas film films seance",
+    theatre: "theatre theatres spectacle spectacles piece",
+    bibliotheque: "bibliotheque bibliotheques mediatheque mediatheques",
+    monument: "monument monuments visiter visite touristique",
+    culte: "eglise eglises mosquee mosquees synagogue synagogues temple culte messe",
+    hopital: "hopital hopitaux urgence urgences clinique",
+    medecin: "medecin medecins docteur generaliste dentiste dentistes",
+    veto: "veterinaire veterinaires veto",
+    animalerie: "animalerie animaleries animaux chien chat",
+    sport: "sport salle gym fitness musculation yoga escalade",
+    piscine: "piscine piscines nager natation",
+    hotel: "hotel hotels auberge dormir chambre",
+    toilettes: "toilettes wc sanisette",
+    eau: "eau fontaine fontaines potable boire",
+    recharge: "recharge borne bornes electrique",
+    parking: "parking parkings garer stationnement",
+    police: "police commissariat gendarmerie",
+    mairie: "mairie mairies",
+    bricolage: "bricolage quincaillerie outils",
+    telephone: "telephone portable smartphone informatique ordinateur reparation",
+    jouets: "jouet jouets",
+    papeterie: "papeterie imprimerie photocopie impression",
+    musique: "musique instrument instruments disque disques vinyle",
+    nuit: "boite boites nuit club clubs danser",
+    escape: "escape game games",
+    coworking: "coworking travailler",
+  }).map(([k, v]) => [k, v.split(' ')]));
   // Onglets personnalisés : [{ key, label?, hidden? }] dans l'ordre choisi, gardés sur l'appareil.
   const CHIPS_KEY = 'onglets';
   function loadChipPrefs() {
@@ -48,7 +146,7 @@
     try { saved = JSON.parse(localStorage.getItem(CHIPS_KEY) || '[]'); } catch { /* rien */ }
     const known = saved.filter((p) => ALL_CATEGORIES.some((c) => c.key === p.key));
     // une catégorie ajoutée après coup apparaît à la fin
-    return [...known, ...ALL_CATEGORIES.filter((c) => !known.some((p) => p.key === c.key)).map((c) => ({ key: c.key }))];
+    return [...known, ...ALL_CATEGORIES.filter((c) => !known.some((p) => p.key === c.key)).map((c) => (c.on ? { key: c.key } : { key: c.key, hidden: true }))];
   }
   const FILLER = new Set(['proche', 'proches', 'pres', 'de', 'd', 'moi', 'ici', 'ouvert', 'ouverte', 'ouverts', 'ouvertes',
     'autour', 'la', 'le', 'les', 'plus', 'un', 'une', 'des', 'du', 'a', 'cote', 'maintenant', 'pas', 'loin', 'nearby', 'near', 'me']);
@@ -138,6 +236,8 @@
   let directions = $state(false);
   let from = $state(null);           // { label, lat, lon, isMe? }
   let to = $state(null);
+  let via = $state(null);            // arrêt intermédiaire facultatif
+  let showVia = $state(false);
   let mode = $state('walk');
   let editing = $state(null);        // 'from' | 'to' | null
   let fieldQuery = $state('');
@@ -218,6 +318,12 @@
   function addCustomLayers() {
     if (map.getSource('route')) return;
     addRouteLayers();
+    map.addSource('cat-hits', { type: 'geojson', data: empty() });
+    map.addLayer({ id: 'cat-hit', type: 'symbol', source: 'cat-hits',
+      layout: { 'icon-image': ['get', 'icon'], 'icon-size': 1.15, 'icon-allow-overlap': true, 'symbol-sort-key': ['get', 'i'],
+                'text-field': ['get', 'name'], 'text-font': ['Open Sans Bold'], 'text-size': 12.5, 'text-anchor': 'left',
+                'text-offset': [1.3, 0], 'text-max-width': 8, 'text-optional': true },
+      paint: { 'text-color': ['get', 'tc'], 'text-halo-color': dark ? 'rgba(22,24,28,0.9)' : '#FFFFFF', 'text-halo-width': 1.8 } });
     map.addSource('favs', { type: 'geojson', data: favData() });
     map.addLayer({ id: 'fav', type: 'symbol', source: 'favs',
       layout: { 'icon-image': 'fav', 'icon-allow-overlap': true, 'icon-size': ['interpolate', ['linear'], ['zoom'], 11, 0.8, 16, 1.05],
@@ -226,7 +332,7 @@
       paint: { 'text-color': dark ? '#F08AB4' : '#A82C5F', 'text-halo-color': dark ? 'rgba(22,24,28,0.9)' : '#FFFFFF', 'text-halo-width': 1.6 } });
     // Après un changement de style : on remet l'état en cours (trajet, catégorie, mode transports).
     if (directions) { drawRoute(); dimPlaces(true); }
-    if (category) map.setFilter('poi-hit', hitFilter(category));
+    if (category) applyHit(category);
     if (mapMode === 'transit') for (const id of ['transit-case', 'transit-line', 'transit-label']) map.setLayoutProperty(id, 'visibility', 'visible');
   }
 
@@ -252,7 +358,8 @@
       paint: { 'line-color': '#6F7A88', 'line-width': width(4, 7), 'line-dasharray': [0, 1.7] } }, before);
     map.addSource('route-ends', { type: 'geojson', data: empty() });
     map.addLayer({ id: 'route-start', type: 'circle', source: 'route-ends',
-      paint: { 'circle-radius': 7.5, 'circle-color': '#2A5BD7', 'circle-stroke-color': '#FFFFFF', 'circle-stroke-width': 3.5 } });
+      paint: { 'circle-radius': 7.5, 'circle-color': ['match', ['get', 'kind'], 'via', '#FFFFFF', '#2A5BD7'],
+               'circle-stroke-color': ['match', ['get', 'kind'], 'via', '#1C1D1F', '#FFFFFF'], 'circle-stroke-width': 3.5 } });
   }
   const empty = () => ({ type: 'FeatureCollection', features: [] });
 
@@ -271,7 +378,8 @@
     }
     src.setData({ type: 'FeatureCollection', features: feats });
     map.getSource('route-ends').setData(from && directions ? { type: 'FeatureCollection', features: [
-      { type: 'Feature', geometry: { type: 'Point', coordinates: [from.lon, from.lat] }, properties: {} }] } : empty());
+      { type: 'Feature', geometry: { type: 'Point', coordinates: [from.lon, from.lat] }, properties: { kind: 'from' } },
+      ...(showVia && via ? [{ type: 'Feature', geometry: { type: 'Point', coordinates: [via.lon, via.lat] }, properties: { kind: 'via' } }] : [])] } : empty());
     if (feats.length) fitTo(feats.flatMap((f) => f.geometry.coordinates));
   }
   const line = (coords, kind, color, edge = color) => ({ type: 'Feature', properties: { kind, color, edge }, geometry: { type: 'LineString', coordinates: coords } });
@@ -316,6 +424,8 @@
     showModes = false;
     const fav = map.queryRenderedFeatures(e.point, { layers: ['fav'] })[0];
     if (fav) return openPlace({ ...favorites[fav.properties.i] });
+    const hit = map.queryRenderedFeatures(e.point, { layers: ['cat-hit'] })[0];
+    if (hit && nearby[hit.properties.i]) return openFeature(nearby[hit.properties.i].f);
     const f = map.queryRenderedFeatures(e.point, { layers: ['poi-hit', 'poi', 'poi-other', 'landmark', 'metro'] })[0];
     if (f) return openFeature(f);
     // Toucher un endroit vide : fiche de l'adresse (si une fiche est ouverte, le toucher la ferme d'abord).
@@ -339,7 +449,7 @@
     const ref = f.properties.osm ? { osmType, osmId: Number(osmId) } : osmRef(f.id);
     const [lon, lat] = f.geometry.coordinates;
     openPlace({
-      id: String(f.id), ...ref, name: f.properties.name,
+      id: String(f.id), ...ref, name: category && !category.transit ? displayName(f, category) : f.properties.name,
       type: typeLabel('', f.properties.subclass) || typeLabel('', f.properties.class)
         || { culture: 'Culture', sight: 'Lieu remarquable', nature: 'Parc ou jardin', health: 'Hôpital', train: 'Gare', shop: 'Grand magasin' }[f.properties.family],
       address: '', lat, lon
@@ -477,7 +587,12 @@
     saveChips();
   }
   function toggleChip(i) {
-    chipPrefs = chipPrefs.map((p, k) => (k === i ? { ...p, hidden: !p.hidden } : p));
+    const p = { ...chipPrefs[i], hidden: !chipPrefs[i].hidden };
+    const rest = chipPrefs.filter((_, k) => k !== i);
+    // affiché → rejoint la fin des raccourcis affichés ; masqué → rejoint le haut des disponibles
+    const firstHidden = rest.findIndex((x) => x.hidden);
+    const at = firstHidden < 0 ? rest.length : firstHidden;
+    chipPrefs = [...rest.slice(0, at), p, ...rest.slice(at)];
     saveChips();
   }
   function renameChip(i, label) {
@@ -485,7 +600,7 @@
     saveChips();
   }
   function resetChips() {
-    chipPrefs = ALL_CATEGORIES.map((c) => ({ key: c.key }));
+    chipPrefs = ALL_CATEGORIES.map((c) => (c.on ? { key: c.key } : { key: c.key, hidden: true }));
     saveChips();
   }
   const catOf = (key) => ALL_CATEGORIES.find((c) => c.key === key);
@@ -611,7 +726,24 @@
   let hoursIndex = null;
   const loadHours = () => (hoursIndex ??= fetch(new URL('data/hours.json', location.href)).then((r) => r.json()).catch(() => ({ v: [], k: {} })));
 
-  const hitFilter = (c) => (c.transit ? ['==', ['get', 'subclass'], '__none__'] : ['match', ['get', 'subclass'], c.classes, true, false]);
+  const hitFilter = (c) => (c.transit ? ['==', ['get', 'subclass'], '__none__'] : ['match', ['get', c.by || 'subclass'], c.classes, true, false]);
+  const catIcon = (c) => c.icon || FAMILIES[c.family]?.icon || 'dot';
+  // Lieux mis en avant : filtre, pictogramme et couleur de la catégorie choisie.
+  // Les lieux de la liste sont aussi posés sur la carte (y compris ceux trouvés hors de la vue).
+  function applyHit(c) {
+    const src = map?.getSource('cat-hits');
+    if (!src) return;
+    if (!c || c.transit) return src.setData(empty());
+    src.setData({ type: 'FeatureCollection', features: nearby.map(({ f }, i) => ({
+      type: 'Feature', id: i, geometry: { type: 'Point', coordinates: f.geometry.coordinates },
+      properties: { i, name: displayName(f, c), icon: `cat|${catIcon(c)}|${famColor(c)}`, tc: darken(famColor(c)) } })) });
+  }
+  // Un lieu sans nom (toilettes, borne…) ou au nom de code (« G-040 ») prend le nom de sa catégorie.
+  const displayName = (f, c) => {
+    const n = f.properties.name;
+    return !n || (c?.unnamed && /^[A-Z0-9][A-Z0-9 _-]{0,9}$/.test(n)) ? c?.unnamed || n || 'Sans nom' : n;
+  };
+  $effect(() => { nearby; category; applyHit(category); });
 
   async function pickCategory(c) {
     if (category?.key === c.key) return clearCategory();
@@ -619,7 +751,7 @@
     closePlace();
     nearby = [];
     nearbyDone = false;
-    map.setFilter('poi-hit', hitFilter(c));
+    applyHit(c);
     // « Le plus proche de vous » : depuis votre position si elle est connue (ou déjà autorisée), sinon depuis le centre de la carte.
     let origin = me;
     if (!origin) {
@@ -634,7 +766,7 @@
       const seen = new Set();
       const filter = c.transit
         ? ['all', ['has', 'name'], ['==', ['get', 'class'], 'railway'], ['match', ['get', 'subclass'], ['subway', 'station', 'halt'], true, false]]
-        : ['all', ['has', 'name'], ['match', ['get', 'subclass'], c.classes, true, false]];
+        : c.unnamed ? hitFilter(c) : ['all', ['has', 'name'], hitFilter(c)];
       // Une station a souvent plusieurs points (un par ligne) : on n'en garde qu'un par nom.
       const keyOf = (f) => (c.transit ? f.properties.name : f.id);
       const list = map.querySourceFeatures('omt', { sourceLayer: 'poi', filter })
@@ -656,6 +788,18 @@
         for (let i = 5; i < nearby.length; i++) nearby[i] = { ...nearby[i], deps: null };
         return;
       }
+      // Compléter avec les lieux hors de la vue (catégories rares : cimetières, piscines…).
+      if (list.length < 12 && c.inc) {
+        const extra = await searchCategory(c.inc, o, undefined, c.q).catch(() => []);
+        const near = (a, b) => dist(a[1], a[0], b[1], b[0]) < 80;
+        for (const f of extra) {
+          const xy = f.geometry.coordinates;
+          if (list.some((n) => n.f.properties.name === f.properties.name && near(n.f.geometry.coordinates, xy))) continue;
+          list.push({ f, d: dist(o.lat, o.lon, xy[1], xy[0]) });
+        }
+        list.sort((a, b) => a.d - b.d);
+        list.splice(25);
+      }
       const hours = await hoursP;
       if (category?.key !== c.key) return;
       nearby = list.map((n) => {
@@ -663,6 +807,9 @@
         return { ...n, st: h ? hoursStatus(h, n.f.geometry.coordinates[1], n.f.geometry.coordinates[0]) : null };
       });
       nearbyDone = true;
+      // Les plus proches sont hors de la vue (catégorie rare) : on élargit la carte pour les montrer.
+      const first = nearby.slice(0, 4).map((n) => n.f.geometry.coordinates);
+      if (first.length && !first.some((xy) => map.getBounds().contains(xy))) fitTo([[o.lon, o.lat], ...first]);
     };
     const target = origin ? [origin.lon, origin.lat] : null;
     if (target || map.getZoom() < 15) {
@@ -678,7 +825,7 @@
   function clearCategory() {
     category = null;
     nearby = [];
-    map?.setFilter('poi-hit', ['==', ['get', 'subclass'], '__none__']);
+    applyHit(null);
   }
 
   function dist(lat1, lon1, lat2, lon2) {
@@ -707,7 +854,7 @@
     if (editing) {
       const pt = { label: r.name, lat: r.lat, lon: r.lon };
       const which = editing;
-      if (which === 'from') from = pt; else to = pt;
+      setPoint(which, pt);
       editing = null;
       fieldQuery = '';
       results = [];
@@ -781,7 +928,8 @@
   // Point choisi en touchant la carte : on retrouve l'adresse la plus proche.
   async function pickOnMap(which, { lng, lat }) {
     const pt = { label: 'Point sur la carte', lat, lon: lng };
-    if (which === 'from') from = pt; else { to = pt; placeMarker(lng, lat); }
+    setPoint(which, pt);
+    if (which === 'to') placeMarker(lng, lat);
     editing = null;
     lastEdit = { which: null, at: 0 };
     fieldQuery = '';
@@ -791,8 +939,7 @@
     if (label) {
       // (les objets d'état sont des copies : on compare les coordonnées)
       const same = (q) => q && q.lat === lat && q.lon === lng;
-      if (which === 'from' && same(from)) from = { ...pt, label };
-      if (which === 'to' && same(to)) to = { ...pt, label };
+      if (same(pointOf(which))) setPoint(which, { ...pt, label });
     }
   }
 
@@ -801,6 +948,8 @@
     directions = true;
     dimPlaces(true);
     to = { label: place.name, lat: place.lat, lon: place.lon };
+    via = null;
+    showVia = false;
     routes = { walk: null, bike: null, transit: null };
     picked = 0;
     try {
@@ -823,6 +972,23 @@
     map.getSource('route')?.setData(empty());
     map.getSource('route-ends')?.setData(empty());
     if (place) { placeMarker(place.lon, place.lat); frame(place.lon, place.lat); }
+  }
+
+  const pointOf = (which) => ({ from, via, to })[which];
+  function setPoint(which, pt) {
+    if (which === 'from') from = pt;
+    else if (which === 'via') via = pt;
+    else to = pt;
+  }
+  function addStop() {
+    showVia = true;
+    editField('via');
+  }
+  function removeStop() {
+    showVia = false;
+    via = null;
+    if (editing === 'via') editing = null;
+    computeRoutes();
   }
 
   async function editField(which) {
@@ -848,7 +1014,7 @@
   let routeCtrl;
   function computeRoutes() {
     routeCtrl?.abort();
-    if (!from || !to) return;
+    if (!from || !to || (showVia && !via)) return;
     routeCtrl = new AbortController();
     const signal = routeCtrl.signal;
     picked = 0;
@@ -864,11 +1030,12 @@
       }
       if (id === mode) drawRoute();
     };
-    run('walk', () => streetRoute(from, to, 'walk', signal));
-    run('bike', () => streetRoute(from, to, 'bike', signal));
-    run('transit', () => transitRoutes(from, to, signal));
+    const v = showVia ? via : null;
+    run('walk', () => streetRoute(from, to, 'walk', signal, v));
+    run('bike', () => streetRoute(from, to, 'bike', signal, v));
+    run('transit', () => (v ? transitWithStop(from, v, to, signal) : transitRoutes(from, to, signal)));
     run('car', async () => {
-      const r = await streetRoute(from, to, 'car', signal);
+      const r = await streetRoute(from, to, 'car', signal, v);
       const t = await trafficEstimate(from, to);
       return { ...r, freeDuration: r.duration, duration: r.duration * t.factor, traffic: t.label };
     });
@@ -909,7 +1076,8 @@
       if (legExits[k] !== undefined) return;
       legExits[k] = null;
       const after = it.legs.slice(i + 1);
-      const nextRide = after.find((l) => l.mode !== 'WALK');
+      let nextRide = after.find((l) => l.mode !== 'WALK');
+      if (nextRide?.mode === 'STOP') nextRide = null;          // on sort pour l'arrêt intermédiaire
       const walkBetween = after.slice(0, after.indexOf(nextRide)).reduce((t, l) => t + (l.duration || 0), 0);
       if (nextRide && walkBetween <= 600) {
         // correspondance dans la station (ou tout près) : pas de sortie, mais la bonne voiture
@@ -1042,6 +1210,138 @@
   </ul>
 {/snippet}
 
+{#snippet photoBlock()}
+      {#if wiki?.photo}
+        <figure class="photo">
+          <img src={wiki.photo.src} alt={title} loading="lazy" />
+          <figcaption><a href={wiki.photo.page} target="_blank" rel="noopener">Photo : {wiki.photo.credit || 'Wikimedia Commons'} · Wikimedia Commons</a></figcaption>
+        </figure>
+      {/if}
+{/snippet}
+
+{#snippet aboutBlock()}
+      {#if wiki?.extract}
+        <div class="about">
+          <h2>Informations</h2>
+          <p class:clamped={!moreText}>{wiki.extract}</p>
+          {#if !moreText && wiki.extract.length > 180}<button class="link more" onclick={() => (moreText = true)}>Plus</button>{/if}
+          <p class="credit">Plus d'infos sur <a href={wiki.url} target="_blank" rel="noopener">Wikipédia</a></p>
+        </div>
+      {/if}
+
+{/snippet}
+
+{#snippet transitBlock()}
+      {#if isStation}
+        <div class="deps" aria-live="polite">
+          <h2>Prochains passages</h2>
+          {#if !deps || deps.status === 'loading'}
+            <p class="muted">Recherche des prochains passages…</p>
+          {:else if deps.status === 'error'}
+            <p class="muted">Horaires indisponibles pour le moment. Réessayez dans un instant.</p>
+          {:else if deps.status === 'none'}
+            <p class="muted">Aucun passage prévu dans l'heure.</p>
+          {:else}
+            <ul>
+              {#each deps.data.lines as l}
+                <li>
+                  <span class="badge" class:round={l.mode === 'SUBWAY' || l.mode === 'METRO'} style:background={l.color} style:color={l.textColor}>{l.line}</span>
+                  <span class="dep-dir">{l.headsign}</span>
+                  <span class="dep-times">
+                    {#if l.realTime}<span class="live" title="En temps réel" aria-label="En temps réel"></span>{/if}
+                    {#each l.times as t, i}<span class:first={i === 0}>{fmtWait(t, now)}</span>{#if i < l.times.length - 1}<span class="sep"> · </span>{/if}{/each}
+                  </span>
+                </li>
+              {/each}
+            </ul>
+            <p class="credit">Horaires : <a href="https://transitous.org/sources/" target="_blank" rel="noopener">Transitous et réseaux de transport</a></p>
+          {/if}
+        </div>
+      {/if}
+      {#if exits?.status === 'ok' && exits.data.length}
+        <div class="exits">
+          <h2>Sorties</h2>
+          <ul>
+            {#each allExits ? exits.data : exits.data.slice(0, 4) as e}
+              <li><span class="exit-sq" aria-hidden="true"></span><span>{exitLabel(e)}</span>
+                {#if e.wheelchair}<span class="exit-tag">accessible</span>{:else if e.escalator}<span class="exit-tag">escalier mécanique</span>{/if}</li>
+            {/each}
+          </ul>
+          {#if exits.data.length > 4 && !allExits}<button class="link more" onclick={() => (allExits = true)}>Toutes les sorties ({exits.data.length})</button>{/if}
+        </div>
+      {/if}
+
+{/snippet}
+
+{#snippet rowsBlock()}
+      <ul class="rows">
+        {#if address}
+          <li class="row">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z" /><circle cx="12" cy="9.5" r="2.5" /></svg>
+            <span>{address}</span>
+          </li>
+        {/if}
+        {#if status}
+          <li class="row">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></svg>
+            <button class="row-btn" onclick={() => (showWeek = !showWeek)} aria-expanded={showWeek}>
+              <span>{showWeek ? 'Masquer les horaires' : 'Voir les horaires de la semaine'}</span>
+              <svg viewBox="0 0 24 24" aria-hidden="true" class="chev" class:flip={showWeek}><path d="m7 10 5 5 5-5" /></svg>
+            </button>
+          </li>
+          {#if week}
+            <li class="week-row">
+              <table class="week"><tbody>
+                {#each week as d}<tr class:today={d.today}><th>{d.day}</th><td>{d.text}</td></tr>{/each}
+              </tbody></table>
+            </li>
+          {/if}
+        {:else if info?.expectsHours && !isStation}
+          <li class="row muted">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></svg>
+            <span>Horaires non renseignés<small class="why">Personne ne les a encore ajoutés à la carte collaborative que nous utilisons (OpenStreetMap).</small></span>
+          </li>
+        {/if}
+        {#if info?.phone}
+          <li class="row">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.6 3.5 9 3l2 4.6-2.3 1.6a12 12 0 0 0 6.1 6.1l1.6-2.3L21 15l-.5 2.4A3 3 0 0 1 17.6 20C10 20 4 14 4 6.4a3 3 0 0 1 2.6-2.9z" /></svg>
+            <a class="row-link" href={`tel:${info.phone.replace(/\s/g, '')}`}>{info.phone}</a>
+          </li>
+        {/if}
+        {#if info?.website}
+          <li class="row">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M3.5 12h17M12 3.5c2.5 2.6 3.6 5.4 3.6 8.5s-1.1 5.9-3.6 8.5M12 3.5C9.5 6.1 8.4 8.9 8.4 12s1.1 5.9 3.6 8.5" /></svg>
+            <a class="row-link" href={href(info.website)} target="_blank" rel="noopener">{host(info.website)}</a>
+          </li>
+        {/if}
+        {#if !isStation}
+          <li class="row sc-row">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.5 12 5l8 6.5M6.5 10v9.5h11V10" /><path d="M10.2 19.5v-4.8h3.6v4.8" /></svg>
+            {#if placeShortcut}
+              <span>Votre {SHORT_NAMES[placeShortcut].toLowerCase()}</span>
+              <button class="link" onclick={() => { setShortcut(placeShortcut, null); say('Raccourci retiré'); }}>Retirer</button>
+            {:else}
+              <span>Définir comme</span>
+              <button class="link" onclick={() => { setShortcut('home', place); say('Maison enregistrée · gardée sur cet appareil'); }}>Maison</button>
+              <button class="link" onclick={() => { setShortcut('work', place); say('Travail enregistré · gardé sur cet appareil'); }}>Travail</button>
+            {/if}
+          </li>
+        {/if}
+        {#each info?.practical || [] as d}
+          <li class="row">
+            {#if d.icon === 'wheelchair'}
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="4.5" r="1.8" /><path d="M11 7.5v6h5l2 5M11 10h4M8.5 11.2a5 5 0 1 0 6.3 6.3" /></svg>
+            {:else if d.icon === 'ticket'}
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16v3a2 2 0 0 0 0 4v3H4v-3a2 2 0 0 0 0-4z" /><path d="M14 7v10" stroke-dasharray="2 2" /></svg>
+            {:else}
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 20.5h17M5 20.5v-9M19 20.5v-9M9 20.5v-9M15 20.5v-9M3.5 11.5h17L12 4z" /></svg>
+            {/if}
+            <span>{d.text}</span>
+          </li>
+        {/each}
+      </ul>
+{/snippet}
+
 <div class="app" class:routing={directions}>
   <div class="map" bind:this={mapEl} aria-label="Carte"></div>
 
@@ -1079,21 +1379,31 @@
         <button class="icon-btn back" onclick={closeDirections} aria-label="Revenir à la fiche du lieu">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
         </button>
-        <div class="fields">
-          {#each [['from', from, 'Choisir un point de départ'], ['to', to, 'Choisir une destination']] as [which, pt, ph]}
-            <div class="field" class:editing={editing === which}>
+        <div class="fields" class:has-add={!showVia && !editing}>
+          {#each [['from', from, 'Choisir un point de départ'], ...(showVia ? [['via', via, 'Choisir un arrêt']] : []), ['to', to, 'Choisir une destination']] as [which, pt, ph] (which)}
+            <div class="field" class:editing={editing === which} class:via-field={which === 'via'}>
               <span class="field-mark {which}" aria-hidden="true"></span>
               {#if editing === which}
                 <input id={`field-${which}`} bind:this={fieldEl} bind:value={fieldQuery} placeholder={ph} autocomplete="off"
-                  aria-label={which === 'from' ? 'Départ' : 'Arrivée'} onkeydown={onKey}
-                  onblur={() => { lastEdit = { which, at: Date.now() }; setTimeout(() => { if (editing === which && (which === 'from' ? from : to)) editing = null; }, 250); }} />
+                  aria-label={{ from: 'Départ', via: 'Arrêt', to: 'Arrivée' }[which]} onkeydown={onKey}
+                  onblur={() => { lastEdit = { which, at: Date.now() }; setTimeout(() => { if (editing === which && pointOf(which)) editing = null; }, 250); }} />
               {:else}
                 <button class="field-btn" class:placeholder={!pt} onclick={() => editField(which)}>
                   {pt ? pt.label : ph}
                 </button>
               {/if}
+              {#if which === 'via'}
+                <button class="icon-btn rm-stop" onclick={removeStop} aria-label="Retirer l'arrêt">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" /></svg>
+                </button>
+              {/if}
             </div>
           {/each}
+          {#if !showVia && !editing}
+            <button class="add-stop" onclick={addStop}>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12M6 12h12" /></svg>Ajouter un arrêt
+            </button>
+          {/if}
         </div>
         <button class="icon-btn swap" onclick={swap} aria-label="Inverser départ et arrivée" disabled={!from || !to}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4v15M4.5 7.5 8 4l3.5 3.5M16 20V5M12.5 16.5 16 20l3.5-3.5" /></svg>
@@ -1178,6 +1488,7 @@
       <p class="kind">Choisissez ceux qui s'affichent, leur ordre et leur nom.</p>
       <ul class="chip-edit">
         {#each chipPrefs as pr, i (pr.key)}
+          {#if i === chipPrefs.findIndex((x) => x.hidden) && i > 0}<li class="ce-head">Autres raccourcis disponibles</li>{/if}
           {@const c = catOf(pr.key)}
           <li class:off={pr.hidden}>
             <button class="ce-toggle" onclick={() => toggleChip(i)} role="switch" aria-checked={!pr.hidden} aria-label={`Afficher ${c.label}`}
@@ -1222,7 +1533,7 @@
         </div>
         <ol class="steps">
           {#each r.steps as s}
-            <li><span>{s.text}</span>{#if s.distance >= 10}<span class="step-dist">{fmtDistance(s.distance)}</span>{/if}</li>
+            <li class:stop={s.stop}><span>{s.text}</span>{#if s.distance >= 10}<span class="step-dist">{fmtDistance(s.distance)}</span>{/if}</li>
           {/each}
           <li class="arrive"><span>Arrivée : {to.label}</span></li>
         </ol>
@@ -1235,7 +1546,9 @@
                   <span class="chain">
                     {#each it.legs as leg, j}
                       {#if j > 0}<span class="sep" aria-hidden="true">›</span>{/if}
-                      {#if leg.mode === 'WALK'}
+                      {#if leg.mode === 'STOP'}
+                        <span class="stop-chip" aria-label={`Arrêt : ${leg.from}`}></span>
+                      {:else if leg.mode === 'WALK'}
                         <span class="walk-chip" aria-label={`Marche ${fmtDuration(leg.duration)}`}>{@render modeIcon('walk')}</span>
                       {:else}
                         <span class="badge" style:background={leg.color} style:color={leg.textColor}
@@ -1256,7 +1569,16 @@
               {#if picked === i}
                 <ol class="legs">
                   {#each it.legs as leg, li}
-                    {#if leg.mode === 'WALK'}
+                    {#if leg.mode === 'STOP'}
+                      <li class="leg stop">
+                        <span class="leg-time">{fmtTime(leg.start)}</span>
+                        <span class="leg-rail stop" aria-hidden="true"></span>
+                        <span class="leg-body">
+                          <span class="leg-place">Arrêt : {leg.from}</span>
+                          <span class="leg-meta">Reprise à {fmtTime(leg.end)}{leg.duration > 90 ? ` · ${fmtDuration(leg.duration)} sur place` : ''}</span>
+                        </span>
+                      </li>
+                    {:else if leg.mode === 'WALK'}
                       <li class="leg walk">
                         <span class="leg-time">{fmtTime(leg.start)}</span>
                         <span class="leg-rail walk" aria-hidden="true"></span>
@@ -1344,126 +1666,15 @@
         {/if}
       </div>
 
-      {#if wiki?.photo}
-        <figure class="photo">
-          <img src={wiki.photo.src} alt={title} loading="lazy" />
-          <figcaption><a href={wiki.photo.page} target="_blank" rel="noopener">Photo : {wiki.photo.credit || 'Wikimedia Commons'} · Wikimedia Commons</a></figcaption>
-        </figure>
-      {/if}
-      {#if wiki?.extract}
-        <div class="about">
-          <h2>Informations</h2>
-          <p class:clamped={!moreText}>{wiki.extract}</p>
-          {#if !moreText && wiki.extract.length > 180}<button class="link more" onclick={() => (moreText = true)}>Plus</button>{/if}
-          <p class="credit">Plus d'infos sur <a href={wiki.url} target="_blank" rel="noopener">Wikipédia</a></p>
-        </div>
-      {/if}
-
+      <!-- Ordre selon ce qui sert le plus : une station → prochains passages et sorties d'abord ;
+           un commerce → horaires, téléphone, site avant le texte Wikipédia ; un monument → photo et histoire. -->
       {#if isStation}
-        <div class="deps" aria-live="polite">
-          <h2>Prochains passages</h2>
-          {#if !deps || deps.status === 'loading'}
-            <p class="muted">Recherche des prochains passages…</p>
-          {:else if deps.status === 'error'}
-            <p class="muted">Horaires indisponibles pour le moment. Réessayez dans un instant.</p>
-          {:else if deps.status === 'none'}
-            <p class="muted">Aucun passage prévu dans l'heure.</p>
-          {:else}
-            <ul>
-              {#each deps.data.lines as l}
-                <li>
-                  <span class="badge" class:round={l.mode === 'SUBWAY' || l.mode === 'METRO'} style:background={l.color} style:color={l.textColor}>{l.line}</span>
-                  <span class="dep-dir">{l.headsign}</span>
-                  <span class="dep-times">
-                    {#if l.realTime}<span class="live" title="En temps réel" aria-label="En temps réel"></span>{/if}
-                    {#each l.times as t, i}<span class:first={i === 0}>{fmtWait(t, now)}</span>{#if i < l.times.length - 1}<span class="sep"> · </span>{/if}{/each}
-                  </span>
-                </li>
-              {/each}
-            </ul>
-            <p class="credit">Horaires : <a href="https://transitous.org/sources/" target="_blank" rel="noopener">Transitous et réseaux de transport</a></p>
-          {/if}
-        </div>
+        {@render transitBlock()}{@render photoBlock()}{@render aboutBlock()}{@render rowsBlock()}
+      {:else if info?.expectsHours}
+        {@render photoBlock()}{@render rowsBlock()}{@render aboutBlock()}
+      {:else}
+        {@render photoBlock()}{@render aboutBlock()}{@render rowsBlock()}
       {/if}
-      {#if exits?.status === 'ok' && exits.data.length}
-        <div class="exits">
-          <h2>Sorties</h2>
-          <ul>
-            {#each allExits ? exits.data : exits.data.slice(0, 4) as e}
-              <li><span class="exit-sq" aria-hidden="true"></span><span>{exitLabel(e)}</span>
-                {#if e.wheelchair}<span class="exit-tag">accessible</span>{:else if e.escalator}<span class="exit-tag">escalier mécanique</span>{/if}</li>
-            {/each}
-          </ul>
-          {#if exits.data.length > 4 && !allExits}<button class="link more" onclick={() => (allExits = true)}>Toutes les sorties ({exits.data.length})</button>{/if}
-        </div>
-      {/if}
-
-      <ul class="rows">
-        {#if address}
-          <li class="row">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z" /><circle cx="12" cy="9.5" r="2.5" /></svg>
-            <span>{address}</span>
-          </li>
-        {/if}
-        {#if status}
-          <li class="row">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></svg>
-            <button class="row-btn" onclick={() => (showWeek = !showWeek)} aria-expanded={showWeek}>
-              <span>{showWeek ? 'Masquer les horaires' : 'Voir les horaires de la semaine'}</span>
-              <svg viewBox="0 0 24 24" aria-hidden="true" class="chev" class:flip={showWeek}><path d="m7 10 5 5 5-5" /></svg>
-            </button>
-          </li>
-          {#if week}
-            <li class="week-row">
-              <table class="week"><tbody>
-                {#each week as d}<tr class:today={d.today}><th>{d.day}</th><td>{d.text}</td></tr>{/each}
-              </tbody></table>
-            </li>
-          {/if}
-        {:else if info?.expectsHours && !isStation}
-          <li class="row muted">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></svg>
-            <span>Horaires non renseignés<small class="why">Personne ne les a encore ajoutés à la carte collaborative que nous utilisons (OpenStreetMap).</small></span>
-          </li>
-        {/if}
-        {#if info?.phone}
-          <li class="row">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.6 3.5 9 3l2 4.6-2.3 1.6a12 12 0 0 0 6.1 6.1l1.6-2.3L21 15l-.5 2.4A3 3 0 0 1 17.6 20C10 20 4 14 4 6.4a3 3 0 0 1 2.6-2.9z" /></svg>
-            <a class="row-link" href={`tel:${info.phone.replace(/\s/g, '')}`}>{info.phone}</a>
-          </li>
-        {/if}
-        {#if info?.website}
-          <li class="row">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M3.5 12h17M12 3.5c2.5 2.6 3.6 5.4 3.6 8.5s-1.1 5.9-3.6 8.5M12 3.5C9.5 6.1 8.4 8.9 8.4 12s1.1 5.9 3.6 8.5" /></svg>
-            <a class="row-link" href={href(info.website)} target="_blank" rel="noopener">{host(info.website)}</a>
-          </li>
-        {/if}
-        {#if !isStation}
-          <li class="row sc-row">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.5 12 5l8 6.5M6.5 10v9.5h11V10" /><path d="M10.2 19.5v-4.8h3.6v4.8" /></svg>
-            {#if placeShortcut}
-              <span>Votre {SHORT_NAMES[placeShortcut].toLowerCase()}</span>
-              <button class="link" onclick={() => { setShortcut(placeShortcut, null); say('Raccourci retiré'); }}>Retirer</button>
-            {:else}
-              <span>Définir comme</span>
-              <button class="link" onclick={() => { setShortcut('home', place); say('Maison enregistrée · gardée sur cet appareil'); }}>Maison</button>
-              <button class="link" onclick={() => { setShortcut('work', place); say('Travail enregistré · gardé sur cet appareil'); }}>Travail</button>
-            {/if}
-          </li>
-        {/if}
-        {#each info?.practical || [] as d}
-          <li class="row">
-            {#if d.icon === 'wheelchair'}
-              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="4.5" r="1.8" /><path d="M11 7.5v6h5l2 5M11 10h4M8.5 11.2a5 5 0 1 0 6.3 6.3" /></svg>
-            {:else if d.icon === 'ticket'}
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16v3a2 2 0 0 0 0 4v3H4v-3a2 2 0 0 0 0-4z" /><path d="M14 7v10" stroke-dasharray="2 2" /></svg>
-            {:else}
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 20.5h17M5 20.5v-9M19 20.5v-9M9 20.5v-9M15 20.5v-9M3.5 11.5h17L12 4z" /></svg>
-            {/if}
-            <span>{d.text}</span>
-          </li>
-        {/each}
-      </ul>
       {#if info?.checkDate}
         <p class="fresh">Informations vérifiées le {new Date(info.checkDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
       {/if}
@@ -1482,7 +1693,7 @@
             <button onclick={() => openFeature(f)}>
               <span class="n-dot" style:--fam={famColor(category)} aria-hidden="true"></span>
               <span class="r-text">
-                <span class="r-name">{f.properties.name}</span>
+                <span class="r-name">{displayName(f, category)}</span>
                 {#if category.transit}
                   {#if sd?.status === 'ok'}
                     {#each sd.data.lines.slice(0, 4) as l}
@@ -1660,6 +1871,17 @@
   .field.editing { background: var(--fill); border-radius: 10px; }
   .swap svg { width: 22px; height: 22px; color: var(--ink); }
   .dir-card .results { margin-top: 4px; }
+  .field.via-field { grid-template-columns: 22px 1fr 36px; }
+  .field-mark.via { width: 7px; height: 7px; border-radius: 2px; border: 2.5px solid var(--muted); background: var(--card); }
+  .rm-stop { width: 36px; height: 36px; color: var(--muted); }
+  .rm-stop svg { width: 18px; height: 18px; }
+  .add-stop { display: flex; align-items: center; gap: 10px; border: 0; background: none; color: var(--accent); font-size: 15px; font-weight: 500;
+    padding: 9px 6px 9px 0; cursor: pointer; border-top: 1px solid var(--line); margin-left: 22px; }
+  .add-stop svg { width: 16px; height: 16px; stroke-width: 2.2; margin-left: -22px; }
+  .fields.has-add::before { bottom: 64px; }
+  .steps li.stop { font-weight: 600; }
+  .stop-chip { width: 10px; height: 10px; border-radius: 2px; border: 2.5px solid var(--muted); background: var(--card); }
+  .leg-rail.stop { background: none; border: 2.5px solid var(--muted); border-radius: 3px; width: 8px; height: 8px; align-self: start; margin-top: 6px; }
 
   .modes { display: flex; gap: 6px; }
   .mode {
@@ -1900,6 +2122,7 @@
   .howto a { color: var(--accent); }
   .import-btn { display: flex; justify-content: center; align-items: center; min-height: 48px; border-radius: 14px; cursor: pointer; font-weight: 600; }
   .chip-edit { list-style: none; margin: 12px 0 8px; padding: 0; }
+  .chip-edit li.ce-head { display: block; min-height: 0; padding: 18px 0 6px; font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
   .chip-edit li { display: grid; grid-template-columns: 44px 1fr 40px 40px; align-items: center; gap: 4px; border-bottom: 1px solid var(--line); min-height: 52px; }
   .chip-edit input { border: 0; background: none; font: inherit; font-size: 16px; color: var(--ink); padding: 10px 0; min-width: 0; }
   .chip-edit input::placeholder { color: var(--ink); }

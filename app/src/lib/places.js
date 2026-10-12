@@ -20,6 +20,19 @@ const TYPES = {
   clothing_store: 'Vêtements', jewelry: 'Bijouterie', shoes: 'Chaussures', art_gallery: "Galerie d'art",
   subway: 'Station de métro', halt: 'Gare', hostel: 'Auberge de jeunesse', dentist: 'Dentiste',
   beauty: 'Institut de beauté', optician: 'Opticien', gift: 'Cadeaux', toys: 'Jouets',
+  cemetery: 'Cimetière', grave_yard: 'Cimetière', florist: 'Fleuriste', tobacco: 'Tabac', newsagent: 'Presse',
+  kiosk: 'Kiosque', laundry: 'Laverie', dry_cleaning: 'Pressing', bicycle_rental: 'Vélos en libre-service',
+  bicycle: 'Magasin de vélos', parcel_locker: 'Consigne à colis', playground: 'Aire de jeux', clinic: 'Clinique',
+  veterinary: 'Vétérinaire', pet: 'Animalerie', sports_centre: 'Centre sportif', fitness_centre: 'Salle de sport',
+  swimming_pool: 'Piscine', toilets: 'Toilettes', drinking_water: "Point d'eau", charging_station: 'Borne de recharge',
+  parking: 'Parking', police: 'Police', hardware: 'Quincaillerie', doityourself: 'Bricolage', mobile_phone: 'Téléphonie',
+  computer: 'Informatique', electronics: 'Électronique', stationery: 'Papeterie', copyshop: 'Reprographie',
+  townhall: 'Mairie', musical_instrument: 'Instruments de musique', music: 'Disquaire', nightclub: 'Boîte de nuit',
+  escape_game: 'Escape game', coworking: 'Coworking', chocolate: 'Chocolatier', confectionery: 'Confiserie',
+  greengrocer: 'Primeur', deli: 'Traiteur', alcohol: 'Caviste', beverages: 'Boissons', cosmetics: 'Cosmétiques',
+  perfumery: 'Parfumerie', bag: 'Maroquinerie', atm: 'Distributeur', fuel: 'Station-service', yoga: 'Yoga',
+  climbing: 'Escalade', viewpoint: 'Point de vue', memorial: 'Mémorial', castle: 'Château', guest_house: "Chambre d'hôtes",
+  christian: 'Église', jewish: 'Synagogue', muslim: 'Mosquée', buddhist: 'Temple bouddhiste', paint: 'Peinture',
   house: 'Adresse', street: 'Rue', residential: 'Rue', city: 'Ville', suburb: 'Quartier'
 };
 
@@ -107,4 +120,30 @@ export async function details(place, signal) {
     wikidata: t.wikidata,
     wikipedia: t.wikipedia
   };
+}
+
+/**
+ * Lieux d'une catégorie autour d'un point (Photon, filtre « include », ex. osm.shop.florist).
+ * Complète les lieux lus dans la carte, utile pour les catégories rares (cimetières, piscines…).
+ * Rendu sous la forme des lieux de la carte : { id, properties: { name, subclass, osm }, geometry }.
+ */
+export async function searchCategory(include, near, signal, q = null) {
+  const url = new URL(PHOTON);
+  const params = new URLSearchParams({
+    lang: 'fr', limit: '20', lat: String(near.lat), lon: String(near.lon), location_bias_scale: '0.1',
+    bbox: '2.15,48.75,2.55,48.95'
+  });
+  // Avec un mot (« piscine ») : recherche texte limitée aux étiquettes OSM ; sinon : par catégorie seule.
+  if (q) { params.set('q', q); for (const c of include) params.append('osm_tag', c.replace(/^osm\./, '').replace('.', ':')); }
+  else params.set('include', include.join(','));
+  url.search = params;
+  const res = await fetch(url, { signal });
+  if (!res.ok) throw new Error(`Photon ${res.status}`);
+  const data = await res.json();
+  return data.features.filter((f) => f.properties.name).map((f) => {
+    const p = f.properties;
+    const type = { N: 'node', W: 'way', R: 'relation' }[p.osm_type];
+    return { id: `ph${p.osm_type}${p.osm_id}`, properties: { name: p.name, subclass: p.osm_value, osm: `${type}/${p.osm_id}` },
+      geometry: { coordinates: f.geometry.coordinates } };
+  });
 }
