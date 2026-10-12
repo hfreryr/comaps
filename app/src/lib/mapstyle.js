@@ -206,16 +206,18 @@ function lightStyle(base) {
 
       // Plan des transports : masqué par défaut, affiché par le bouton de modes.
       { id: 'transit-case', type: 'line', source: 'transit', layout: { visibility: 'none', 'line-cap': 'round', 'line-join': 'round' },
-        paint: { 'line-color': '#FFFFFF', 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 3.5, 16, 9] } },
+        paint: { 'line-color': '#FFFFFF', 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 1.8, 14, 3.2, 17, 5.5] } },
       { id: 'transit-line', type: 'line', source: 'transit', layout: { visibility: 'none', 'line-cap': 'round', 'line-join': 'round',
           'line-sort-key': ['match', ['get', 'mode'], 'rer', 2, 'metro', 1, 0] },
         paint: { 'line-color': ['get', 'colour'],
-                 'line-width': ['interpolate', ['linear'], ['zoom'], 11, ['match', ['get', 'mode'], 'rer', 2.6, 1.8], 16, ['match', ['get', 'mode'], 'rer', 6.5, 5]] } },
-      { id: 'transit-label', type: 'symbol', source: 'transit', minzoom: 12.5,
-        layout: { visibility: 'none', 'symbol-placement': 'line', 'symbol-spacing': 500,
-                  'text-field': ['concat', ['match', ['get', 'mode'], 'metro', 'M', 'rer', 'RER ', 'tram', '', ''], ['get', 'ref']],
-                  'text-font': FONT.bold, 'text-size': 11, 'text-keep-upright': true },
-        paint: { 'text-color': ['get', 'colour'], 'text-halo-color': C.halo, 'text-halo-width': 2.2 } },
+                 // traits fins, comme les plans de référence (le RER un peu plus épais que le métro)
+                 'line-width': ['interpolate', ['linear'], ['zoom'], 11, ['match', ['get', 'mode'], 'rer', 1.4, 0.9], 14, ['match', ['get', 'mode'], 'rer', 2.4, 1.8], 17, ['match', ['get', 'mode'], 'rer', 3.8, 3]] } },
+      // Numéro de la ligne en petite pastille posée sur le tracé : rond (métro), carré (RER), rectangle (tram).
+      { id: 'transit-label', type: 'symbol', source: 'transit', minzoom: 11.5,
+        layout: { visibility: 'none', 'symbol-placement': 'line', 'symbol-spacing': ['interpolate', ['linear'], ['zoom'], 12, 220, 16, 420],
+                  'icon-image': ['concat', 'tl|', ['get', 'mode'], '|', ['get', 'ref'], '|', ['get', 'colour']],
+                  'icon-rotation-alignment': 'viewport', 'icon-size': ['interpolate', ['linear'], ['zoom'], 11.5, 0.8, 15, 1],
+                  'icon-padding': 2, 'symbol-sort-key': ['match', ['get', 'mode'], 'rer', 0, 'metro', 1, 2] } },
       ...['Point', 'LineString'].map((g) => ({
         id: `water-name-${g === 'Point' ? 'point' : 'line'}`, type: 'symbol', source: 'omt', 'source-layer': 'water_name',
         filter: ['==', ['geometry-type'], g],
@@ -334,6 +336,31 @@ export function poiImage(color, glyph, px = 18) {
   return { data: g.getImageData(0, 0, size, size), pixelRatio: s };
 }
 
+// Pastille de ligne de transport : rond (métro), carré arrondi (RER), rectangle arrondi (tram),
+// à la couleur officielle de la ligne, numéro en blanc (ou en noir sur les couleurs claires).
+export function lineBadge(mode, ref, colour) {
+  const s = 2, h = 15;
+  const label = mode === 'metro' ? ref.replace('bis', 'b') : ref;
+  const c = document.createElement('canvas');
+  const g = c.getContext('2d');
+  const fontPx = (label.length > 2 ? 8 : label.length > 1 ? 9 : 10) * s;
+  const font = `700 ${fontPx}px -apple-system, "Segoe UI", Roboto, Arial, sans-serif`;
+  g.font = font;
+  const textW = g.measureText(label).width;
+  const w = mode === 'metro' && label.length <= 2 ? h : Math.max(h, Math.ceil(textW / s) + 7);
+  c.width = (w + 2) * s; c.height = (h + 2) * s;
+  const ctx = c.getContext('2d');
+  const x = s, y = s, W = w * s, H = h * s;
+  const r = mode === 'metro' ? H / 2 : mode === 'rer' ? 3.5 * s : 5 * s;
+  ctx.beginPath(); ctx.roundRect(x - s * 0.8, y - s * 0.8, W + s * 1.6, H + s * 1.6, r + s * 0.8); ctx.fillStyle = '#FFFFFF'; ctx.fill();
+  ctx.beginPath(); ctx.roundRect(x, y, W, H, r); ctx.fillStyle = colour; ctx.fill();
+  const n = parseInt(colour.slice(1), 16), lum = (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
+  ctx.fillStyle = lum > 0.62 ? '#1C1D1F' : '#FFFFFF';
+  ctx.font = font; ctx.textAlign = 'center';   // (redimensionner le canevas efface la police) ctx.textBaseline = 'middle';
+  ctx.fillText(label, x + W / 2, y + H / 2 + s * 0.6);
+  return { data: ctx.getImageData(0, 0, c.width, c.height), pixelRatio: s };
+}
+
 // Pastille métro : disque bleu, liseré blanc, « M » blanc.
 export function metroImage(px = 18) {
   const s = 2, size = (px + 4) * s;
@@ -361,6 +388,11 @@ export function provideImage(map, id) {
   }
   if (id === 'fav') {             // lieux enregistrés : pastille rose à cœur blanc
     const { data, pixelRatio } = poiImage(FAV_COLOR, 'heart', 20);
+    return map.addImage(id, data, { pixelRatio });
+  }
+  if (id.startsWith('tl|')) {
+    const [, mode, ref, colour] = id.split('|');
+    const { data, pixelRatio } = lineBadge(mode, ref, colour);
     return map.addImage(id, data, { pixelRatio });
   }
   if (id.startsWith('poi-')) {
