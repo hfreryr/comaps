@@ -12,6 +12,7 @@
   import { stationExits, bestExit, exitLabel, sortExits } from '#lib/exits.js';
   import { readGoogleExport } from '#lib/importgoogle.js';
   import { placeForExit, placeForTransfer, placeLabel } from '#lib/rame.js';
+  import { prepare, progress, arrowAngle, isRoundabout, navDistance, spokenDistance } from '#lib/nav.js';
 
   // Raccourcis de catégories. « key » ne change jamais ; intitulé, ordre et affichage sont personnalisables.
   // on : affiché d'origine (les autres s'ajoutent dans « Personnaliser les raccourcis ») ;
@@ -239,6 +240,13 @@
   let via = $state(null);            // arrêt intermédiaire facultatif
   let showVia = $state(false);
   let mode = $state('walk');
+  let pickedStreet = $state(0);      // itinéraire choisi parmi le principal et ses variantes (à pied, vélo, voiture)
+  let showSteps = $state(false);
+  // Guidage en cours : { kind, mode, steps, coords, cum, total, s, k, off, arrived, … }
+  let nav = $state(null);
+  let navFollow = $state(true);      // la carte suit la position (jusqu'à ce qu'on la déplace à la main)
+  let navList = $state(false);
+  let voice = $state(true);
   let editing = $state(null);        // 'from' | 'to' | null
   let fieldQuery = $state('');
   let fieldEl = $state();
@@ -288,6 +296,7 @@
     });
     map.setMissingStyleImageResolver((id) => provideImage(map, id));
     if (location.hostname === 'localhost') window.__map = map; // pour les tests locaux
+    if (location.hostname === 'localhost') window.__nav = () => nav && { k: nav.k, s: nav.s, total: nav.total, coords: $state.snapshot(nav.coords) };
     // Nos calques (trajet, favoris) sont à rajouter à chaque changement de style (clair ↔ sombre).
     map.on('style.load', addCustomLayers);
     darkMQ.addEventListener('change', (e) => { dark = e.matches; map.setStyle(mapStyle(base, dark)); });
@@ -302,6 +311,7 @@
       }
     });
     map.on('click', onMapClick);
+    map.on('dragstart', (e) => { if (nav && e.originalEvent) navFollow = false; });
     window.addEventListener('popstate', onPopState);
     window.addEventListener('keydown', onKeyDown);
     const offline = () => say('Pas de connexion. La recherche et les itinéraires reprendront dès le retour du réseau.');
@@ -396,7 +406,11 @@
     const feats = [];
     const r = current?.status === 'ok' ? current.data : null;
     if (r && mode !== 'transit') {
-      feats.push(mode === 'bike' ? line(r.coords, 'bike', BIKE_COLOR, '#13612A') : line(r.coords, mode, WALK_COLOR, '#1B3F9E'));
+      const opts = streetOpts(r);
+      const sel = opts[pickedStreet] || r;
+      // variantes en gris dessous (touchables), le trajet choisi en couleur par-dessus
+      opts.forEach((o, i) => { if (o !== sel) feats.push({ ...line(o.coords, 'alt', '#A3ADBA', '#7F8A98'), properties: { kind: 'alt', color: '#A3ADBA', edge: '#7F8A98', i } }); });
+      feats.push(mode === 'bike' ? line(sel.coords, 'bike', BIKE_COLOR, '#13612A') : line(sel.coords, mode, WALK_COLOR, '#1B3F9E'));
     } else if (r && mode === 'transit' && r[picked]) {
       for (const leg of r[picked].legs) {
         if (leg.coords.length < 2) continue;
@@ -448,7 +462,11 @@
   }
 
   function onMapClick(e) {
+    if (nav) return;
     if (directions) {
+      const alt = !editing && map.queryRenderedFeatures([[e.point.x - 8, e.point.y - 8], [e.point.x + 8, e.point.y + 8]], { layers: ['route-line'] })
+        .find((f) => f.properties.kind === 'alt');
+      if (alt) return pickStreet(alt.properties.i);
       const which = editing || (Date.now() - lastEdit.at < 800 ? lastEdit.which : null);
       if (which) pickOnMap(which, e.lngLat);
       return;
@@ -468,10 +486,14 @@
 
   async function openPoint({ lng, lat }) {
     const p = { id: `pt${lng},${lat}`, name: 'Point sélectionné', type: 'Adresse', address: '', lat, lon: lng };
+    clearSelection();
     placeMarker(lng, lat);
     place = p;
     info = {};
     deps = null;
+    wiki = null;          // (sinon la photo du lieu précédent restait affichée)
+    exits = null;
+    moreText = false;
     showWeek = false;
     const label = await reverseAddress(lat, lng).catch(() => null);
     if (place === p || place?.id === p.id) { place = { ...p, name: label || 'Point sélectionné' }; remember(place); }
@@ -711,6 +733,9 @@
   }
 
   async function openPlace(p) {
+    showModes = false;      // une seule chose ouverte à la fois
+    editChips = false;
+    importOpen = false;
     if (p.name) remember(p);
     place = p;
     info = null;
@@ -785,6 +810,8 @@
     place = null;
     info = null;
     deps = null;
+    wiki = null;
+    exits = null;
     marker?.remove();
     clearSelection();
   }
@@ -969,7 +996,9 @@
 
   // Fermer « ce qui est au-dessus » : Échap, ou le bouton Retour du téléphone.
   function closeTop() {
-    if (showModes) showModes = false;
+    if (navList) navList = false;
+    else if (nav) endNav();
+    else if (showModes) showModes = false;
     else if (editing) editing = null;
     else if (editChips || importOpen) { editChips = false; importOpen = false; }
     else if (directions) closeDirections();
@@ -1146,6 +1175,7 @@
     routeCtrl = new AbortController();
     const signal = routeCtrl.signal;
     picked = 0;
+    pickedStreet = 0;
     routes = { walk: { status: 'loading' }, bike: { status: 'loading' }, transit: { status: 'loading' }, car: { status: 'loading' } };
     const run = async (id, fn) => {
       try {
@@ -1165,13 +1195,21 @@
     run('car', async () => {
       const r = await streetRoute(from, to, 'car', signal, v);
       const t = await trafficEstimate(from, to);
-      return { ...r, freeDuration: r.duration, duration: r.duration * t.factor, traffic: t.label };
+      const withTraffic = (x) => ({ ...x, freeDuration: x.duration, duration: x.duration * t.factor, traffic: t.label });
+      return { ...withTraffic(r), alts: r.alts.map(withTraffic) };
     });
   }
 
   function chooseMode(m) {
     mode = m;
     picked = 0;
+    pickedStreet = 0;
+    showSteps = false;
+    drawRoute();
+  }
+  const streetOpts = (r) => (r ? [r, ...(r.alts || [])] : []);
+  function pickStreet(i) {
+    pickedStreet = i;
     drawRoute();
   }
 
@@ -1179,6 +1217,190 @@
     picked = i;
     drawRoute();
   }
+
+  // ——— Guidage ———
+  let navWatch = null;
+  let wakeLock = null;
+  let offCount = 0;
+  let rerouting = false;
+  let arriveCount = 0;
+  let spoken = new Set();
+  let navTick;
+  const NAV = { walk: { far: 120, near: 25, off: 35, zoom: 17.6 }, bike: { far: 200, near: 40, off: 45, zoom: 17 },
+                car: { far: 500, near: 120, off: 50, zoom: 16.3 }, transit: { far: 0, near: 0, off: 9999, zoom: 16.5 } };
+
+  function speak(text) {
+    if (!voice || !text || !('speechSynthesis' in window)) return;
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'fr-FR';
+    speechSynthesis.speak(u);
+  }
+
+  // Trajet en transport → étapes du guidage : marcher, monter, descendre (avec sortie et place dans la rame).
+  function transitSteps(it) {
+    const coords = [], steps = [];
+    it.legs.forEach((leg, i) => {
+      const idx = Math.max(0, coords.length - 1);
+      if (leg.mode === 'STOP') { steps.push({ text: `Arrêt : ${leg.from}`, type: 'stop', idx, t: +leg.start }); return; }
+      coords.push(...leg.coords);
+      if (leg.mode === 'WALK') {
+        const dest = leg.to === 'Arrivée' || i === it.legs.length - 1 ? to.label : leg.to;
+        steps.push({ text: `Marchez jusqu'à ${dest}`, sub: `${fmtDuration(leg.duration)}${leg.distance ? ` · ${fmtDistance(leg.distance)}` : ''}`, type: 'walk', idx, t: +leg.start });
+      } else {
+        const tip = legExits[`${picked}|${i}|${leg.to}`];
+        const name = `${MODE_NAMES[leg.mode] || 'Ligne'} ${leg.line}`.trim();
+        steps.push({ text: `Prenez le ${name} direction ${leg.headsign}`, sub: `À ${leg.from} · départ ${fmtTime(leg.start)}${tip?.place ? ` · montez ${placeLabel(tip.place)}` : ''}`,
+          type: 'board', idx, t: +leg.start, leg });
+        steps.push({ text: `Descendez à ${leg.to}`, sub: `${leg.stops ? `${leg.stops + 1} arrêts · ` : ''}arrivée ${fmtTime(leg.end)}${tip?.exit ? ` · ${exitLabel(tip.exit).replace(/^Sortie/, 'sortie')}` : ''}`,
+          type: 'alight', idx: Math.max(0, coords.length - 1), t: +leg.end - 60000, leg });
+      }
+    });
+    return { coords: coords.length > 1 ? coords : [[from.lon, from.lat], [to.lon, to.lat]], steps };
+  }
+
+  async function startNav(option) {
+    const kind = mode === 'transit' ? 'transit' : 'street';
+    let base;
+    if (kind === 'transit') {
+      const { coords, steps } = transitSteps(option);
+      base = { ...prepare(coords, steps, option.duration), end: +option.end };
+    } else {
+      base = prepare(option.raw, option.steps, option.duration);
+      // pendant le trajet, seul l'itinéraire choisi reste sur la carte
+      map.getSource('route')?.setData({ type: 'FeatureCollection', features: [line(option.coords, mode,
+        mode === 'bike' ? BIKE_COLOR : WALK_COLOR, mode === 'bike' ? '#13612A' : '#1B3F9E')] });
+    }
+    nav = { ...base, kind, mode, option, s: 0, k: 0, off: 0, arrived: false, startedAt: Date.now() };
+    navFollow = true;
+    navList = false;
+    offCount = 0;
+    arriveCount = 0;
+    spoken = new Set();
+    // l'écran reste allumé pendant le trajet (si le téléphone le permet)
+    try { wakeLock = await navigator.wakeLock?.request('screen'); } catch { wakeLock = null; }
+    speak(kind === 'transit' ? nav.steps[0]?.text : nav.steps[0]?.speak || nav.steps[0]?.text);
+    clearInterval(navTick);
+    navTick = setInterval(() => { now = Date.now(); if (nav?.kind === 'transit') updateNav(); }, 5000);
+    if (navigator.geolocation) {
+      navWatch = navigator.geolocation.watchPosition(onFix, () => {}, { enableHighAccuracy: true, maximumAge: 2000, timeout: 20000 });
+    }
+    if (me) onFix({ coords: { latitude: me.lat, longitude: me.lon, heading: null, speed: null } });
+  }
+
+  let lastFix = null;
+  function onFix(pos) {
+    if (!nav) return;
+    const { latitude: lat, longitude: lon, heading, speed } = pos.coords;
+    me = { label: 'Votre position', lat, lon, isMe: true };
+    lastFix = { lat, lon, heading: speed > 1 && heading != null && !Number.isNaN(heading) ? heading : null };
+    if (!meMarker) {
+      const el = document.createElement('div');
+      el.className = 'me';
+      meMarker = new maplibregl.Marker({ element: el, rotationAlignment: 'map' });
+    }
+    meMarker.setLngLat([lon, lat]).addTo(map);
+    updateNav();
+  }
+
+  function updateNav() {
+    if (!nav || !lastFix) return;
+    const cfg = NAV[nav.kind === 'transit' ? 'transit' : nav.mode];
+    const p = progress(nav, [lastFix.lon, lastFix.lat], nav.s);
+    let k = p.k;
+    if (nav.kind === 'transit') {
+      // sous terre, plus de position : on avance aussi avec l'horaire
+      const byTime = nav.steps.reduce((acc, st, i) => (st.t <= Date.now() ? i : acc), 0);
+      k = Math.max(k, byTime, nav.k);
+    } else k = Math.max(k, nav.k);
+    // arrivée confirmée par deux positions de suite (une position ancienne ou imprécise ne suffit pas)
+    const atEnd = nav.total - p.s < 20 && p.off < 40 || (nav.kind === 'transit' && Date.now() > nav.end && nav.total - p.s < 80);
+    arriveCount = atEnd ? arriveCount + 1 : 0;
+    const arrived = arriveCount >= 2;
+    const heading = lastFix.heading ?? p.heading;
+    const prevK = nav.k;
+    nav = { ...nav, s: Math.max(p.s, nav.s - 30), k, off: p.off, heading, arrived: nav.arrived || arrived };
+    meMarker?.setRotationAlignment('map');      // la flèche suit la carte (qui tourne avec vous)
+    meMarker?.setRotation(heading);
+    meMarker?.getElement().classList.add('navigating');
+    if (navFollow) {
+      map.easeTo({ center: [lastFix.lon, lastFix.lat], bearing: heading, pitch: 50, zoom: cfg.zoom,
+        offset: [0, Math.round(window.innerHeight * 0.18)], duration: 900 });
+    }
+    if (nav.arrived && !spoken.has('fin')) { spoken.add('fin'); speak(`Vous êtes arrivé. ${to.label}`); return; }
+    if (nav.kind === 'transit') {
+      if (k !== prevK) speak(nav.steps[k].text);
+      return;
+    }
+    // annonces : une de loin, une juste avant la manœuvre
+    const next = nav.steps[k + 1];
+    if (next) {
+      const d = next.s - nav.s;
+      if (d < cfg.near && !spoken.has(`${k + 1}n`)) { spoken.add(`${k + 1}n`); spoken.add(`${k + 1}f`); speak(next.speak || next.text); }
+      else if (d < cfg.far && d > cfg.near * 2 && !spoken.has(`${k + 1}f`)) { spoken.add(`${k + 1}f`); speak(spokenDistance(d) + (next.speak || next.text).replace(/^./, (c) => c.toLowerCase())); }
+    }
+    // écart au trajet : nouveau calcul depuis la position actuelle
+    offCount = p.off > cfg.off ? offCount + 1 : 0;
+    if (offCount >= 3 && !rerouting) reroute();
+  }
+
+  async function reroute() {
+    rerouting = true;
+    try {
+      const passedVia = !showVia || !via || nav.steps.findIndex((st) => st.type === 'stop') <= nav.k;
+      const r = await streetRoute({ lat: me.lat, lon: me.lon }, to, nav.mode, undefined, passedVia ? null : via);
+      if (!nav) return;
+      let route = r;
+      if (nav.mode === 'car') { const t = await trafficEstimate(me, to); route = { ...r, duration: r.duration * t.factor }; }
+      nav = { ...nav, ...prepare(route.raw, route.steps, route.duration), option: route, s: 0, k: 0, startedAt: Date.now() };
+      spoken = new Set();
+      offCount = 0;
+      say('Nouvel itinéraire');
+      speak('Nouvel itinéraire. ' + (route.steps[0]?.speak || ''));
+      map.getSource('route')?.setData({ type: 'FeatureCollection', features: [line(route.coords, nav.mode, nav.mode === 'bike' ? BIKE_COLOR : WALK_COLOR, nav.mode === 'bike' ? '#13612A' : '#1B3F9E')] });
+    } catch { /* on réessaiera au prochain écart */ }
+    rerouting = false;
+  }
+
+  function endNav() {
+    if (navWatch != null) navigator.geolocation.clearWatch(navWatch);
+    navWatch = null;
+    clearInterval(navTick);
+    wakeLock?.release?.().catch?.(() => {});
+    wakeLock = null;
+    if ('speechSynthesis' in window) speechSynthesis.cancel();
+    nav = null;
+    navList = false;
+    meMarker?.setRotation(0);
+    meMarker?.setRotationAlignment('viewport');
+    meMarker?.getElement().classList.remove('navigating');
+    map.easeTo({ pitch: 0, bearing: 0, duration: 600 });
+    drawRoute();
+  }
+  // l'écran peut se rallumer après un passage en arrière-plan : on redemande à le garder allumé
+  $effect(() => {
+    const again = async () => { if (nav && document.visibilityState === 'visible') { try { wakeLock = await navigator.wakeLock?.request('screen'); } catch { /* rien */ } } };
+    document.addEventListener('visibilitychange', again);
+    return () => document.removeEventListener('visibilitychange', again);
+  });
+
+  // Ce qu'affiche le bandeau du haut
+  const navBanner = $derived.by(() => {
+    if (!nav) return null;
+    if (nav.arrived) return { arrived: true, text: `Vous êtes arrivé`, sub: to?.label };
+    if (nav.kind === 'transit') {
+      const st = nav.steps[nav.k];
+      return { icon: st.type, text: st.text, sub: st.sub, then: nav.steps[nav.k + 1]?.text, line: st.leg };
+    }
+    const next = nav.steps[nav.k + 1];
+    if (!next) return { icon: 'arrive', dist: navDistance(nav.total - nav.s), text: `Arrivée : ${to.label}` };
+    return { icon: next.type, dist: navDistance(next.s - nav.s), text: next.text, then: nav.steps[nav.k + 2]?.text || `Arrivée : ${to.label}` };
+  });
+  const navRemaining = $derived.by(() => {
+    if (!nav) return null;
+    const left = nav.kind === 'transit' ? Math.max(0, (nav.end - now) / 1000) : nav.duration * Math.max(0, 1 - nav.s / nav.total);
+    return { eta: fmtTime(new Date(now + left * 1000)), min: fmtDuration(left), km: fmtDistance(Math.max(0, nav.total - nav.s)) };
+  });
 
   const arrival = (seconds) => fmtTime(new Date(Date.now() + seconds * 1000));
   const inMinutes = (d) => {
@@ -1470,7 +1692,7 @@
       </ul>
 {/snippet}
 
-<div class="app" class:routing={directions}>
+<div class="app" class:routing={directions} class:navigating={!!nav}>
   <div class="map" bind:this={mapEl} aria-label="Carte"></div>
 
   {#if !directions}
@@ -1479,7 +1701,7 @@
         <svg class="lens" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="M15.5 15.5 20 20" /></svg>
         <input id="search" type="search" placeholder="Rechercher un lieu ou une adresse" aria-label="Rechercher un lieu ou une adresse"
           autocomplete="off" enterkeyhint="search" bind:value={query}
-          onfocus={() => { focused = true; editChips = false; importOpen = false; showModes = false; }} onblur={() => setTimeout(() => (focused = false), 150)} onkeydown={onKey} />
+          onfocus={() => { focused = true; editChips = false; importOpen = false; showModes = false; closePlace(); clearCategory(); }} onblur={() => setTimeout(() => (focused = false), 150)} onkeydown={onKey} />
         {#if query}
           <button class="icon-btn" onclick={clearSearch} aria-label="Effacer la recherche">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" /></svg>
@@ -1501,7 +1723,7 @@
         </nav>
       {/if}
     </header>
-  {:else}
+  {:else if !nav}
     <header class="top dir">
       <div class="dir-card" class:open={editing}>
         <button class="icon-btn back" onclick={closeDirections} aria-label="Revenir à la fiche du lieu">
@@ -1583,6 +1805,59 @@
   <button class="locate" class:busy={locating} onclick={locate} aria-label="Me localiser">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 4 4 11l7 2 2 7z" class="solid" /></svg>
   </button>
+  {#if nav && navBanner}
+    <div class="nav-top" class:arrived={navBanner.arrived} role="status" aria-live="polite">
+      <div class="nav-main">
+        <span class="nav-icon" aria-hidden="true">
+          {#if navBanner.arrived || navBanner.icon === 'arrive' || navBanner.icon === 'stop'}
+            <svg viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z" class="solid" /><circle cx="12" cy="9.5" r="2.6" class="hole" /></svg>
+          {:else if navBanner.icon === 'walk'}{@render modeIcon('walk')}
+          {:else if navBanner.icon === 'board' || navBanner.icon === 'alight'}
+            <span class="badge" class:round={navBanner.line?.mode === 'SUBWAY' || navBanner.line?.mode === 'METRO'} style:background={navBanner.line?.color} style:color={navBanner.line?.textColor}>{navBanner.line ? badge(navBanner.line) : ''}</span>
+          {:else if isRoundabout(navBanner.icon)}
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="4.5" /><path d="M12 8.5V3M9 6l3-3 3 3M12 17.5V22" /></svg>
+          {:else}
+            <svg viewBox="0 0 24 24" style:transform={`rotate(${arrowAngle(navBanner.icon)}deg)`}><path d="M12 21V6M6.5 11.5 12 6l5.5 5.5" /></svg>
+          {/if}
+        </span>
+        <span class="nav-txt">
+          {#if navBanner.dist}<span class="nav-dist">{navBanner.dist}</span>{/if}
+          <span class="nav-text">{navBanner.text}</span>
+          {#if navBanner.sub}<span class="nav-sub">{navBanner.sub}</span>{/if}
+        </span>
+      </div>
+      {#if navBanner.then && !navBanner.arrived}<p class="nav-then">Puis : {navBanner.then}</p>{/if}
+    </div>
+    {#if !navFollow}
+      <button class="nav-recenter" onclick={() => { navFollow = true; updateNav(); }}>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4 19 20l-7-4-7 4z" class="solid" /></svg>Recentrer
+      </button>
+    {/if}
+    {#if navList}
+      <section class="sheet nav-list" aria-label="Étapes du trajet">
+        <h1>Étapes</h1>
+        <ol class="steps">
+          {#each nav.steps as st, i}
+            <li class:done={i < nav.k + (nav.kind === 'transit' ? 0 : 1)} class:now={i === (nav.kind === 'transit' ? nav.k : nav.k + 1)}>
+              <span>{st.text}{#if st.sub}<small class="why">{st.sub}</small>{/if}</span>
+            </li>
+          {/each}
+          <li class="arrive"><span>Arrivée : {to.label}</span></li>
+        </ol>
+      </section>
+    {/if}
+    <div class="nav-bottom">
+      <button class="nav-eta" onclick={() => (navList = !navList)} aria-expanded={navList} aria-label="Voir les étapes">
+        <strong>{navBanner.arrived ? 'Arrivé' : navRemaining.eta}</strong>
+        <span>{navBanner.arrived ? to.label : `${navRemaining.min} · ${navRemaining.km}`}</span>
+      </button>
+      <button class="nav-btn" onclick={() => { voice = !voice; if (!voice && 'speechSynthesis' in window) speechSynthesis.cancel(); }} aria-pressed={voice} aria-label={voice ? 'Couper la voix' : 'Activer la voix'}>
+        {#if voice}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" /><path d="M15.5 9a4.5 4.5 0 0 1 0 6M18 6.5a8 8 0 0 1 0 11" /></svg>
+        {:else}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" /><path d="m16 9.5 5 5M21 9.5l-5 5" /></svg>{/if}
+      </button>
+      <button class="nav-end" onclick={endNav}>Fin</button>
+    </div>
+  {/if}
   {#if toast}<p class="toast" role="status">{toast}{#if toastAction}<button onclick={undoToast}>{toastAction.label}</button>{/if}</p>{/if}
   {#if showPromise && !place && !category && !directions && !importOpen && !editChips}
     <div class="promise" role="note">
@@ -1637,7 +1912,7 @@
       </ul>
       <button class="link more" onclick={resetChips}>Revenir aux raccourcis d'origine</button>
     </section>
-  {:else if directions && !editing}
+  {:else if directions && !editing && !nav}
     <section class="sheet" aria-label="Itinéraire" use:draggable={{ key: `${from?.lat},${to?.lat}` }}>
       <button class="grip" aria-label="Agrandir la fiche"></button>
       {#if !from}
@@ -1653,23 +1928,37 @@
         <p class="empty">Le service d'itinéraire ne répond pas. Réessayez dans un instant.</p>
         <button class="retry" onclick={computeRoutes}>Réessayer</button>
       {:else if mode !== 'transit'}
-        {@const r = current.data}
-        <div class="summary">
-          <p class="big">{fmtDuration(r.duration)}</p>
-          <p class="sub">{fmtDistance(r.distance)} · arrivée vers {arrival(r.duration)}</p>
-          {#if mode === 'bike'}
-            <p class="traffic-note">Itinéraire adapté aux vélos : pistes cyclables et rues calmes en priorité.</p>
-          {/if}
-          {#if mode === 'car'}
-            <p class="traffic-note">{r.traffic ? `Estimation avec le ${r.traffic}` : 'Estimation sur route fluide'}, d'après les capteurs de la Ville de Paris. Pas de trafic en temps réel : nous ne suivons pas les téléphones.</p>
-          {/if}
-        </div>
-        <ol class="steps">
-          {#each r.steps as s}
-            <li class:stop={s.stop}><span>{s.text}</span>{#if s.distance >= 10}<span class="step-dist">{fmtDistance(s.distance)}</span>{/if}</li>
+        {@const opts = streetOpts(current.data)}
+        {@const sel = opts[pickedStreet] || opts[0]}
+        <ul class="route-cards">
+          {#each opts as r, i}
+            <li class:on={i === pickedStreet}>
+              <button class="rc-main" onclick={() => pickStreet(i)} aria-pressed={i === pickedStreet}>
+                <span class="rc-dur">{fmtDuration(r.duration)}</span>
+                <span class="rc-sub">Arrivée {arrival(r.duration)} · {fmtDistance(r.distance)}</span>
+                <span class="rc-tag">{i === 0 ? 'Le plus rapide' : `${Math.max(1, Math.round((r.duration - opts[0].duration) / 60))} min de plus`}</span>
+              </button>
+              <button class="go" onclick={() => startNav(r)}>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4 19 20l-7-4-7 4z" class="solid" /></svg>Aller
+              </button>
+            </li>
           {/each}
-          <li class="arrive"><span>Arrivée : {to.label}</span></li>
-        </ol>
+        </ul>
+        {#if mode === 'bike'}
+          <p class="traffic-note">Itinéraire adapté aux vélos : pistes cyclables et rues calmes en priorité.</p>
+        {/if}
+        {#if mode === 'car'}
+          <p class="traffic-note">{sel.traffic ? `Estimation avec le ${sel.traffic}` : 'Estimation sur route fluide'}, d'après les capteurs de la Ville de Paris. Pas de trafic en temps réel : nous ne suivons pas les téléphones.</p>
+        {/if}
+        <button class="link more" onclick={() => (showSteps = !showSteps)} aria-expanded={showSteps}>{showSteps ? 'Masquer les étapes' : 'Voir les étapes'}</button>
+        {#if showSteps}
+          <ol class="steps">
+            {#each sel.steps as s}
+              <li class:stop={s.stop}><span>{s.text}</span>{#if s.distance >= 10}<span class="step-dist">{fmtDistance(s.distance)}</span>{/if}</li>
+            {/each}
+            <li class="arrive"><span>Arrivée : {to.label}</span></li>
+          </ol>
+        {/if}
       {:else}
         <ul class="options">
           {#each current.data as it, i}
@@ -1700,6 +1989,9 @@
                 <span class="opt-sub">Arrivée {fmtTime(it.end)}</span>
               </button>
               {#if picked === i}
+                <button class="go wide" onclick={() => startNav(it)}>
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4 19 20l-7-4-7 4z" class="solid" /></svg>Aller
+                </button>
                 <ol class="legs">
                   {#each it.legs as leg, li}
                     {#if leg.mode === 'STOP'}
@@ -2099,6 +2391,65 @@
   .close::after, .share::after { content: ''; position: absolute; inset: -6px; }
   .results .list-foot .link { min-height: 40px; }
   .rm-stop { width: 44px; height: 44px; }
+  /* ——— Choix de l'itinéraire ——— */
+  .route-cards { list-style: none; margin: 4px 0 8px; padding: 0; display: grid; gap: 8px; }
+  .route-cards li { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px; padding: 12px 12px 12px 16px;
+    border-radius: 16px; background: var(--fill); border: 2px solid transparent; }
+  .route-cards li.on { border-color: var(--accent); background: var(--soft-accent); }
+  .rc-main { display: grid; gap: 2px; text-align: left; border: 0; background: none; padding: 0; cursor: pointer; min-width: 0; }
+  .rc-dur { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .rc-sub { font-size: 14px; color: var(--muted); }
+  .rc-tag { font-size: 13.5px; color: var(--open); font-weight: 600; }
+  .route-cards li:not(:first-child) .rc-tag { color: var(--muted); font-weight: 500; }
+  .go { display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: 14px; background: #1E9E4A; color: #fff;
+    font-size: 16px; font-weight: 700; padding: 0 18px; height: 48px; cursor: pointer; }
+  .go svg { width: 18px; height: 18px; }
+  .go.wide { width: calc(100% - 40px); justify-content: center; margin: 4px 20px 6px; }
+  .traffic-note { margin-top: 8px; }
+
+  /* ——— Guidage ——— */
+  .navigating .modes-ctl, .navigating .locate { display: none; }
+  .navigating .toast { bottom: calc(96px + env(safe-area-inset-bottom)); right: 12px; }
+  .nav-top {
+    position: absolute; z-index: 5; left: 10px; right: 10px; top: calc(10px + env(safe-area-inset-top));
+    background: #1D3A86; color: #fff; border-radius: 22px; box-shadow: var(--shadow-float); padding: 14px 16px; max-width: 520px;
+  }
+  .nav-top.arrived { background: #1E7A3E; }
+  .nav-main { display: grid; grid-template-columns: 52px 1fr; gap: 12px; align-items: center; }
+  .nav-icon { width: 52px; height: 52px; display: grid; place-items: center; }
+  .nav-icon svg { width: 46px; height: 46px; stroke-width: 2.6; transition: transform 0.2s; }
+  .nav-icon .solid { fill: #fff; }
+  .nav-icon .hole { fill: #1D3A86; stroke: none; }
+  .nav-icon .badge { font-size: 15px; }
+  .nav-txt { display: grid; gap: 1px; min-width: 0; }
+  .nav-dist { font-size: 30px; font-weight: 800; line-height: 1.05; font-variant-numeric: tabular-nums; }
+  .nav-text { font-size: 18px; font-weight: 600; line-height: 1.25; }
+  .nav-sub { font-size: 14px; opacity: 0.85; }
+  .nav-then { margin: 10px 0 0; padding-top: 9px; border-top: 1px solid rgb(255 255 255 / 0.2); font-size: 14.5px; opacity: 0.9;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .nav-bottom {
+    position: absolute; z-index: 5; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center;
+    padding: 12px 14px calc(12px + env(safe-area-inset-bottom)); background: var(--card); box-shadow: var(--shadow-sheet); border-radius: 22px 22px 0 0;
+  }
+  .nav-eta { display: grid; text-align: left; border: 0; background: none; padding: 4px 6px; cursor: pointer; min-width: 0; }
+  .nav-eta strong { font-size: 22px; font-variant-numeric: tabular-nums; }
+  .nav-eta span { font-size: 14px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .nav-btn { width: 48px; height: 48px; border-radius: 50%; border: 0; background: var(--fill); display: grid; place-items: center; cursor: pointer; color: var(--ink); }
+  .nav-btn svg { width: 22px; height: 22px; }
+  .nav-end { height: 48px; padding: 0 22px; border: 0; border-radius: 24px; background: var(--closed); color: #fff; font-weight: 700; font-size: 16px; cursor: pointer; }
+  .nav-recenter { position: absolute; z-index: 5; left: 50%; transform: translateX(-50%); bottom: calc(96px + env(safe-area-inset-bottom));
+    display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 18px; border: 0; border-radius: 22px;
+    background: var(--card); color: var(--accent); font-weight: 700; box-shadow: var(--shadow-float); cursor: pointer; }
+  .nav-recenter svg { width: 16px; height: 16px; }
+  .nav-list { bottom: calc(72px + env(safe-area-inset-bottom)); border-radius: 22px 22px 0 0; z-index: 4; }
+  .nav-list h1 { margin-top: 8px; }
+  .steps li.done { color: var(--faint); }
+  .steps li.now { font-weight: 700; color: var(--accent); }
+  :global(.me.navigating) {
+    width: 0; height: 0; border-radius: 0; background: none; border: 0; box-shadow: none;
+    border-left: 13px solid transparent; border-right: 13px solid transparent; border-bottom: 30px solid var(--accent);
+    filter: drop-shadow(0 0 2px #fff) drop-shadow(0 0 1px #fff) drop-shadow(0 2px 4px rgb(0 0 0 / 0.35));
+  }
   .chip.edit.on-edit { background: var(--accent-btn); color: #fff; }
   .compass svg { width: 24px; height: 24px; transition: transform 0.1s; }
   .compass .north { fill: var(--closed); }

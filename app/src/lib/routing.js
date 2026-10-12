@@ -80,31 +80,49 @@ export async function streetRoute(from, to, mode, signal, via = null) {
     costing,
     costing_options: mode === 'bike' ? { bicycle: { bicycle_type: 'City', use_roads: 0.25 } } : {},
     language: 'fr-FR',
-    units: 'km'
+    units: 'km',
+    ...(via ? {} : { alternates: 2 })      // itinéraires de rechange (pas possible avec un arrêt)
   };
   const url = `${VALHALLA}?json=${encodeURIComponent(JSON.stringify(body))}`;
   const res = await fetch(url, { signal });
   if (!res.ok) throw new Error(res.status === 400 ? 'no-route' : `valhalla-${res.status}`);
-  const { trip } = await res.json();
+  const json = await res.json();
+  const best = parseTrip(json.trip, mode, via);
+  best.alts = (json.alternates || []).map((a) => parseTrip(a.trip, mode, via))
+    // un « autre » trajet presque identique n'apporte rien
+    .filter((r) => Math.abs(r.distance - best.distance) > 40 || Math.abs(r.duration - best.duration) > 30);
+  return best;
+}
+
+/**
+ * Un trajet Valhalla → tracé lissé (pour la carte), tracé brut et étapes situées sur ce tracé (pour le guidage).
+ * Chaque étape : texte, distance, type de manœuvre, phrase à dire, et position (idx) sur le tracé brut.
+ */
+function parseTrip(trip, mode, via) {
   const coords = [];
+  const raw = [];
   const steps = [];
   trip.legs.forEach((leg, i) => {
-    coords.push(...smooth(decodePolyline(leg.shape, 6), mode === 'walk' ? 7 : 4));
-    steps.push(...simplifySteps(leg.maneuvers));
-    if (i < trip.legs.length - 1) steps.push({ text: `Arrêt : ${via.label}`, distance: 0, stop: true });
+    const shape = decodePolyline(leg.shape, 6);
+    const offset = raw.length;
+    raw.push(...shape);
+    coords.push(...smooth(shape, mode === 'walk' ? 7 : 4));
+    steps.push(...simplifySteps(leg.maneuvers, offset));
+    if (i < trip.legs.length - 1) steps.push({ text: `Arrêt : ${via.label}`, speak: `Arrêt : ${via.label}`, distance: 0, stop: true, type: 'stop', idx: raw.length - 1 });
   });
-  return { duration: trip.summary.time, distance: trip.summary.length * 1000, coords, steps };
+  return { duration: trip.summary.time, distance: trip.summary.length * 1000, coords, raw, steps };
 }
 
 // Des consignes à l'échelle de la rue, pas du trottoir : les petits tronçons sans nom
 // (traversées, bouts de trottoir) sont fondus dans la consigne précédente.
-function simplifySteps(maneuvers) {
+function simplifySteps(maneuvers, offset = 0) {
   const steps = [];
   for (const m of maneuvers) {
     if (m.type === 4 || m.type === 5 || m.type === 6) continue; // « Vous êtes arrivé »
     const street = m.street_names?.[0];
     const named = street && !/^(allée|trottoir|chemin|passage piéton)$/i.test(street);
-    const s = { text: tidy(m.instruction), distance: m.length * 1000, named };
+    const s = { text: tidy(m.instruction), distance: m.length * 1000, named, type: m.type, idx: offset + m.begin_shape_index,
+      speak: tidy(m.verbal_pre_transition_instruction || m.instruction) };
     const last = steps[steps.length - 1];
     if (last && !named && s.distance < 80) { last.distance += s.distance; continue; }
     if (last && last.text === s.text) { last.distance += s.distance; continue; }
