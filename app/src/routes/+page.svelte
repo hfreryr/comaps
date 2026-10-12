@@ -397,6 +397,17 @@
     map.addLayer({ id: 'route-walk', type: 'line', source: 'route', filter: ['==', ['get', 'kind'], 'transfer'],
       layout: { 'line-cap': 'round', 'line-join': 'round' },
       paint: { 'line-color': '#6F7A88', 'line-width': width(3.2, 5.5), 'line-dasharray': [0, 1.7] } }, before);
+    // Étiquettes sur les tracés : « 18 min » sur celui choisi, « +2 min » sur les autres (comme Plans et Maps)
+    map.addSource('route-tags', { type: 'geojson', data: empty() });
+    const tagLayout = { 'text-field': ['get', 'label'], 'text-font': ['Open Sans Bold'], 'text-size': 13,
+      'icon-image': ['case', ['get', 'sel'], 'tag-sel', 'tag-alt'], 'icon-text-fit': 'both', 'icon-text-fit-padding': [4, 8, 4, 8] };
+    // les étiquettes restent toujours visibles ; leur position (routeTags) évite qu'elles se chevauchent
+    map.addLayer({ id: 'route-tag', type: 'symbol', source: 'route-tags', filter: ['!', ['get', 'sel']],
+      layout: { ...tagLayout, 'icon-allow-overlap': true, 'text-allow-overlap': true },
+      paint: { 'text-color': dark ? '#E6E9EE' : '#1C1D1F' } });
+    map.addLayer({ id: 'route-tag-sel', type: 'symbol', source: 'route-tags', filter: ['get', 'sel'],
+      layout: { ...tagLayout, 'icon-allow-overlap': true, 'text-allow-overlap': true },
+      paint: { 'text-color': '#FFFFFF' } });
     map.addSource('route-ends', { type: 'geojson', data: empty() });
     map.addLayer({ id: 'route-start', type: 'circle', source: 'route-ends',
       paint: { 'circle-radius': 7.5, 'circle-color': ['match', ['get', 'kind'], 'via', '#FFFFFF', '#2A5BD7'],
@@ -404,7 +415,7 @@
   }
   const empty = () => ({ type: 'FeatureCollection', features: [] });
 
-  function drawRoute() {
+  function drawRoute(fit = true) {
     const src = map?.getSource('route');
     if (!src) return;
     const feats = [];
@@ -425,7 +436,11 @@
     map.getSource('route-ends').setData(from && directions ? { type: 'FeatureCollection', features: [
       { type: 'Feature', geometry: { type: 'Point', coordinates: [from.lon, from.lat] }, properties: { kind: 'from' } },
       ...(showVia && via ? [{ type: 'Feature', geometry: { type: 'Point', coordinates: [via.lon, via.lat] }, properties: { kind: 'via' } }] : [])] } : empty());
-    if (feats.length) fitTo(feats.flatMap((f) => f.geometry.coordinates));
+    const all = feats.flatMap((f) => f.geometry.coordinates);
+    // zoom d'arrivée (après cadrage) : sert à écarter les étiquettes à l'écran
+    const z = all.length && fit ? map.cameraForBounds(boundsOf(all), fitOptions())?.zoom ?? map.getZoom() : map.getZoom();
+    map.getSource('route-tags')?.setData(routeTags(r, z));
+    if (feats.length && fit) fitTo(all);
   }
   const line = (coords, kind, color, edge = color) => ({ type: 'Feature', properties: { kind, color, edge }, geometry: { type: 'LineString', coordinates: coords } });
   // Teinte plus foncée d'une couleur, pour le liseré d'un trait.
@@ -453,21 +468,22 @@
     if (m === 'transit' && map.getZoom() > 14.5) map.easeTo({ zoom: 13.5, duration: 600 });
   }
 
-  function fitTo(coords) {
-    const b = new maplibregl.LngLatBounds(coords[0], coords[0]);
-    for (const c of coords) b.extend(c);
+  function fitOptions() {
     const mobile = window.matchMedia('(max-width: 767px)').matches;
-    map.fitBounds(b, {
-      padding: mobile
+    return { padding: mobile
         ? { top: 210, bottom: Math.round(window.innerHeight * 0.46), left: 36, right: 36 }
-        : { top: 60, bottom: 60, left: 460, right: 60 },
-      maxZoom: 17, duration: 700
-    });
+        : { top: 60, bottom: 60, left: 460, right: 60 }, maxZoom: 17 };
+  }
+  const boundsOf = (coords) => coords.reduce((b, c) => b.extend(c), new maplibregl.LngLatBounds(coords[0], coords[0]));
+  function fitTo(coords) {
+    map.fitBounds(boundsOf(coords), { ...fitOptions(), duration: 700 });
   }
 
   function onMapClick(e) {
     if (nav) return;
     if (directions) {
+      const tag = !editing && map.queryRenderedFeatures(e.point, { layers: ['route-tag', 'route-tag-sel'] })[0];
+      if (tag) return pickStreet(tag.properties.i);
       const alt = !editing && map.queryRenderedFeatures([[e.point.x - 8, e.point.y - 8], [e.point.x + 8, e.point.y + 8]], { layers: ['route-line'] })
         .find((f) => f.properties.kind === 'alt');
       if (alt) return pickStreet(alt.properties.i);
@@ -1132,6 +1148,7 @@
     routes = { walk: null, bike: null, transit: null };
     map.getSource('route')?.setData(empty());
     map.getSource('route-ends')?.setData(empty());
+    map.getSource('route-tags')?.setData(empty());
     if (place) { showSelection(place); frame(place.lon, place.lat); }
   }
 
@@ -1221,7 +1238,40 @@
   }
   function pickStreet(i) {
     pickedStreet = i;
-    drawRoute();
+    drawRoute(false);
+  }
+  // Où poser l'étiquette d'un tracé : sur sa partie la plus éloignée des autres tracés (là où il se distingue).
+  function routeTags(r, zoom = map.getZoom()) {
+    if (!r || mode === 'transit' || nav) return empty();
+    const opts = streetOpts(r);
+    const k = Math.cos((opts[0].coords[0][1] * Math.PI) / 180);
+    const d2 = (a, b) => ((a[0] - b[0]) * k) ** 2 + (a[1] - b[1]) ** 2;
+    const sel = opts[pickedStreet] || opts[0];
+    const placed = [];
+    // taille d'une étiquette sur la carte, en degrés, au zoom d'affichage (≈ 100 × 34 px)
+    const mpp = 78271.5 * k / 2 ** zoom;
+    const tagW = (100 * mpp) / 111320 / k, tagH = (34 * mpp) / 111320;
+    const clashes = (c) => placed.some((q) => Math.abs(c[0] - q[0]) < tagW && Math.abs(c[1] - q[1]) < tagH);
+    // le trajet choisi d'abord, puis les autres, chacun loin des autres tracés et des étiquettes déjà posées
+    const order = [sel, ...opts.filter((o) => o !== sel)];
+    const features = order.map((o) => {
+      const i = opts.indexOf(o);
+      const others = opts.filter((x) => x !== o).flatMap((x) => x.coords.filter((_, j) => j % 3 === 0));
+      const n = o.coords.length;
+      let best = o.coords[Math.floor(n / 2)], score = -1;
+      for (let j = Math.floor(n * 0.15); j < n * 0.85; j += Math.max(1, Math.floor(n / 60))) {
+        const c = o.coords[j];
+        const mLine = others.length ? Math.min(...others.map((x) => d2(c, x))) : 1;
+        const m = clashes(c) ? mLine * 1e-6 : mLine;      // un point qui chevauche une étiquette n'est retenu qu'en dernier recours
+        if (m > score) { score = m; best = c; }
+      }
+      placed.push(best);
+      // comme Plans et Maps : la durée sur le trajet choisi, l'écart (« +3 min ») sur les autres
+      const dm = Math.round(o.duration / 60) - Math.round(sel.duration / 60);
+      const label = o === sel ? fmtDuration(o.duration) : dm > 0 ? `+${dm} min` : dm < 0 ? `−${-dm} min` : 'Même durée';
+      return { type: 'Feature', geometry: { type: 'Point', coordinates: best }, properties: { i, sel: o === sel, label } };
+    });
+    return { type: 'FeatureCollection', features };
   }
 
   function pickTransit(i) {
@@ -1278,6 +1328,7 @@
       base = { ...prepare(coords, steps, option.duration), end: +option.end };
     } else {
       base = prepare(option.raw, option.steps, option.duration);
+      map.getSource('route-tags')?.setData(empty());
       // pendant le trajet, seul l'itinéraire choisi reste sur la carte
       map.getSource('route')?.setData({ type: 'FeatureCollection', features: [line(option.coords, mode,
         mode === 'bike' ? BIKE_COLOR : WALK_COLOR, mode === 'bike' ? '#13612A' : '#1B3F9E')] });
@@ -1781,7 +1832,8 @@
               <span class="mode-time">
                 {#if !r}{m.label}
                 {:else if r.status === 'loading'}<span class="dots" aria-label="Calcul en cours"></span>
-                {:else if r.status === 'ok'}{fmtDuration(m.id === 'transit' ? r.data[0].duration : r.data.duration)}
+                {:else if r.status === 'ok'}{fmtDuration(m.id === 'transit' ? (r.data[m.id === mode ? picked : 0] || r.data[0]).duration
+                  : (streetOpts(r.data)[m.id === mode ? pickedStreet : 0] || r.data).duration)}
                 {:else}–{/if}
               </span>
             </button>

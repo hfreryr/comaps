@@ -87,10 +87,12 @@ export async function streetRoute(from, to, mode, signal, via = null) {
   const res = await fetch(url, { signal });
   if (!res.ok) throw new Error(res.status === 400 ? 'no-route' : `valhalla-${res.status}`);
   const json = await res.json();
-  const best = parseTrip(json.trip, mode, via);
-  best.alts = (json.alternates || []).map((a) => parseTrip(a.trip, mode, via))
-    // un « autre » trajet presque identique n'apporte rien
-    .filter((r) => Math.abs(r.distance - best.distance) > 40 || Math.abs(r.duration - best.duration) > 30);
+  // Valhalla classe par « coût » (confort, détours…), pas par durée : on trie nous-mêmes, le plus rapide d'abord.
+  const all = [json.trip, ...(json.alternates || []).map((a) => a.trip)].map((t) => parseTrip(t, mode, via))
+    .sort((a, b) => a.duration - b.duration);
+  const [best, ...rest] = all;
+  // un « autre » trajet presque identique n'apporte rien
+  best.alts = rest.filter((r) => Math.abs(r.distance - best.distance) > 40 || Math.abs(r.duration - best.duration) > 30);
   return best;
 }
 

@@ -472,6 +472,18 @@ export function provideImage(map, id) {
     const { data, pixelRatio } = poiImage(FAV_COLOR, 'heart', 20);
     return map.addImage(id, data, { pixelRatio });
   }
+  if (id === 'tag-sel' || id === 'tag-alt') {   // bulle étirable des étiquettes de trajet
+    const sel = id === 'tag-sel';
+    const dark = document.documentElement && matchMedia('(prefers-color-scheme: dark)').matches;
+    const s = 2, w = 40 * s, h = 28 * s, r = 9 * s, c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    const g = c.getContext('2d');
+    g.shadowColor = 'rgba(0,0,0,0.3)'; g.shadowBlur = 3 * s; g.shadowOffsetY = 1 * s;
+    g.fillStyle = sel ? '#2A5BD7' : dark ? '#2B3038' : '#FFFFFF';
+    g.beginPath(); g.roundRect(3 * s, 3 * s, w - 6 * s, h - 6 * s, r); g.fill();
+    return map.addImage(id, g.getImageData(0, 0, w, h), { pixelRatio: s,
+      stretchX: [[12 * s, w - 12 * s]], stretchY: [[12 * s, h - 12 * s]], content: [8 * s, 6 * s, w - 8 * s, h - 6 * s] });
+  }
   if (id === 'sel-metro' || id.startsWith('sel|')) {
     const [, glyph, colour] = id === 'sel-metro' ? [null, 'M', '#2B4793'] : id.split('|');
     const { data, pixelRatio } = bigPin(colour, glyph);
