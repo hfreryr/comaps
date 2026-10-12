@@ -11,6 +11,7 @@
   import { streetRoute, transitRoutes, departures, trafficEstimate, MODE_NAMES, fmtDuration, fmtTime, fmtWait, fmtDistance } from '#lib/routing.js';
   import { stationExits, bestExit, exitLabel, sortExits } from '#lib/exits.js';
   import { readGoogleExport } from '#lib/importgoogle.js';
+  import { placeForExit, placeForTransfer, placeLabel } from '#lib/rame.js';
 
   // Raccourcis de catégories. « key » ne change jamais ; l'intitulé et l'ordre sont personnalisables.
   const ALL_CATEGORIES = [
@@ -896,20 +897,35 @@
   const href = (url) => (/^https?:\/\//.test(url) ? url : `https://${url}`);
   const famColor = (c) => c.color || FAMILIES[c.family].color;
 
-  // Sortie conseillée à la descente du métro ou du RER : l'entrée la plus proche de l'étape suivante.
+  // À la descente du métro ou du RER : sortie conseillée (la plus proche de l'étape suivante, d'après OSM)
+  // et place dans la rame (données RATP / IDFM). Pour une correspondance : place pour changer au plus vite.
   $effect(() => {
     const r = routes.transit;
     if (mode !== 'transit' || r?.status !== 'ok' || !r.data[picked]) return;
     const it = r.data[picked];
     it.legs.forEach((leg, i) => {
       if (!['SUBWAY', 'METRO', 'REGIONAL_RAIL', 'SUBURBAN'].includes(leg.mode) || !leg.toPos) return;
-      const nextLeg = it.legs[i + 1];
-      if (nextLeg && nextLeg.mode !== 'WALK') return;      // correspondance sans sortir
       const k = `${picked}|${i}|${leg.to}`;
       if (legExits[k] !== undefined) return;
       legExits[k] = null;
+      const after = it.legs.slice(i + 1);
+      const nextRide = after.find((l) => l.mode !== 'WALK');
+      const walkBetween = after.slice(0, after.indexOf(nextRide)).reduce((t, l) => t + (l.duration || 0), 0);
+      if (nextRide && walkBetween <= 600) {
+        // correspondance dans la station (ou tout près) : pas de sortie, mais la bonne voiture
+        placeForTransfer(leg.toStop, nextRide.fromStop)
+          .then((pl) => { legExits[k] = pl ? { place: pl, transfer: nextRide } : false; })
+          .catch(() => { legExits[k] = false; });
+        return;
+      }
+      const nextLeg = after[0];
       const goal = nextLeg?.coords?.length ? { lon: nextLeg.coords.at(-1)[0], lat: nextLeg.coords.at(-1)[1] } : to;
-      bestExit(leg.toPos, goal).then((e) => { legExits[k] = e || false; }).catch(() => { legExits[k] = false; });
+      bestExit(leg.toPos, goal)
+        .then(async (e) => {
+          const pl = e ? await placeForExit(leg.toStop, e.name).catch(() => null) : null;
+          legExits[k] = e ? { exit: e, place: pl } : false;
+        })
+        .catch(() => { legExits[k] = false; });
     });
   });
 </script>
@@ -1260,9 +1276,14 @@
                             {MODE_NAMES[leg.mode] || ''} direction {leg.headsign}
                           </span>
                           <span class="leg-meta">{leg.stops ? `${leg.stops + 1} arrêts · ` : ''}{fmtDuration(leg.duration)}{leg.realTime ? ' · temps réel' : ''}</span>
-                          {#if legExits[`${i}|${li}|${leg.to}`]}
-                            <span class="leg-exit"><span class="exit-sq" aria-hidden="true"></span>Descendre à {leg.to} · {exitLabel(legExits[`${i}|${li}|${leg.to}`])}</span>
+                          {#each [legExits[`${i}|${li}|${leg.to}`]] as tip}
+                          {#if tip?.place}
+                            <span class="leg-tip"><span class="car-ic" aria-hidden="true"></span>Montez {placeLabel(tip.place)}{tip.transfer ? ` pour la correspondance${tip.transfer.line ? ` avec la ligne ${tip.transfer.line}` : ''}` : ''}</span>
                           {/if}
+                          {#if tip?.exit}
+                            <span class="leg-exit"><span class="exit-sq" aria-hidden="true"></span>À {leg.to}, prenez la {exitLabel(tip.exit).replace(/^Sortie/, 'sortie')}{tip.exit.ref ? '' : ' (sortie)'}</span>
+                          {/if}
+                          {/each}
                         </span>
                       </li>
                     {/if}
@@ -1277,7 +1298,7 @@
             </li>
           {/each}
         </ul>
-        <p class="credit">Horaires : <a href="https://transitous.org/sources/" target="_blank" rel="noopener">Transitous et réseaux de transport</a></p>
+        <p class="credit">Horaires : <a href="https://transitous.org/sources/" target="_blank" rel="noopener">Transitous et réseaux de transport</a> · Place dans la rame : RATP / Île-de-France Mobilités</p>
       {/if}
     </section>
   {:else if place && !directions}
@@ -1861,7 +1882,10 @@
   .n-dir { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .n-time { font-weight: 600; color: var(--open); font-variant-numeric: tabular-nums; }
   .exit-sq { display: inline-block; width: 12px; height: 12px; border-radius: 3px; background: #2E8B57; flex: none; margin-right: 6px; vertical-align: -1px; }
-  .leg-exit { font-size: 13.5px; color: var(--ink); margin-top: 4px; display: flex; align-items: center; }
+  .leg-exit, .leg-tip { font-size: 13.5px; color: var(--ink); margin-top: 4px; display: flex; align-items: flex-start; line-height: 1.35; }
+  .leg-exit .exit-sq { margin-top: 3px; }
+  .car-ic { flex: none; width: 14px; height: 10px; margin: 4px 6px 0 0; border: 2px solid var(--ink); border-radius: 3px; box-sizing: border-box;
+    background: linear-gradient(90deg, transparent 30%, var(--ink) 30% 40%, transparent 40% 60%, var(--ink) 60% 70%, transparent 70%); }
   .exits { margin: 18px 0 4px; }
   .exits h2 { font-size: 15px; font-weight: 700; margin: 0 0 6px; }
   .exits ul { list-style: none; margin: 0; padding: 0; }

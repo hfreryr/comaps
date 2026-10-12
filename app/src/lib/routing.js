@@ -169,6 +169,8 @@ export async function transitRoutes(from, to, signal, when = new Date()) {
         from: l.from?.name === 'START' ? 'Départ' : l.from?.name,
         to: l.to?.name === 'END' ? 'Arrivée' : l.to?.name,
         toPos: l.to?.lat != null ? { lat: l.to.lat, lon: l.to.lon } : null,
+        fromStop: l.from?.stopId || null,
+        toStop: l.to?.stopId || null,
         start: new Date(l.startTime),
         end: new Date(l.endTime),
         duration: l.duration,

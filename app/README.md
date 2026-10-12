@@ -44,7 +44,7 @@ Aucune donnée personnelle collectée. La position de l'utilisateur ne quitte pa
 ## Retours des premiers tests (12/10/2026)
 - **Métro** : raccourci « Métro » (stations les plus proches, prochains passages directement dans la liste) ; la recherche comprend « métro », « station », « métro le plus proche » ; les stations restent toujours visibles sur la carte dès le zoom 13.
 - **Distributeurs, Banques, Stations-service** : nouveaux raccourcis et pictogrammes.
-- **Sorties de métro** : fiche station (« Sorties ») et « sortie conseillée » dans les trajets en transport. Index `static/data/exits.json` construit depuis OSM par `scripts/build_overlays.py`. La place dans la rame n'existe dans aucune source ouverte connue : non affichée.
+- **Sorties de métro** : fiche station (« Sorties ») et « sortie conseillée » dans les trajets en transport. Index `static/data/exits.json` construit depuis OSM par `scripts/build_overlays.py`. **Place dans la rame** : jeu « Positionnement dans la rame » (RATP / Île-de-France Mobilités, Licence Ouverte 2.0), converti par `python app/scripts/build_rame.py` en `static/data/rame.json` ; le quai est retrouvé grâce à l'identifiant IDFM donné par Transitous. Conseil affiché pour la sortie choisie (si son nom correspond) et pour les correspondances.
 - **Maison / Travail** : raccourcis en tête de la recherche (itinéraire en un geste), définissables depuis la fiche d'un lieu.
 - **Import Google Maps** : archive Google Takeout « Maps (vos adresses) » lue sur le téléphone (`src/lib/importgoogle.js`), lieux enregistrés → favoris, adresses « Domicile / Travail » → raccourcis.
 - **Raccourcis personnalisables** : affichage, ordre et nom, gardés sur l'appareil.
