@@ -166,6 +166,70 @@ export async function transitRoutes(from, to, signal, when = new Date()) {
   return [...groups.values()].sort((a, b) => a.end - b.end).slice(0, 4);
 }
 
+// ——— Prochains passages à une station ———
+const MOTIS = 'https://api.transitous.org/api';
+const RAIL = new Set(['SUBWAY', 'METRO', 'TRAM', 'RAIL', 'SUBURBAN', 'REGIONAL_RAIL', 'REGIONAL_FAST_RAIL',
+  'HIGHSPEED_RAIL', 'LONG_DISTANCE', 'NIGHT_RAIL', 'FUNICULAR']);
+const norm = (s) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+
+/** Arrêt de transport correspondant à une station de la carte (même nom, le plus proche). */
+async function findStop(name, lat, lon, signal) {
+  const d = 0.004;
+  const res = await fetch(`${MOTIS}/v1/map/stops?min=${lat - d},${lon - d}&max=${lat + d},${lon + d}`, { signal });
+  if (!res.ok) throw new Error(`transitous-${res.status}`);
+  const stops = await res.json();
+  const n = norm(name).replace(/^(gare|station) (de |du |d )?/, '');
+  const dist = (s) => Math.hypot(s.lat - lat, (s.lon - lon) * Math.cos((lat * Math.PI) / 180));
+  const rail = stops.filter((s) => s.modes?.some((m) => RAIL.has(m)));
+  const named = rail.filter((s) => { const k = norm(s.name); return k && (k.includes(n) || n.includes(k)); });
+  const pool = named.length ? named : rail.filter((s) => dist(s) < 0.0025); // ~250 m
+  return pool.sort((a, b) => dist(a) - dist(b))[0] || null;
+}
+
+/**
+ * Prochains passages (métro, RER, tram, train) : une ligne par ligne + direction,
+ * avec jusqu'à 3 départs. @returns {Promise<{name:string, lines:object[]}|null>}
+ */
+export async function departures(name, lat, lon, signal) {
+  const stop = await findStop(name, lat, lon, signal);
+  if (!stop) return null;
+  const res = await fetch(`${MOTIS}/v5/stoptimes?stopId=${encodeURIComponent(stop.stopId)}&n=120`, { signal });
+  if (!res.ok) throw new Error(`transitous-${res.status}`);
+  const { stopTimes = [] } = await res.json();
+  const now = Date.now();
+  const groups = new Map();
+  for (const s of stopTimes) {
+    if (!RAIL.has(s.mode) || s.cancelled || s.tripCancelled) continue;
+    const when = new Date(s.place.departure || s.place.arrival);
+    if (when - now < -30000) continue;
+    // Le RER affiche un code de mission (« KARI ») : on prend le vrai terminus du train.
+    const dest = s.tripTo?.name || s.headsign || '';
+    const key = `${s.mode}|${s.routeShortName}|${dest}`;
+    let g = groups.get(key);
+    if (!g) {
+      g = { mode: s.mode, line: s.routeShortName || MODE_NAMES[s.mode] || 'Train', headsign: dest,
+        color: s.routeColor ? `#${s.routeColor}` : '#5B6573',
+        textColor: s.routeTextColor ? `#${s.routeTextColor}` : '#FFFFFF', times: [], realTime: false };
+      groups.set(key, g);
+    }
+    if (g.times.length < 3 && !g.times.some((t) => Math.abs(t - when) < 30000)) g.times.push(when);
+    g.realTime ||= s.realTime;
+  }
+  const order = (g) => (g.mode === 'SUBWAY' || g.mode === 'METRO' ? 0 : g.mode === 'TRAM' ? 2 : 1);
+  const lines = [...groups.values()]
+    .sort((a, b) => order(a) - order(b) || a.line.localeCompare(b.line, 'fr', { numeric: true }) || a.times[0] - b.times[0])
+    .slice(0, 12);
+  return { name: stop.name, lines };
+}
+
+/** « 2 min », « à quai » ou l'heure si c'est loin. */
+export function fmtWait(d, now = Date.now()) {
+  const m = Math.round((d - now) / 60000);
+  if (m <= 0) return 'à quai';
+  if (m < 60) return `${m} min`;
+  return fmtTime(d);
+}
+
 export const MODE_NAMES = {
   SUBWAY: 'Métro', METRO: 'Métro', BUS: 'Bus', TRAM: 'Tram', RAIL: 'Train', REGIONAL_RAIL: 'RER',
   SUBURBAN: 'RER', COACH: 'Car', FERRY: 'Bateau', FUNICULAR: 'Funiculaire', CABLE_CAR: 'Téléphérique',

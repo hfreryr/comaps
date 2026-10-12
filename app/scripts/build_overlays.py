@@ -178,8 +178,9 @@ def line_geometry(relations, geoms):
         for l in getattr(p, "geoms", [p]):
             if l.geom_type == "LineString":
                 lines.append(l)
-    merged = linemerge(MultiLineString(lines)).simplify(0.00006, preserve_topology=False)
-    smooth = [LineString(chaikin(list(l.coords))) for l in getattr(merged, "geoms", [merged]) if l.length > 0.0004]
+    # Simplification plus forte puis 4 passes d'arrondi : des courbes amples, façon plan de métro.
+    merged = linemerge(MultiLineString(lines)).simplify(0.00012, preserve_topology=False)
+    smooth = [LineString(chaikin(list(l.coords), 4)) for l in getattr(merged, "geoms", [merged]) if l.length > 0.0004]
     return MultiLineString(smooth) if len(smooth) > 1 else (smooth[0] if smooth else None)
 
 

@@ -3,10 +3,10 @@
   import * as maplibregl from 'maplibre-gl';
   import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
   import 'maplibre-gl/dist/maplibre-gl.css';
-  import { search, details, reverse, typeLabel, PARIS } from '#lib/places.js';
+  import { search, details, reverse, reverseAddress, typeLabel, PARIS } from '#lib/places.js';
   import { hoursStatus, hoursTable } from '#lib/hours.js';
   import { mapStyle, provideImage, osmRef, FAMILIES } from '#lib/mapstyle.js';
-  import { streetRoute, transitRoutes, MODE_NAMES, fmtDuration, fmtTime, fmtDistance } from '#lib/routing.js';
+  import { streetRoute, transitRoutes, departures, MODE_NAMES, fmtDuration, fmtTime, fmtWait, fmtDistance } from '#lib/routing.js';
 
   const CATEGORIES = [
     { label: 'Restaurants', classes: ['restaurant', 'fast_food'], family: 'food' },
@@ -44,6 +44,8 @@
   let place = $state(null);
   let info = $state(null);
   let showWeek = $state(false);
+  let deps = $state(null);           // prochains passages d'une station : { status, data? }
+  let now = $state(Date.now());
   let locating = $state(false);
   let toast = $state('');
   let me = $state(null); // dernière position connue de l'utilisateur, gardée sur l'appareil
@@ -70,6 +72,17 @@
   const title = $derived(isAddress ? place.name.split(',')[0] : place?.name);
   const address = $derived(isAddress ? '' : (info?.address && info.address.includes(' ') ? info.address : '') || place?.address || '');
   const current = $derived(routes[mode]);
+  const STATION_TYPES = ['Station de métro', 'Station', 'Gare', 'Entrée de métro', 'Station de tram'];
+  const isStation = $derived(!!place && STATION_TYPES.includes(place.type));
+  // « Métro 4 · RER B » : les lignes qui passent, déduites des prochains passages.
+  const stationKind = $derived(deps?.status === 'ok'
+    ? [...deps.data.lines.reduce((acc, l) => {
+        const m = MODE_NAMES[l.mode] || 'Train';
+        if (!acc.has(m)) acc.set(m, new Set());
+        if (l.line !== m) acc.get(m).add(l.line);
+        return acc;
+      }, new Map())].map(([m, ls]) => `${m} ${[...ls].join(', ')}`.trim()).join(' · ')
+    : null);
 
   onMount(() => {
     maplibregl.setWorkerUrl(workerUrl);
@@ -91,6 +104,8 @@
       addRouteLayers();
     });
     map.on('click', onMapClick);
+    // Appui long (ou clic droit) : adresse du point, même si une fiche est ouverte.
+    map.on('contextmenu', (e) => { if (!directions) openPoint(e.lngLat); });
     for (const id of ['poi', 'poi-other', 'poi-hit', 'landmark', 'metro']) {
       map.on('mouseenter', id, () => (map.getCanvas().style.cursor = 'pointer'));
       map.on('mouseleave', id, () => (map.getCanvas().style.cursor = ''));
@@ -182,8 +197,21 @@
     }
     showModes = false;
     const f = map.queryRenderedFeatures(e.point, { layers: ['poi-hit', 'poi', 'poi-other', 'landmark', 'metro'] })[0];
-    if (!f) { if (place) closePlace(); return; }
-    openFeature(f);
+    if (f) return openFeature(f);
+    // Toucher un endroit vide : fiche de l'adresse (si une fiche est ouverte, le toucher la ferme d'abord).
+    if (place) return closePlace();
+    openPoint(e.lngLat);
+  }
+
+  async function openPoint({ lng, lat }) {
+    const p = { id: `pt${lng},${lat}`, name: 'Point sélectionné', type: 'Adresse', address: '', lat, lon: lng };
+    placeMarker(lng, lat);
+    place = p;
+    info = {};
+    deps = null;
+    showWeek = false;
+    const label = await reverseAddress(lat, lng).catch(() => null);
+    if (place === p || place?.id === p.id) place = { ...p, name: label || 'Point sélectionné' };
   }
 
   function openFeature(f) {
@@ -244,17 +272,39 @@
   async function openPlace(p) {
     place = p;
     info = null;
+    deps = null;
     showWeek = false;
     focused = false;
     document.activeElement?.blur();
     placeMarker(p.lon, p.lat);
     frame(p.lon, p.lat);
+    if (STATION_TYPES.includes(p.type)) loadDepartures(p);
     try { info = await details(p); } catch { info = {}; }
   }
+
+  // Prochains passages d'une station, rafraîchis toutes les 30 s tant que la fiche est ouverte.
+  async function loadDepartures(p) {
+    if (!deps) deps = { status: 'loading' };
+    try {
+      const data = await departures(p.name, p.lat, p.lon);
+      if (place?.id !== p.id) return;
+      deps = data?.lines.length ? { status: 'ok', data } : { status: 'none' };
+    } catch {
+      if (place?.id === p.id && deps?.status !== 'ok') deps = { status: 'error' };
+    }
+  }
+  $effect(() => {
+    if (!isStation || directions) return;
+    const p = place;
+    const t = setInterval(() => { now = Date.now(); loadDepartures(p); }, 30000);
+    const tick1 = setInterval(() => (now = Date.now()), 10000);
+    return () => { clearInterval(t); clearInterval(tick1); };
+  });
 
   function closePlace() {
     place = null;
     info = null;
+    deps = null;
     marker?.remove();
   }
 
@@ -717,7 +767,7 @@
       <h1>{title}</h1>
       <p class="kind">{isAddress
         ? (place.name.split(',').slice(1).join(',').trim() || place.address || 'Adresse')
-        : [place.type, info?.cuisine && info.cuisine.split(';')[0].replace(/_/g, ' ')].filter(Boolean).join(' · ') || 'Lieu'}</p>
+        : [stationKind || place.type, info?.cuisine && info.cuisine.split(';')[0].replace(/_/g, ' ')].filter(Boolean).join(' · ') || 'Lieu'}</p>
       {#if info === null}
         <p class="status muted">Chargement…</p>
       {:else if status}
@@ -743,6 +793,33 @@
         {/if}
       </div>
 
+      {#if isStation}
+        <div class="deps" aria-live="polite">
+          <h2>Prochains passages</h2>
+          {#if !deps || deps.status === 'loading'}
+            <p class="muted">Recherche des prochains passages…</p>
+          {:else if deps.status === 'error'}
+            <p class="muted">Horaires indisponibles pour le moment. Réessayez dans un instant.</p>
+          {:else if deps.status === 'none'}
+            <p class="muted">Aucun passage prévu dans l'heure.</p>
+          {:else}
+            <ul>
+              {#each deps.data.lines as l}
+                <li>
+                  <span class="badge" class:round={l.mode === 'SUBWAY' || l.mode === 'METRO'} style:background={l.color} style:color={l.textColor}>{l.line}</span>
+                  <span class="dep-dir">{l.headsign}</span>
+                  <span class="dep-times">
+                    {#if l.realTime}<span class="live" title="En temps réel" aria-label="En temps réel"></span>{/if}
+                    {#each l.times as t, i}<span class:first={i === 0}>{fmtWait(t, now)}</span>{#if i < l.times.length - 1}<span class="sep"> · </span>{/if}{/each}
+                  </span>
+                </li>
+              {/each}
+            </ul>
+            <p class="credit">Horaires : <a href="https://transitous.org/sources/" target="_blank" rel="noopener">Transitous et réseaux de transport</a></p>
+          {/if}
+        </div>
+      {/if}
+
       <ul class="rows">
         {#if address}
           <li class="row">
@@ -765,7 +842,7 @@
               </tbody></table>
             </li>
           {/if}
-        {:else if info && !isAddress && place.type !== 'Rue'}
+        {:else if info && !isAddress && !isStation && place.type !== 'Rue'}
           <li class="row muted">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></svg>
             <span>Horaires non renseignés</span>
@@ -774,13 +851,13 @@
         {#if info?.phone}
           <li class="row">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.6 3.5 9 3l2 4.6-2.3 1.6a12 12 0 0 0 6.1 6.1l1.6-2.3L21 15l-.5 2.4A3 3 0 0 1 17.6 20C10 20 4 14 4 6.4a3 3 0 0 1 2.6-2.9z" /></svg>
-            <span class="selectable">{info.phone}</span>
+            <a class="row-link" href={`tel:${info.phone.replace(/\s/g, '')}`}>{info.phone}</a>
           </li>
         {/if}
         {#if info?.website}
           <li class="row">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M3.5 12h17M12 3.5c2.5 2.6 3.6 5.4 3.6 8.5s-1.1 5.9-3.6 8.5M12 3.5C9.5 6.1 8.4 8.9 8.4 12s1.1 5.9 3.6 8.5" /></svg>
-            <span>{host(info.website)}</span>
+            <a class="row-link" href={href(info.website)} target="_blank" rel="noopener">{host(info.website)}</a>
           </li>
         {/if}
       </ul>
@@ -1063,6 +1140,21 @@
   .opt-sub { color: var(--muted); font-size: 14px; font-variant-numeric: tabular-nums; }
   .opt-sub strong { color: var(--ink); font-weight: 600; }
   .live { color: var(--open); font-size: 10px; vertical-align: 2px; }
+  .badge.round { border-radius: 50%; width: 26px; min-width: 26px; height: 26px; padding: 0; }
+
+  /* Prochains passages d'une station */
+  .deps { margin: 18px 0 4px; }
+  .deps h2 { font-size: 15px; font-weight: 700; margin: 0 0 6px; }
+  .deps > p.muted { color: var(--muted); font-size: 14.5px; margin: 6px 0 10px; }
+  .deps ul { list-style: none; margin: 0; padding: 0; }
+  .deps li { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; min-height: 48px; border-bottom: 1px solid var(--line); }
+  .dep-dir { font-size: 15px; line-height: 1.25; min-width: 0; }
+  .dep-times { font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; display: flex; align-items: center; gap: 2px; }
+  .dep-times .first { color: var(--open); font-weight: 700; font-size: 15px; }
+  .dep-times .live { width: 7px; height: 7px; border-radius: 50%; background: var(--open); margin-right: 6px; animation: pulse 2s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: 0.35; } }
+  .row-link { color: var(--accent, #2A5BD7); text-decoration: none; padding: 14px 0; overflow-wrap: anywhere; }
+  .row-link:hover { text-decoration: underline; }
 
   .legs { list-style: none; margin: 0; padding: 4px 20px 14px; background: #f5f8ff; }
   .leg { display: grid; grid-template-columns: 44px 16px 1fr; gap: 10px; min-height: 52px; }
@@ -1096,7 +1188,7 @@
 
   @media (prefers-reduced-motion: reduce) {
     .sheet, .chev { animation: none; transition: none; }
-    .locate.busy svg, .dots { animation: none; }
+    .locate.busy svg, .dots, .dep-times .live { animation: none; }
   }
 
   :global(.maplibregl-ctrl-attrib) { font-family: var(--ui); font-size: 11px; }

@@ -68,6 +68,17 @@ export async function reverse(lat, lon) {
   return p.name && !p.housenumber ? p.name : address(p) || p.name || null;
 }
 
+/** Adresse postale d'un point touché sur la carte : « 57 Rue de Rennes, 75006 Paris ». */
+export async function reverseAddress(lat, lon) {
+  const res = await fetch(`https://photon.komoot.io/reverse?lat=${lat}&lon=${lon}&lang=fr&limit=1&layer=house&layer=street`);
+  if (!res.ok) return null;
+  const p = (await res.json()).features?.[0]?.properties;
+  if (!p) return null;
+  const line = p.housenumber ? [p.housenumber, p.street].filter(Boolean).join(' ') : p.street || p.name;
+  const where = [p.postcode, p.city].filter(Boolean).join(' ');
+  return line ? [line, where].filter(Boolean).join(', ') : null;
+}
+
 export async function details(place, signal) {
   if (!place.osmType) return {};
   const res = await fetch(`${OSM_API}/${place.osmType}/${place.osmId}.json`, { signal });
