@@ -10,11 +10,11 @@
 ## Le projet
 Rendre les cartes libres basées sur OpenStreetMap (OSM) aussi fiables et agréables que Google Maps. Deux chantiers :
 
-1. **`app/`** (SvelteKit statique + MapLibre) — notre propre app web grand public, concurrente de Google Maps, branchée sur des moteurs libres existants (OpenFreeMap, Photon, puis Valhalla et Transitous). Public : le grand public inquiet de sa dépendance aux GAFAM, pas les militants du libre. Promesse : aussi bien que Google Maps, sans vous pister.
+1. **`app/`** (SvelteKit statique + MapLibre) — notre propre app web grand public, concurrente de Google Maps, branchée sur des moteurs libres existants (OpenFreeMap, Photon, puis Valhalla et Transitous). Public : le grand public inquiet de sa dépendance aux GAFAM, celui qui a déjà choisi Signal, Proton ou Brave (pas les militants du libre). Objectif à terme : transmettre le produit à un acteur de ce type (intégration dans une suite), pas le gérer sur le long terme. Promesse : aussi bien que Google Maps, sans vous pister.
 2. **`pipeline/`** (Python) — détecter les lieux OSM obsolètes (commerces fermés) en confrontant OSM à Overture Maps via DuckDB. Constat : `operating_status` d'Overture est quasi vide à Paris ; on s'appuie sur le score d'existence et l'absence.
 
 Ville pilote : **Paris** (pipeline : 6e arrondissement).
-Nom de code : **Projet Paris** (nom définitif en cours de choix ; finalistes Ruella, Clairue, Venelle).
+Nom : **Untracked** (marque) / **Untracked Maps** (nom de l'app). Choisi le 12/10/2026 : seul finaliste sans marque déposée en classes 9, 38, 42 (TMview + USPTO). Écartés pour conflit de marque : Traceless, Trackless, Untraced. Dépôt GitHub à renommer `untracked`.
 Ne jamais se présenter comme lié à CoMaps ou à Cartes.app.
 
 Voir `README.md` pour la feuille de route.

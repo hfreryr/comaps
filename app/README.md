@@ -1,8 +1,8 @@
-# App — prototype *(nom de code : Projet Paris)*
+# Untracked Maps — l'app (prototype)
 
 Carte de Paris, recherche de lieux, fiche lieu avec horaires lisibles, raccourcis de catégories, itinéraires à pied, à vélo et en transports en commun.
 
-En ligne : https://hfreryr.github.io/projet-paris/
+En ligne : https://hfreryr.github.io/untracked/
 
 ## Lancer
 

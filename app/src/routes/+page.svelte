@@ -98,7 +98,7 @@
       zoom: 13,
       hash: 'carte',
       attributionControl: { compact: true, customAttribution:
-        'Itinéraires <a href="https://valhalla1.openstreetmap.de" target="_blank" rel="noopener">Valhalla / FOSSGIS</a>, <a href="https://transitous.org/sources/" target="_blank" rel="noopener">Transitous</a> · <a href="https://github.com/hfreryr/projet-paris" target="_blank" rel="noopener">Projet libre</a>' },
+        'Itinéraires <a href="https://valhalla1.openstreetmap.de" target="_blank" rel="noopener">Valhalla / FOSSGIS</a>, <a href="https://transitous.org/sources/" target="_blank" rel="noopener">Transitous</a> · <a href="https://github.com/hfreryr/untracked" target="_blank" rel="noopener">Projet libre</a>' },
       fadeDuration: 200
     });
     map.setMissingStyleImageResolver((id) => provideImage(map, id));

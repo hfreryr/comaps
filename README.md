@@ -1,6 +1,6 @@
-# Projet Paris *(nom de code)*
+# Untracked
 
-Une carte grand public, aussi agréable que Google Maps, qui ne vous piste pas. Bâtie sur OpenStreetMap et des moteurs libres.
+Une carte aussi agréable que Google Maps, qui ne vous piste pas. Pour celles et ceux qui ont déjà choisi Signal, Proton ou Brave. Bâtie sur OpenStreetMap et des moteurs libres.
 
 **Ville pilote : Paris** (vérifications terrain d'abord sur un arrondissement).
 
@@ -18,7 +18,7 @@ Repérer automatiquement les lieux d'OSM qui ne sont plus à jour — en commen�
 Concevoir et tester une expérience à la hauteur de Google Maps, d'abord sur le parcours **« faire un itinéraire »**.
 
 - Prototypes testés avec de vrais utilisateurs, comparés à Google Maps.
-- Notre propre app web, branchée sur des moteurs libres : https://hfreryr.github.io/projet-paris/
+- Notre propre app web, branchée sur des moteurs libres : https://hfreryr.github.io/untracked/
 
 ## Feuille de route
 
