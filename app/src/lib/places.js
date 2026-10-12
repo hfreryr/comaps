@@ -43,7 +43,12 @@ export async function search(query, near = PARIS, signal) {
   const res = await fetch(url, { signal });
   if (!res.ok) throw new Error(`Photon ${res.status}`);
   const data = await res.json();
-  return data.features.map((f) => {
+  // Photon renvoie parfois deux fois le même lieu : on n'en garde qu'un (sinon la liste plante).
+  const seen = new Set();
+  return data.features.filter((f) => {
+    const id = `${f.properties.osm_type}${f.properties.osm_id}`;
+    return !seen.has(id) && seen.add(id);
+  }).map((f) => {
     const p = f.properties;
     const [lon, lat] = f.geometry.coordinates;
     const isAddress = !p.name;

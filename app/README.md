@@ -1,6 +1,6 @@
 # Untracked Maps — l'app (prototype)
 
-Carte de Paris, recherche de lieux, fiche lieu avec horaires lisibles, raccourcis de catégories, itinéraires à pied, à vélo et en transports en commun.
+Carte de Paris centrée sur vous à l'ouverture, recherche de lieux et de types de lieux (« pharmacie », « resto près de moi »), fiche lieu avec horaires lisibles et prochains passages en station, listes par catégorie triées depuis votre position (distance, ouvert / fermé), favoris et lieux récents (gardés sur l'appareil uniquement), mode sombre automatique, itinéraires à pied, à vélo et en transports en commun.
 
 En ligne : https://hfreryr.github.io/untracked/
 
@@ -22,6 +22,7 @@ python app/scripts/build_overlays.py data/paris.osm.pbf
 ```
 
 - `landmarks.geojson` : ~7 300 lieux affichés jusqu'au zoom 18 : monuments, musées, parcs et gares, plus les adresses du quotidien (restaurants, cafés, boutiques, hôtels). Chaque lieu a un score de notoriété (traductions du nom, Wikidata, fiche OSM complète ; les enseignes de chaîne ne profitent pas de leurs traductions automatiques) et un **zoom d'apparition** `z`, calculé pour garder un écart régulier à l'écran (plus serré pour les lieux très connus). Au-delà du zoom 17, le fond de carte complète avec tous les lieux.
+- `hours.json` : horaires OSM des restaurants, cafés, bars, boulangeries, commerces alimentaires, pharmacies et musées (~12 500 lieux), indexés par identifiant de tuile, pour afficher « Ouvert / Fermé » dans les listes sans interroger OSM lieu par lieu.
 - `transit-lines.geojson` : lignes de métro, RER et tram à leurs couleurs officielles (mode « Transports »).
 
 ## Briques utilisées (prototype)

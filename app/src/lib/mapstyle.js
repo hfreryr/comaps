@@ -47,6 +47,7 @@ export const FAMILIES = {
   health:  { color: '#D84A45', icon: 'cross',    classes: ['pharmacy', 'hospital', 'doctors', 'dentist', 'clinic', 'veterinary'] },
   stay:    { color: '#9A55A0', icon: 'bed',      classes: ['hotel', 'hostel', 'guest_house', 'lodging', 'motel'] }
 };
+export const FAV_COLOR = '#D63A7A';
 const OTHER = { color: '#7D838A', icon: 'dot' };
 const TRAIN = { color: '#2B4793', icon: 'train' };
 const LANDMARK_FAMILY = { culture: 'culture', sight: 'sight', nature: 'nature', health: 'health', shop: 'shop' };
@@ -111,7 +112,47 @@ function roadPair(id, classes, { color, casing, widths, minzoom = 0, caseFade })
   ];
 }
 
-export function mapStyle(base = '') {
+// ——— Mode sombre ———
+// Même carte, couleurs traduites une à une : fond gris-bleu profond, rues gris moyen, eau et
+// parcs sourds, textes clairs. Les pastilles de lieux gardent leurs couleurs (repères connus).
+export const DARK_LAND = '#1E2126';
+const DARK_HALO = 'rgba(22,24,28,0.9)';
+const DARK = {
+  '#F6F4F0': DARK_LAND, '#F1EEE8': '#22262B', '#FBFAF7': '#262A30',
+  '#D4EBCB': '#1F3326', '#C7E3BC': '#1C3022', '#ABD4F2': '#16304A',
+  '#E8E5DF': '#2A2E34', '#E3DFD9': '#33373E',
+  '#D3CEC6': '#4A4F57', '#EEEBE6': '#2B2F35', '#E9E5DF': '#31353C',
+  '#EDC060': '#5E4C22', '#FAD98A': '#7A6430', '#CCC8C1': '#474B52', '#C9C3BA': '#4A4E55',
+  '#4A84B5': '#7DB0DA', '#8C9096': '#9AA0A6', '#6A6E73': '#A3A8AE', '#5F656C': '#AEB3B9',
+  '#2B4793': '#9DB2F2', '#7C8187': '#8A9097', '#2E3135': '#E6E8EB', '#A2A6AB': '#6F757C',
+  '#62666C': '#B0B5BB',
+  // noms des lieux, par famille
+  '#B55A25': '#F0A06A', '#3352A8': '#8FA8F0', '#3253AA': '#8FA8F0', '#0E717B': '#5FC6D0', '#0E7681': '#5FC6D0',
+  '#306F40': '#7CC48D', '#2F6E3F': '#7CC48D', '#A83A36': '#F08A85', '#A8392F': '#F08A85', '#78427D': '#D29AD6'
+};
+function darkify(style) {
+  const tr = (v, prop) => {
+    if (typeof v === 'string') {
+      const u = v.toUpperCase();
+      if (u === '#FFFFFF') return prop.startsWith('text-halo') ? DARK_HALO : '#3A3F47';   // halo des textes / rues
+      if (u.startsWith('RGBA(255,255,255')) return DARK_HALO;
+      return DARK[u] || v;
+    }
+    return Array.isArray(v) ? v.map((x) => tr(x, prop)) : v;
+  };
+  for (const l of style.layers) {
+    if (!l.paint) continue;
+    for (const [k, v] of Object.entries(l.paint)) l.paint[k] = tr(v, k);
+  }
+  return style;
+}
+
+export function mapStyle(base = '', dark = false) {
+  const style = lightStyle(base);
+  return dark ? darkify(style) : style;
+}
+
+function lightStyle(base) {
   return {
     version: 8,
     glyphs: `${base}fonts/{fontstack}/{range}.pbf`,
@@ -266,6 +307,7 @@ const GLYPHS = {
   cross: 'M9.6 4h4.8v5.6H20v4.8h-5.6V20H9.6v-5.6H4V9.6h5.6z',
   bed: 'M3 6h2v6.5h6V9h6.5a3.5 3.5 0 0 1 3.5 3.5V19h-2v-2.5H5V19H3zM8 8.4a1.9 1.9 0 1 1 0 3.8 1.9 1.9 0 0 1 0-3.8z',
   train: 'M7.5 3h9A2.5 2.5 0 0 1 19 5.5v9a2.5 2.5 0 0 1-2.5 2.5h-9A2.5 2.5 0 0 1 5 14.5v-9A2.5 2.5 0 0 1 7.5 3zM7 6v4h10V6zm1.8 6.3a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 0 0 0-2.4zm6.4 0a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 0 0 0-2.4zM8 18h2l-1.5 3H6.5zm6 0h2l1.5 3h-2z',
+  heart: 'M12 20.3l-1.3-1.2C6 14.9 3 12.2 3 8.9 3 6.2 5.1 4 7.8 4c1.5 0 3 .7 4.2 1.9C13.2 4.7 14.7 4 16.2 4 18.9 4 21 6.2 21 8.9c0 3.3-3 6-7.7 10.2z',
   dot: 'M12 8.2a3.8 3.8 0 1 1 0 7.6 3.8 3.8 0 0 1 0-7.6z'
 };
 
@@ -315,6 +357,10 @@ export function provideImage(map, id) {
   if (map.hasImage(id)) return;
   if (id === 'metro') {
     const { data, pixelRatio } = metroImage();
+    return map.addImage(id, data, { pixelRatio });
+  }
+  if (id === 'fav') {             // lieux enregistrés : pastille rose à cœur blanc
+    const { data, pixelRatio } = poiImage(FAV_COLOR, 'heart', 20);
     return map.addImage(id, data, { pixelRatio });
   }
   if (id.startsWith('poi-')) {

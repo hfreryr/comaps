@@ -3,7 +3,8 @@
   static/data/landmarks.geojson      lieux affichés jusqu'au zoom 17 : lieux remarquables (monuments,
                                      musées, parcs, gares) et adresses (restaurants, cafés, boutiques…),
                                      chacun avec un zoom d'apparition (« z ») qui garde la carte lisible ;
-  static/data/transit-lines.geojson  lignes de métro, RER et tram, à leurs couleurs officielles.
+  static/data/transit-lines.geojson  lignes de métro, RER et tram, à leurs couleurs officielles ;
+  static/data/hours.json             horaires des restaurants, cafés, boulangeries, pharmacies… (listes).
 
 La notoriété est estimée par le nombre de traductions du nom (name:xx) dans OSM
 (le Louvre en a plus de cent, un square de quartier aucune), la présence d'une fiche Wikidata
@@ -304,6 +305,38 @@ def assign_zoom(items, lat0=48.86):
     return [i for i in items if "z" in i]
 
 
+# ——— Horaires des lieux des raccourcis de catégorie ———
+# Les tuiles du fond de carte ne contiennent pas les horaires : on en fait un petit index
+# (identifiant de tuile → horaires OSM) pour afficher « Ouvert / Fermé » dans les listes,
+# sans interroger OpenStreetMap lieu par lieu.
+HOURS_CLASSES = {
+    "amenity": {"restaurant", "fast_food", "cafe", "bar", "pub", "pharmacy"},
+    "shop": {"bakery", "pastry", "supermarket", "convenience", "greengrocer", "deli", "alcohol", "wine"},
+    "tourism": {"museum", "gallery"},
+}
+
+
+class Hours(osmium.SimpleHandler):
+    def __init__(self):
+        super().__init__()
+        self.values, self.index, self.keys = [], {}, {}
+
+    def _add(self, oid, kind, tags):
+        oh = tags.get("opening_hours")
+        if not oh or not any(tags.get(k) in v for k, v in HOURS_CLASSES.items()):
+            return
+        if oh not in self.index:
+            self.index[oh] = len(self.values)
+            self.values.append(oh)
+        self.keys[str(oid * 10 + kind)] = self.index[oh]   # même codage que les identifiants des tuiles
+
+    def node(self, n):
+        self._add(n.id, 1, n.tags)
+
+    def way(self, w):
+        self._add(w.id, 2, w.tags)
+
+
 def main(pbf):
     OUT.mkdir(parents=True, exist_ok=True)
 
@@ -330,6 +363,11 @@ def main(pbf):
     print(f"{len(feats)} lieux ({sum(i['kind'] == 'place' for i in items)} commerces) ; par zoom :",
           dict(sorted(Counter(i["z"] for i in items).items())))
     print("premiers commerces :", [i["name"] for i in items if i["kind"] == "place"][:25])
+
+    hs = Hours()
+    hs.apply_file(str(pbf))
+    (OUT / "hours.json").write_text(json.dumps({"v": hs.values, "k": hs.keys}, ensure_ascii=False, separators=(",", ":")))
+    print(f"{len(hs.keys)} horaires ({len(hs.values)} formules différentes)")
 
     rt = Routes()
     rt.apply_file(str(pbf))

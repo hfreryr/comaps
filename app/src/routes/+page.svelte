@@ -6,7 +6,7 @@
   import { search, details, reverse, reverseAddress, typeLabel, PARIS } from '#lib/places.js';
   import { hoursStatus, hoursTable } from '#lib/hours.js';
   import { draggable } from '#lib/sheet.js';
-  import { mapStyle, provideImage, osmRef, FAMILIES } from '#lib/mapstyle.js';
+  import { mapStyle, provideImage, osmRef, FAMILIES, DARK_LAND } from '#lib/mapstyle.js';
   import { streetRoute, transitRoutes, departures, MODE_NAMES, fmtDuration, fmtTime, fmtWait, fmtDistance } from '#lib/routing.js';
 
   const CATEGORIES = [
@@ -18,6 +18,29 @@
     { label: 'Musées', classes: ['museum', 'art_gallery', 'gallery'], family: 'culture' },
     { label: 'Bars', classes: ['bar', 'pub', 'beer'], family: 'bar' }
   ];
+  // Taper un type de lieu (« pharmacie », « resto près de moi ») propose la liste triée par proximité.
+  const CATEGORY_WORDS = {
+    Restaurants: ['restaurant', 'restaurants', 'resto', 'restos', 'manger', 'dejeuner', 'diner', 'brasserie', 'brasseries'],
+    'Cafés': ['cafe', 'cafes', 'coffee', 'cafeteria'],
+    Boulangeries: ['boulangerie', 'boulangeries', 'boulanger', 'pain', 'patisserie', 'patisseries', 'viennoiseries'],
+    Pharmacies: ['pharmacie', 'pharmacies', 'pharma', 'medicament', 'medicaments'],
+    Courses: ['courses', 'supermarche', 'supermarches', 'epicerie', 'epiceries', 'superette', 'supermarket', 'magasin alimentaire'],
+    'Musées': ['musee', 'musees', 'expo', 'expos', 'exposition', 'expositions', 'galerie', 'galeries'],
+    Bars: ['bar', 'bars', 'boire', 'verre', 'pub', 'pubs', 'apero']
+  };
+  const FILLER = new Set(['proche', 'proches', 'pres', 'de', 'd', 'moi', 'ici', 'ouvert', 'ouverte', 'ouverts', 'ouvertes',
+    'autour', 'la', 'le', 'les', 'plus', 'un', 'une', 'des', 'du', 'a', 'cote', 'maintenant', 'pas', 'loin', 'nearby', 'near', 'me']);
+  const norm = (t) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  function categoryFor(q) {
+    const words = norm(q).split(' ').filter(Boolean);
+    if (!words.length) return null;
+    for (const c of CATEGORIES) {
+      const kws = CATEGORY_WORDS[c.label];
+      if (words.some((w) => kws.includes(w)) && words.every((w) => kws.includes(w) || FILLER.has(w))) return c;
+    }
+    return null;
+  }
+
   const MODES = [
     { id: 'walk', label: 'À pied' },
     { id: 'bike', label: 'Vélo' },
@@ -41,6 +64,8 @@
 
   let category = $state(null);
   let nearby = $state([]);
+  let nearbyFromMe = $state(false);
+  let nearbyDone = $state(false);
 
   let place = $state(null);
   let info = $state(null);
@@ -53,6 +78,10 @@
   // Lieux récents : gardés uniquement dans ce navigateur, jamais envoyés ; effaçables d'un geste.
   const RECENTS_KEY = 'lieux-recents';
   let recents = $state(loadRecents());
+  // Favoris : même principe, gardés uniquement dans ce navigateur.
+  const FAVS_KEY = 'lieux-favoris';
+  let favorites = $state(loadList(FAVS_KEY, 200));
+  const isFav = $derived(!!place && favorites.some((f) => sameSpot(f, place)));
 
   // ——— Itinéraire ———
   let directions = $state(false);
@@ -71,7 +100,8 @@
   const status = $derived(info?.hours ? hoursStatus(info.hours, place.lat, place.lon) : null);
   const week = $derived(showWeek && info?.hours ? hoursTable(info.hours, place.lat, place.lon) : null);
   const activeQuery = $derived(editing ? fieldQuery : query);
-  const showList = $derived(editing ? true : focused && (query.trim().length >= 2 || (!query.trim() && recents.length > 0)));
+  const catHit = $derived(editing ? null : categoryFor(query));
+  const showList = $derived(editing ? true : focused && (query.trim().length >= 2 || (!query.trim() && (recents.length > 0 || favorites.length > 0))));
   const isAddress = $derived(place?.type === 'Adresse');
   const title = $derived(isAddress ? place.name.split(',')[0] : place?.name);
   const address = $derived(isAddress ? '' : (info?.address && info.address.includes(' ') ? info.address : '') || place?.address || '');
@@ -90,10 +120,14 @@
 
   onMount(() => {
     maplibregl.setWorkerUrl(workerUrl);
+    const fresh = !location.hash.includes('carte='); // ouverture « à neuf » (pas un lien vers un endroit précis)
+    // Mode sombre : suit le réglage du téléphone, y compris s'il change pendant l'utilisation.
+    const darkMQ = matchMedia('(prefers-color-scheme: dark)');
+    dark = darkMQ.matches;
     const base = new URL('.', location.href).href;
     map = new maplibregl.Map({
       container: mapEl,
-      style: mapStyle(base),
+      style: mapStyle(base, dark),
       center: [PARIS.lon, PARIS.lat],
       zoom: 13,
       hash: 'carte',
@@ -103,19 +137,42 @@
     });
     map.setMissingStyleImageResolver((id) => provideImage(map, id));
     if (location.hostname === 'localhost') window.__map = map; // pour les tests locaux
+    // Nos calques (trajet, favoris) sont à rajouter à chaque changement de style (clair ↔ sombre).
+    map.on('style.load', addCustomLayers);
+    darkMQ.addEventListener('change', (e) => { dark = e.matches; map.setStyle(mapStyle(base, dark)); });
     map.once('load', () => {
       document.querySelector('.maplibregl-ctrl-attrib')?.classList.remove('maplibregl-compact-show');
-      addRouteLayers();
+      if (fresh) startupLocate();
     });
     map.on('click', onMapClick);
     // Appui long (ou clic droit) : adresse du point, même si une fiche est ouverte.
     map.on('contextmenu', (e) => { if (!directions) openPoint(e.lngLat); });
-    for (const id of ['poi', 'poi-other', 'poi-hit', 'landmark', 'metro']) {
+    for (const id of ['poi', 'poi-other', 'poi-hit', 'landmark', 'metro', 'fav']) {
       map.on('mouseenter', id, () => (map.getCanvas().style.cursor = 'pointer'));
       map.on('mouseleave', id, () => (map.getCanvas().style.cursor = ''));
     }
     return () => map.remove();
   });
+
+  let dark = $state(false);
+  const favData = () => ({ type: 'FeatureCollection', features: favorites.map((f, i) => ({
+    type: 'Feature', id: i, geometry: { type: 'Point', coordinates: [f.lon, f.lat] }, properties: { i, name: f.name } })) });
+
+  function addCustomLayers() {
+    if (map.getSource('route')) return;
+    addRouteLayers();
+    map.addSource('favs', { type: 'geojson', data: favData() });
+    map.addLayer({ id: 'fav', type: 'symbol', source: 'favs',
+      layout: { 'icon-image': 'fav', 'icon-allow-overlap': true, 'icon-size': ['interpolate', ['linear'], ['zoom'], 11, 0.8, 16, 1.05],
+                'text-field': ['step', ['zoom'], '', 14, ['get', 'name']], 'text-font': ['Open Sans Semibold'], 'text-size': 12,
+                'text-anchor': 'left', 'text-offset': [1.1, 0], 'text-optional': true, 'text-max-width': 8 },
+      paint: { 'text-color': dark ? '#F08AB4' : '#A82C5F', 'text-halo-color': dark ? 'rgba(22,24,28,0.9)' : '#FFFFFF', 'text-halo-width': 1.6 } });
+    // Après un changement de style : on remet l'état en cours (trajet, catégorie, mode transports).
+    if (directions) { drawRoute(); dimPlaces(true); }
+    if (category) map.setFilter('poi-hit', ['match', ['get', 'subclass'], category.classes, true, false]);
+    if (mapMode === 'transit') for (const id of ['transit-case', 'transit-line', 'transit-label']) map.setLayoutProperty(id, 'visibility', 'visible');
+  }
+
 
   // ——— Carte ———
   function addRouteLayers() {
@@ -125,7 +182,7 @@
     // Trajets à pied, à vélo et en transport : trait plein, liseré foncé puis bord blanc.
     map.addLayer({ id: 'route-halo', type: 'line', source: 'route', filter: ['!=', ['get', 'kind'], 'transfer'],
       layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: { 'line-color': '#FFFFFF', 'line-width': width(9, 17) } }, before);
+      paint: { 'line-color': dark ? DARK_LAND : '#FFFFFF', 'line-width': width(9, 17) } }, before);
     map.addLayer({ id: 'route-case', type: 'line', source: 'route', filter: ['!=', ['get', 'kind'], 'transfer'],
       layout: { 'line-cap': 'round', 'line-join': 'round' },
       paint: { 'line-color': ['get', 'edge'], 'line-width': width(6.5, 13) } }, before);
@@ -200,6 +257,8 @@
       return;
     }
     showModes = false;
+    const fav = map.queryRenderedFeatures(e.point, { layers: ['fav'] })[0];
+    if (fav) return openPlace({ ...favorites[fav.properties.i] });
     const f = map.queryRenderedFeatures(e.point, { layers: ['poi-hit', 'poi', 'poi-other', 'landmark', 'metro'] })[0];
     if (f) return openFeature(f);
     // Toucher un endroit vide : fiche de l'adresse (si une fiche est ouverte, le toucher la ferme d'abord).
@@ -273,9 +332,33 @@
     marker.setLngLat([lon, lat]).addTo(map);
   }
 
-  function loadRecents() {
-    try { return JSON.parse(localStorage.getItem(RECENTS_KEY) || '[]').slice(0, 8); } catch { return []; }
+  function loadList(key, max) {
+    try { return JSON.parse(localStorage.getItem(key) || '[]').slice(0, max); } catch { return []; }
   }
+  function loadRecents() { return loadList(RECENTS_KEY, 8); }
+  // Un même lieu : même identifiant OSM, ou même nom au même endroit (à ~20 m près).
+  function sameSpot(a, b) {
+    if (a.osmType && b.osmType) return a.osmType === b.osmType && String(a.osmId) === String(b.osmId);
+    return a.name === b.name && Math.abs(a.lat - b.lat) < 0.0002 && Math.abs(a.lon - b.lon) < 0.0003;
+  }
+  function toggleFavorite() {
+    const p = place;
+    if (!p) return;
+    if (favorites.some((f) => sameSpot(f, p))) {
+      favorites = favorites.filter((f) => !sameSpot(f, p));
+      say('Retiré de vos favoris');
+    } else {
+      const keep = { id: p.id, name: p.name, type: p.type, address: p.address || info?.address || '', lat: p.lat, lon: p.lon, osmType: p.osmType, osmId: p.osmId };
+      favorites = [keep, ...favorites];
+      say('Ajouté à vos favoris · gardé sur cet appareil uniquement');
+    }
+    try { localStorage.setItem(FAVS_KEY, JSON.stringify(favorites)); } catch { /* navigation privée */ }
+  }
+  // Les favoris apparaissent aussi sur la carte (pastille rose à cœur).
+  $effect(() => {
+    const data = favData();
+    map?.getSource('favs')?.setData(data);
+  });
   function remember(p) {
     if (!p?.name || p.name === 'Point sélectionné') return;
     const keep = { id: p.id, name: p.name, type: p.type, address: p.address, lat: p.lat, lon: p.lon, osmType: p.osmType, osmId: p.osmId };
@@ -333,23 +416,52 @@
     closePlace();
   }
 
-  function pickCategory(c) {
-    if (category === c) return clearCategory();
+  // Horaires des lieux des listes : petit index chargé à la première liste ouverte.
+  let hoursIndex = null;
+  const loadHours = () => (hoursIndex ??= fetch(new URL('data/hours.json', location.href)).then((r) => r.json()).catch(() => ({ v: [], k: {} })));
+
+  async function pickCategory(c) {
+    if (category?.label === c.label) return clearCategory();
     category = c;
     closePlace();
+    nearby = [];
+    nearbyDone = false;
     map.setFilter('poi-hit', ['match', ['get', 'subclass'], c.classes, true, false]);
-    const collect = () => {
-      const center = map.getCenter();
+    // « Le plus proche de vous » : depuis votre position si elle est connue (ou déjà autorisée), sinon depuis le centre de la carte.
+    let origin = me;
+    if (!origin) {
+      const perm = await navigator.permissions?.query({ name: 'geolocation' }).catch(() => null);
+      if (perm?.state === 'granted') origin = await getPosition().catch(() => null);
+    }
+    if (category?.label !== c.label) return; // (l'état est une copie : on compare les noms)
+    nearbyFromMe = !!origin;
+    const hoursP = loadHours();
+    const collect = async () => {
+      const o = origin || { lat: map.getCenter().lat, lon: map.getCenter().lng };
       const seen = new Set();
-      nearby = map.querySourceFeatures('omt', { sourceLayer: 'poi',
+      const list = map.querySourceFeatures('omt', { sourceLayer: 'poi',
           filter: ['all', ['has', 'name'], ['match', ['get', 'subclass'], c.classes, true, false]] })
         .filter((f) => !seen.has(f.id) && seen.add(f.id))
-        .map((f) => ({ f, d: dist(center.lat, center.lng, f.geometry.coordinates[1], f.geometry.coordinates[0]) }))
+        .map((f) => ({ f, d: dist(o.lat, o.lon, f.geometry.coordinates[1], f.geometry.coordinates[0]) }))
         .sort((a, b) => a.d - b.d)
         .slice(0, 25);
+      const hours = await hoursP;
+      if (category?.label !== c.label) return; // (l'état est une copie : on compare les noms)
+      nearby = list.map((n) => {
+        const h = hours.v[hours.k[String(n.f.id)]];
+        return { ...n, st: h ? hoursStatus(h, n.f.geometry.coordinates[1], n.f.geometry.coordinates[0]) : null };
+      });
+      nearbyDone = true;
     };
-    if (map.getZoom() < 15) { map.flyTo({ zoom: 15.5, duration: 700 }); map.once('idle', collect); }
-    else collect();
+    const target = origin ? [origin.lon, origin.lat] : null;
+    if (target || map.getZoom() < 15) {
+      map.flyTo({ center: target || map.getCenter(), zoom: Math.max(15.5, map.getZoom()), duration: 700 });
+      // Si la carte est déjà au bon endroit, elle ne bouge pas : on n'attend pas indéfiniment.
+      let done = false;
+      const once = () => { if (!done) { done = true; collect(); } };
+      map.once('idle', once);
+      setTimeout(() => { if (!map.isMoving()) once(); }, 1200);
+    } else collect();
   }
 
   function clearCategory() {
@@ -363,7 +475,16 @@
     return Math.hypot(x, lat2 - lat1) * 111320;
   }
 
+  function openCategoryFromSearch() {
+    const c = catHit;          // à lire avant de vider la recherche (catHit en dépend)
+    query = '';
+    focused = false;
+    document.activeElement?.blur();
+    pickCategory(c);
+  }
+
   function onKey(e) {
+    if (e.key === 'Enter' && catHit && active < 0) { e.preventDefault(); openCategoryFromSearch(); return; }
     if (!showList || !results.length) return;
     if (e.key === 'ArrowDown') { active = (active + 1) % results.length; e.preventDefault(); }
     else if (e.key === 'ArrowUp') { active = (active - 1 + results.length) % results.length; e.preventDefault(); }
@@ -412,6 +533,20 @@
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
       );
     });
+  }
+
+  // À l'ouverture, comme les cartes de référence : on se centre sur vous si vous l'acceptez.
+  // Refus ou erreur : la carte reste sur Paris, sans message d'erreur.
+  async function startupLocate() {
+    try {
+      const perm = await navigator.permissions?.query({ name: 'geolocation' }).catch(() => null);
+      if (perm?.state === 'denied') return;
+      let firstTime = false;
+      try { firstTime = !localStorage.getItem('position-expliquee'); localStorage.setItem('position-expliquee', '1'); } catch { /* rien */ }
+      if (firstTime && perm?.state !== 'granted') say('Votre position reste sur votre téléphone.');
+      const p = await getPosition();
+      if (!place && !category && !directions) map.flyTo({ center: [p.lon, p.lat], zoom: 15.5, duration: 900 });
+    } catch { /* on reste sur Paris */ }
   }
 
   async function locate() {
@@ -564,6 +699,22 @@
         </button>
       </li>
     {/if}
+    {#if activeQuery.trim().length < 2 && favorites.length}
+      <li class="note recents-head"><span>Favoris</span></li>
+      {#each favorites.slice(0, editing ? 5 : 8) as r (r.id + r.lat)}
+        <li role="option" aria-selected="false">
+          <button onmousedown={() => pickResult(r)}>
+            <span class="r-icon fav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M12 20.3l-1.3-1.2C6 14.9 3 12.2 3 8.9 3 6.2 5.1 4 7.8 4c1.5 0 3 .7 4.2 1.9C13.2 4.7 14.7 4 16.2 4 18.9 4 21 6.2 21 8.9c0 3.3-3 6-7.7 10.2z" class="solid" /></svg>
+            </span>
+            <span class="r-text">
+              <span class="r-name">{r.name}</span>
+              <span class="r-meta">{[r.type, r.address].filter(Boolean).join(' · ')}</span>
+            </span>
+          </button>
+        </li>
+      {/each}
+    {/if}
     {#if activeQuery.trim().length < 2 && recents.length}
       <li class="note recents-head"><span>Récents</span>
         <button class="link" onmousedown={(e) => { e.preventDefault(); forgetRecents(); }}>Effacer</button></li>
@@ -580,6 +731,17 @@
           </button>
         </li>
       {/each}
+    {/if}
+    {#if catHit}
+      <li role="option" aria-selected="false">
+        <button onmousedown={openCategoryFromSearch}>
+          <span class="r-icon cat-icon" style:--fam={famColor(catHit)} aria-hidden="true"></span>
+          <span class="r-text">
+            <span class="r-name">{catHit.label} près de vous</span>
+            <span class="r-meta">Les plus proches, avec leurs horaires</span>
+          </span>
+        </button>
+      </li>
     {/if}
     {#each results as r, i (r.id)}
       <li role="option" aria-selected={i === active}>
@@ -623,7 +785,7 @@
       {#if !showList}
         <nav class="chips" aria-label="Catégories">
           {#each CATEGORIES as c}
-            <button class="chip" class:on={category === c} onclick={() => pickCategory(c)} style:--fam={famColor(c)} aria-pressed={category === c}>
+            <button class="chip" class:on={category?.label === c.label} onclick={() => pickCategory(c)} style:--fam={famColor(c)} aria-pressed={category?.label === c.label}>
               <span class="chip-dot" aria-hidden="true"></span>{c.label}
             </button>
           {/each}
@@ -815,6 +977,10 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8 21.2 12 12 21.2 2.8 12z" class="solid" /><path d="M9.5 14.5v-2.2a1.5 1.5 0 0 1 1.5-1.5h4M13 8.8l2 2-2 2" class="on-solid" /></svg>
           Itinéraire
         </button>
+        <button class="action" class:saved={isFav} onclick={toggleFavorite} aria-pressed={isFav}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.3l-1.3-1.2C6 14.9 3 12.2 3 8.9 3 6.2 5.1 4 7.8 4c1.5 0 3 .7 4.2 1.9C13.2 4.7 14.7 4 16.2 4 18.9 4 21 6.2 21 8.9c0 3.3-3 6-7.7 10.2z" /></svg>
+          {isFav ? 'Enregistré' : 'Enregistrer'}
+        </button>
         {#if info?.phone}
           <a class="action" href={`tel:${info.phone.replace(/\s/g, '')}`}>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.6 3.5 9 3l2 4.6-2.3 1.6a12 12 0 0 0 6.1 6.1l1.6-2.3L21 15l-.5 2.4A3 3 0 0 1 17.6 20C10 20 4 14 4 6.4a3 3 0 0 1 2.6-2.9z" /></svg>
@@ -908,15 +1074,15 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" /></svg>
       </button>
       <h1>{category.label}</h1>
-      <p class="kind">{nearby.length ? `${nearby.length} à proximité du centre de la carte` : 'Aucun dans cette zone. Déplacez la carte pour chercher ailleurs.'}</p>
+      <p class="kind">{nearby.length ? (nearbyFromMe ? 'Les plus proches de vous' : 'Autour du centre de la carte') : nearbyDone ? 'Aucun dans cette zone. Déplacez la carte pour chercher ailleurs.' : 'Recherche…'}</p>
       <ul class="nearby">
-        {#each nearby as { f, d } (f.id)}
+        {#each nearby as { f, d, st } (f.id)}
           <li>
             <button onclick={() => openFeature(f)}>
               <span class="n-dot" style:--fam={famColor(category)} aria-hidden="true"></span>
               <span class="r-text">
                 <span class="r-name">{f.properties.name}</span>
-                <span class="r-meta">{typeLabel('', f.properties.subclass) || category.label}</span>
+                <span class="r-meta">{typeLabel('', f.properties.subclass) || category.label}{#if st?.open != null}{' · '}<span class:is-open={st.open} class:is-closed={!st.open}>{st.label}</span>{/if}</span>
               </span>
               <span class="n-dist">{fmtDistance(d)}</span>
             </button>
@@ -935,15 +1101,53 @@
     --line: #ececee;
     --card: #ffffff;
     --fill: #f3f3f5;
+    --fav: #D63A7A;
     --open: #1e8e3e;
     --closed: #c5221f;
     --shadow-float: 0 0 0 0.5px rgb(0 0 0 / 0.06), 0 2px 6px rgb(0 0 0 / 0.08), 0 8px 24px rgb(0 0 0 / 0.08);
     --shadow-chip: 0 0 0 0.5px rgb(0 0 0 / 0.07), 0 1px 4px rgb(0 0 0 / 0.12);
     --shadow-sheet: 0 -1px 0 rgb(0 0 0 / 0.04), 0 -8px 30px rgb(0 0 0 / 0.12);
     --ui: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    --page: #f6f4f0;
+    --accent-btn: #2a5bd7;
+    --soft-accent: #f5f8ff;
+    --me-bg: #e8eefc;
+    --grip: #d8d8dc;
+    --faint: #b4b7bc;
+    --rail: #c9ccd1;
+    --walk-rail: #9aa3ae;
+    --end: #d93a2f;
+    color-scheme: light;
+  }
+  /* Mode sombre : suit le réglage du téléphone. */
+  @media (prefers-color-scheme: dark) {
+    :global(:root) {
+      --accent: #6b9bff;
+      --ink: #eceef1;
+      --muted: #9aa0a7;
+      --line: #30343b;
+      --card: #1c1f24;
+      --fill: #2a2e35;
+      --fav: #f06ba0;
+      --open: #4cc46b;
+      --closed: #ff6b61;
+      --shadow-float: 0 0 0 0.5px rgb(255 255 255 / 0.06), 0 2px 8px rgb(0 0 0 / 0.5), 0 8px 24px rgb(0 0 0 / 0.4);
+      --shadow-chip: 0 0 0 0.5px rgb(255 255 255 / 0.08), 0 1px 4px rgb(0 0 0 / 0.5);
+      --shadow-sheet: 0 -1px 0 rgb(255 255 255 / 0.05), 0 -8px 30px rgb(0 0 0 / 0.5);
+      --page: #1e2126;
+      --accent-btn: #3a6fe0;
+      --soft-accent: #1f2836;
+      --me-bg: #22304a;
+      --grip: #4a4f57;
+      --faint: #5d636b;
+      --rail: #4a4f57;
+      --walk-rail: #6f7782;
+      --end: #ff6b61;
+      color-scheme: dark;
+    }
   }
   :global(html, body) {
-    margin: 0; height: 100%; overflow: hidden; background: #f6f4f0;
+    margin: 0; height: 100%; overflow: hidden; background: var(--page);
     font-family: var(--ui); color: var(--ink); -webkit-font-smoothing: antialiased;
     -webkit-tap-highlight-color: transparent;
   }
@@ -987,7 +1191,8 @@
   .results button:hover, .results button.active { background: var(--fill); }
   .r-icon { justify-self: center; width: 32px; height: 32px; border-radius: 50%; background: var(--fill); display: grid; place-items: center; color: var(--muted); }
   .r-icon svg { width: 18px; height: 18px; }
-  .me-icon { background: #e8eefc; color: var(--accent); }
+  .r-icon.cat-icon::after { content: ''; width: 12px; height: 12px; border-radius: 50%; background: var(--fam); }
+  .me-icon { background: var(--me-bg); color: var(--accent); }
   .r-text { display: grid; gap: 1px; min-width: 0; }
   .r-name { font-size: 16px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .r-meta { font-size: 14px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1021,11 +1226,11 @@
   .field { display: grid; grid-template-columns: 22px 1fr; align-items: center; min-height: 44px; }
   .field + .field { border-top: 1px solid var(--line); }
   .field-mark { width: 10px; height: 10px; border-radius: 50%; justify-self: center; }
-  .field-mark.from { border: 2.5px solid #1d1f22; width: 7px; height: 7px; }
-  .field-mark.to { background: #d93a2f; }
+  .field-mark.from { border: 2.5px solid var(--ink); width: 7px; height: 7px; }
+  .field-mark.to { background: var(--end); }
   .fields::before {
     content: ''; position: absolute; left: 10px; top: 28px; bottom: 28px; width: 2px;
-    background: repeating-linear-gradient(#c9ccd1 0 2px, transparent 2px 5px);
+    background: repeating-linear-gradient(var(--rail) 0 2px, transparent 2px 5px);
   }
   .field-btn {
     border: 0; background: none; text-align: left; padding: 11px 8px 11px 6px; font-size: 16px; cursor: pointer;
@@ -1044,7 +1249,7 @@
     font-size: 14.5px; font-weight: 600; cursor: pointer; color: var(--ink); font-variant-numeric: tabular-nums;
   }
   .mode svg { width: 20px; height: 20px; }
-  .mode.on { background: var(--accent); color: #fff; }
+  .mode.on { background: var(--accent-btn); color: #fff; }
   .dots { display: inline-block; width: 22px; height: 6px; background: radial-gradient(circle, currentColor 2px, transparent 2.5px) 0 0 / 8px 6px repeat-x; opacity: 0.5; animation: pulse 1s infinite; }
 
   /* ——— Localisation et messages ——— */
@@ -1106,7 +1311,7 @@
     display: block; width: 72px; height: 22px; margin: -6px auto 4px; padding: 0; border: 0; background: none; cursor: pointer;
     position: relative;
   }
-  .grip::before { content: ''; position: absolute; left: 18px; right: 18px; top: 8px; height: 5px; border-radius: 3px; background: #d8d8dc; }
+  .grip::before { content: ''; position: absolute; left: 18px; right: 18px; top: 8px; height: 5px; border-radius: 3px; background: var(--grip); }
   .grip[hidden] { visibility: hidden; display: block; }
   .close {
     position: absolute; top: 14px; right: 14px; width: 32px; height: 32px; border-radius: 50%;
@@ -1117,8 +1322,8 @@
   .kind { margin: 0; color: var(--muted); font-size: 15px; }
   .kind::first-letter { text-transform: uppercase; }
   .status { margin: 6px 0 0; font-size: 15.5px; font-weight: 600; }
-  .status.is-open { color: var(--open); }
-  .status.is-closed { color: var(--closed); }
+  .status.is-open, .r-meta .is-open { color: var(--open); }
+  .status.is-closed, .r-meta .is-closed { color: var(--closed); }
   .muted { color: var(--muted); font-weight: 400; }
 
   .actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 10px; margin-top: 16px; }
@@ -1127,8 +1332,12 @@
     background: var(--fill); color: var(--accent); text-decoration: none; font-size: 13px; font-weight: 600;
   }
   .action svg { width: 22px; height: 22px; }
-  .action.primary { background: var(--accent); color: #fff; }
-  .action.primary .on-solid { stroke: var(--accent); stroke-width: 2; }
+  .action.primary { background: var(--accent-btn); color: #fff; }
+  .action.saved { color: var(--fav); }
+  .action.saved svg path { fill: var(--fav); stroke: var(--fav); }
+  .r-icon.fav-icon { color: var(--fav); background: color-mix(in srgb, var(--fav) 12%, transparent); }
+  .r-icon.fav-icon .solid { fill: currentColor; stroke: none; }
+  .action.primary .on-solid { stroke: var(--accent-btn); stroke-width: 2; }
 
   .rows { list-style: none; margin: 16px 0 0; padding: 0; border-top: 1px solid var(--line); }
   .row { display: grid; grid-template-columns: 24px 1fr; gap: 16px; align-items: center; min-height: 52px; border-bottom: 1px solid var(--line); font-size: 15.5px; }
@@ -1151,7 +1360,7 @@
     border: 0; background: none; padding: 11px 20px; text-align: left; cursor: pointer; border-top: 1px solid var(--line);
   }
   .nearby button:hover { background: var(--fill); }
-  .n-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--fam); box-shadow: 0 0 0 2px #fff, 0 0 0 3px var(--line); justify-self: center; }
+  .n-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--fam); box-shadow: 0 0 0 2px var(--card), 0 0 0 3px var(--line); justify-self: center; }
   .n-dist { color: var(--muted); font-size: 14px; font-variant-numeric: tabular-nums; }
 
   /* ——— Résultat d'itinéraire ——— */
@@ -1171,10 +1380,10 @@
   .options { list-style: none; margin: 0 -20px; padding: 0; }
   .options > li + li { border-top: 1px solid var(--line); }
   .option { display: grid; gap: 6px; width: 100%; border: 0; background: none; padding: 12px 20px; text-align: left; cursor: pointer; }
-  .option.on { background: #f5f8ff; }
+  .option.on { background: var(--soft-accent); }
   .opt-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
   .chain { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; min-width: 0; }
-  .sep { color: #b4b7bc; font-size: 15px; }
+  .sep { color: var(--faint); font-size: 15px; }
   .walk-chip { display: grid; place-items: center; color: var(--muted); }
   .walk-chip svg { width: 18px; height: 18px; }
   .badge {
@@ -1202,12 +1411,12 @@
   .row-link { color: var(--accent, #2A5BD7); text-decoration: none; padding: 14px 0; overflow-wrap: anywhere; }
   .row-link:hover { text-decoration: underline; }
 
-  .legs { list-style: none; margin: 0; padding: 4px 20px 14px; background: #f5f8ff; }
+  .legs { list-style: none; margin: 0; padding: 4px 20px 14px; background: var(--soft-accent); }
   .leg { display: grid; grid-template-columns: 44px 16px 1fr; gap: 10px; min-height: 52px; }
   .leg-time { font-size: 13.5px; font-weight: 600; font-variant-numeric: tabular-nums; padding-top: 1px; }
   .leg-rail { width: 6px; border-radius: 3px; justify-self: center; margin-top: 4px; }
-  .leg-rail.walk { width: 4px; background: repeating-linear-gradient(#9aa3ae 0 4px, transparent 4px 8px); }
-  .leg-rail.end { width: 12px; height: 12px; border-radius: 50%; background: #d93a2f; margin-top: 3px; }
+  .leg-rail.walk { width: 4px; background: repeating-linear-gradient(var(--walk-rail) 0 4px, transparent 4px 8px); }
+  .leg-rail.end { width: 12px; height: 12px; border-radius: 50%; background: var(--end); margin-top: 3px; }
   .leg-body { display: grid; gap: 3px; padding-bottom: 12px; min-width: 0; }
   .leg-place { font-size: 15px; font-weight: 600; }
   .leg-meta { font-size: 13.5px; color: var(--muted); display: flex; align-items: center; flex-wrap: wrap; }
@@ -1238,6 +1447,11 @@
   }
 
   :global(.maplibregl-ctrl-attrib) { font-family: var(--ui); font-size: 11px; }
+  @media (prefers-color-scheme: dark) {
+    :global(.maplibregl-ctrl-attrib) { background: rgb(28 31 36 / 0.8) !important; color: var(--muted); }
+    :global(.maplibregl-ctrl-attrib a) { color: var(--muted) !important; }
+    :global(.maplibregl-ctrl-attrib-button) { filter: invert(1); }
+  }
   /* Flèche classique sur la carte, main fermée seulement pendant qu'on la fait glisser. */
   :global(.maplibregl-canvas-container.maplibregl-interactive) { cursor: default; }
   :global(.maplibregl-canvas-container.maplibregl-interactive:active) { cursor: grabbing; }
