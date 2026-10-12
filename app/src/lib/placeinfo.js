@@ -72,6 +72,7 @@ const stripTags = (html = '') => html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' 
 export async function wikiInfo({ wikidata, wikipedia }, signal) {
   let title = null;
   let file = null;
+  let category = null;   // catégorie Commons du lieu (P373) : d'autres photos
   const m = /^fr:(.+)$/.exec(wikipedia || '');
   if (m) title = m[1];
   if (wikidata && /^Q\d+$/.test(wikidata)) {
@@ -79,6 +80,7 @@ export async function wikiInfo({ wikidata, wikipedia }, signal) {
     const e = r?.ok ? (await r.json()).entities?.[wikidata] : null;
     title ||= e?.sitelinks?.frwiki?.title || null;
     file = e?.claims?.P18?.[0]?.mainsnak?.datavalue?.value || null;   // image choisie par la communauté Wikidata
+    category = e?.claims?.P373?.[0]?.mainsnak?.datavalue?.value || null;
   }
   const out = {};
   if (title) {
@@ -90,17 +92,32 @@ export async function wikiInfo({ wikidata, wikipedia }, signal) {
       if (!file && s.originalimage?.source?.includes('/commons/')) file = decodeURIComponent(s.originalimage.source.split('/').pop());
     }
   }
-  if (file) {
-    const api = `https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*&prop=imageinfo&iiprop=url|extmetadata&iiurlwidth=900&titles=${encodeURIComponent('File:' + file)}`;
-    const r = await fetch(api, { signal }).catch(() => null);
-    const page = r?.ok ? Object.values((await r.json()).query?.pages || {})[0] : null;
+  // Photos : l'image principale (Wikidata) d'abord, puis jusqu'à 11 autres de la catégorie Commons du lieu.
+  const photos = [];
+  const toPhoto = (page) => {
     const ii = page?.imageinfo?.[0];
-    if (ii?.thumburl) {
-      const meta = ii.extmetadata || {};
-      const artist = stripTags(meta.Artist?.value).slice(0, 60);
-      const licence = stripTags(meta.LicenseShortName?.value);
-      out.photo = { src: ii.thumburl, page: ii.descriptionurl, credit: [artist, licence].filter(Boolean).join(' · ') };
+    if (!ii?.thumburl || !/\.(jpe?g|png|webp)$/i.test(page.title)) return null;
+    const meta = ii.extmetadata || {};
+    const artist = stripTags(meta.Artist?.value).slice(0, 60);
+    const licence = stripTags(meta.LicenseShortName?.value);
+    return { src: ii.thumburl, full: ii.responsiveUrls?.['2'] || ii.thumburl, page: ii.descriptionurl, title: page.title,
+      credit: [artist, licence].filter(Boolean).join(' · ') };
+  };
+  const API = 'https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*&prop=imageinfo&iiprop=url|extmetadata&iiurlwidth=1200';
+  if (file) {
+    const r = await fetch(`${API}&titles=${encodeURIComponent('File:' + file)}`, { signal }).catch(() => null);
+    const ph = toPhoto(r?.ok ? Object.values((await r.json()).query?.pages || {})[0] : null);
+    if (ph) photos.push(ph);
+  }
+  if (category) {
+    const r = await fetch(`${API}&generator=categorymembers&gcmtype=file&gcmlimit=20&gcmtitle=${encodeURIComponent('Category:' + category)}`, { signal }).catch(() => null);
+    const pages = r?.ok ? Object.values((await r.json()).query?.pages || {}) : [];
+    for (const pg of pages) {
+      if (photos.length >= 12) break;
+      const ph = toPhoto(pg);
+      if (ph && !photos.some((x) => x.title === ph.title)) photos.push(ph);
     }
   }
+  if (photos.length) { out.photos = photos; out.photo = photos[0]; }
   return out.extract || out.photo ? out : null;
 }

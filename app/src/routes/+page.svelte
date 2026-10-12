@@ -201,6 +201,14 @@
   let showWeek = $state(false);
   let wiki = $state(null);           // extrait Wikipédia et photo Commons
   let moreText = $state(false);
+  let viewer = $state(null);         // photo affichée en plein écran (indice), null : fermé
+  let viewerEl = $state();
+  let viewerIdx = $state(0);
+  $effect(() => {
+    if (viewer == null || !viewerEl) return;
+    viewerIdx = viewer;
+    viewerEl.scrollTo({ left: viewer * viewerEl.clientWidth, behavior: 'instant' });
+  });
   let deps = $state(null);           // prochains passages d'une station : { status, data? }
   let now = $state(Date.now());
   let locating = $state(false);
@@ -1060,6 +1068,7 @@
 
   function closePlace() {
     place = null;
+    viewer = null;
     info = null;
     deps = null;
     wiki = null;
@@ -1260,7 +1269,8 @@
 
   // Fermer « ce qui est au-dessus » : Échap, ou le bouton Retour du téléphone.
   function closeTop() {
-    if (listPicker) listPicker = false;
+    if (viewer != null) viewer = null;
+    else if (listPicker) listPicker = false;
     else if (hubPanel) hubPanel = null;
     else if (savedList) { savedList = null; refreshSaved(); }
     else if (navList) navList = false;
@@ -1277,7 +1287,7 @@
   }
   // Retour : une entrée d'historique tant qu'un panneau est ouvert, pour que « Retour » le ferme
   // au lieu de quitter l'app.
-  const anyOpen = $derived(!!(place || category || directions || editChips || importOpen || listPicker));
+  const anyOpen = $derived(!!(place || category || directions || editChips || importOpen || listPicker || viewer != null));
   let skipPop = false;
   $effect(() => {
     if (anyOpen && !history.state?.ui) history.pushState({ ...(history.state || {}), ui: 1 }, '', location.href);
@@ -1290,6 +1300,10 @@
     if (anyOpen) history.pushState({ ...(history.state || {}), ui: 1 }, '', location.href);
   }
   function onKeyDown(e) {
+    if (viewer != null && viewerEl && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      viewerEl.scrollBy({ left: (e.key === 'ArrowRight' ? 1 : -1) * viewerEl.clientWidth, behavior: 'smooth' });
+      return;
+    }
     if (e.key === 'Escape' && closeTop()) e.preventDefault();
   }
 
@@ -1889,11 +1903,16 @@
 {/snippet}
 
 {#snippet photoBlock()}
-      {#if wiki?.photo}
-        <figure class="photo">
-          <img src={wiki.photo.src} alt={title} loading="lazy" />
-          <figcaption><a href={wiki.photo.page} target="_blank" rel="noopener">Photo : {wiki.photo.credit || 'Wikimedia Commons'} · Wikimedia Commons</a></figcaption>
-        </figure>
+      {#if wiki?.photos?.length}
+        <div class="photos" class:single={wiki.photos.length === 1}>
+          {#each wiki.photos as ph, i (ph.src)}
+            <button class="ph" onclick={() => (viewer = i)} aria-label={`Voir la photo ${i + 1} sur ${wiki.photos.length} en plein écran`}>
+              <img src={ph.src} alt={i === 0 ? title : ''} loading="lazy" />
+              {#if i === 0 && wiki.photos.length > 1}<span class="ph-count">{wiki.photos.length} photos</span>{/if}
+            </button>
+          {/each}
+        </div>
+        <p class="ph-credit"><a href={wiki.photos[0].page} target="_blank" rel="noopener">Photos : Wikimedia Commons{wiki.photos[0].credit ? ` · ${wiki.photos[0].credit}` : ''}</a></p>
       {/if}
 {/snippet}
 
@@ -2189,6 +2208,32 @@
         {:else}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" /><path d="m16 9.5 5 5M21 9.5l-5 5" /></svg>{/if}
       </button>
       <button class="nav-end" onclick={endNav}>Fin</button>
+    </div>
+  {/if}
+  {#if viewer != null && wiki?.photos?.length}
+    {@const ph = wiki.photos[viewerIdx] || wiki.photos[0]}
+    <div class="viewer" role="dialog" aria-modal="true" aria-label="Photos de {title}">
+      <div class="viewer-strip" bind:this={viewerEl}
+        onscroll={(e) => (viewerIdx = Math.round(e.currentTarget.scrollLeft / e.currentTarget.clientWidth))}>
+        {#each wiki.photos as p, i (p.src)}
+          <div class="viewer-slide"><img src={Math.abs(i - viewerIdx) <= 1 ? p.full : p.src} alt={i === 0 ? title : ''} /></div>
+        {/each}
+      </div>
+      <div class="viewer-top">
+        <span>{viewerIdx + 1} / {wiki.photos.length}</span>
+        <button class="viewer-close" onclick={() => (viewer = null)} aria-label="Fermer">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" /></svg>
+        </button>
+      </div>
+      {#if wiki.photos.length > 1}
+        <button class="viewer-nav prev" disabled={viewerIdx === 0} aria-label="Photo précédente"
+          onclick={() => viewerEl.scrollBy({ left: -viewerEl.clientWidth, behavior: 'smooth' })}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg></button>
+        <button class="viewer-nav next" disabled={viewerIdx === wiki.photos.length - 1} aria-label="Photo suivante"
+          onclick={() => viewerEl.scrollBy({ left: viewerEl.clientWidth, behavior: 'smooth' })}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg></button>
+      {/if}
+      <p class="viewer-credit"><a href={ph.page} target="_blank" rel="noopener">{ph.credit || 'Wikimedia Commons'} · Wikimedia Commons</a></p>
     </div>
   {/if}
   {#if toast}<p class="toast" role="status">{toast}{#if toastAction}<button onclick={undoToast}>{toastAction.label}</button>{/if}</p>{/if}
@@ -2957,6 +3002,37 @@
   .pw input { font: inherit; font-size: 16px; color: var(--ink); background: var(--fill); border: 0; border-radius: 12px; padding: 12px 14px; }
   .action.saved { color: var(--lc, var(--fav)); }
   .action.saved svg path { fill: var(--lc, var(--fav)); stroke: var(--lc, var(--fav)); }
+  /* ——— Photos ——— */
+  .photos { display: flex; gap: 6px; overflow-x: auto; scroll-snap-type: x mandatory; margin: 16px -20px 0; padding: 0 20px; scrollbar-width: none; }
+  .photos::-webkit-scrollbar { display: none; }
+  .ph { flex: none; position: relative; width: 72%; aspect-ratio: 4 / 3; border: 0; padding: 0; border-radius: 14px; overflow: hidden;
+    background: var(--fill); cursor: zoom-in; scroll-snap-align: start; scroll-margin-left: 20px; }
+  .ph:not(:first-child) { width: 46%; }
+  .photos.single .ph { width: 100%; aspect-ratio: 16 / 10; }
+  .ph img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .ph-count { position: absolute; left: 8px; bottom: 8px; background: rgb(0 0 0 / 0.6); color: #fff; font-size: 12.5px; font-weight: 600;
+    padding: 4px 9px; border-radius: 10px; }
+  .ph-credit { font-size: 11.5px; color: var(--muted); margin: 5px 0 0; }
+  .ph-credit a { color: inherit; text-decoration: none; }
+  .viewer { position: fixed; inset: 0; z-index: 20; background: #000; color: #fff; }
+  .viewer-strip { position: absolute; inset: 0; display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; }
+  .viewer-strip::-webkit-scrollbar { display: none; }
+  .viewer-slide { flex: none; width: 100%; height: 100%; display: grid; place-items: center; scroll-snap-align: center; }
+  .viewer-slide img { max-width: 100%; max-height: 100%; object-fit: contain; }
+  .viewer-top { position: absolute; left: 0; right: 0; top: 0; display: flex; justify-content: space-between; align-items: center;
+    padding: calc(10px + env(safe-area-inset-top)) 12px 10px 18px; font-size: 15px; font-weight: 600;
+    background: linear-gradient(rgb(0 0 0 / 0.55), transparent); }
+  .viewer-close, .viewer-nav { width: 44px; height: 44px; border-radius: 50%; border: 0; background: rgb(255 255 255 / 0.16); color: #fff;
+    display: grid; place-items: center; cursor: pointer; }
+  .viewer-close svg, .viewer-nav svg { width: 22px; height: 22px; stroke-width: 2.2; }
+  .viewer-nav { position: absolute; top: 50%; transform: translateY(-50%); }
+  .viewer-nav.prev { left: 12px; }
+  .viewer-nav.next { right: 12px; }
+  .viewer-nav:disabled { opacity: 0; pointer-events: none; }
+  @media (hover: none) { .viewer-nav { display: none; } }
+  .viewer-credit { position: absolute; left: 0; right: 0; bottom: 0; margin: 0; padding: 14px 18px calc(14px + env(safe-area-inset-bottom));
+    font-size: 12.5px; background: linear-gradient(transparent, rgb(0 0 0 / 0.6)); }
+  .viewer-credit a { color: rgb(255 255 255 / 0.85); text-decoration: none; }
   .chip.edit.on-edit { background: var(--accent-btn); color: #fff; }
   .compass svg { width: 24px; height: 24px; transition: transform 0.1s; }
   .compass .north { fill: var(--closed); }
