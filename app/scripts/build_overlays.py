@@ -1,11 +1,15 @@
 """Construit, depuis l'extrait OpenStreetMap de Paris, deux couches légères servies avec l'app :
 
-  static/data/landmarks.geojson      lieux remarquables (monuments, musées, parcs, gares, hôpitaux)
-                                     classés par notoriété ;
+  static/data/landmarks.geojson      lieux affichés jusqu'au zoom 17 : lieux remarquables (monuments,
+                                     musées, parcs, gares) et adresses (restaurants, cafés, boutiques…),
+                                     chacun avec un zoom d'apparition (« z ») qui garde la carte lisible ;
   static/data/transit-lines.geojson  lignes de métro, RER et tram, à leurs couleurs officielles.
 
-La notoriété est estimée par le nombre de traductions du nom (name:xx) dans OSM :
-le Louvre en a plus de cent, un square de quartier aucune.
+La notoriété est estimée par le nombre de traductions du nom (name:xx) dans OSM
+(le Louvre en a plus de cent, un square de quartier aucune), la présence d'une fiche Wikidata
+et, pour les commerces, la richesse de la fiche OSM (site, téléphone, horaires…).
+Le zoom d'apparition est calculé comme le font les cartes grand public : en partant de la vue
+large, on ajoute les lieux du plus connu au moins connu tant qu'ils restent espacés à l'écran.
 
 Usage :  python app/scripts/build_overlays.py data/paris.osm.pbf
 Données © contributeurs OpenStreetMap, licence ODbL.
@@ -45,6 +49,45 @@ def classify(t):
     return None
 
 
+# Commerces et adresses du quotidien → (sous-classe affichée, famille d'icône, bonus de catégorie)
+FOOD = {"restaurant": "food", "fast_food": "food", "ice_cream": "food", "food_court": "food",
+        "cafe": "cafe", "bar": "bar", "pub": "bar", "biergarten": "bar", "nightclub": "bar"}
+SHOP_FAMILY = {"bakery": "bakery", "pastry": "bakery", "confectionery": "bakery", "chocolate": "bakery",
+               "wine": "bar", "alcohol": "bar"}
+CAT_BONUS = {"food": 2, "cafe": 2, "bar": 1, "bakery": 1, "culture": 2, "stay": 1, "health": 1, "shop": 0}
+
+
+def commercial(t):
+    amenity, shop, tourism = t.get("amenity"), t.get("shop"), t.get("tourism")
+    if amenity in FOOD:
+        return amenity, FOOD[amenity]
+    if amenity == "pharmacy":
+        return "pharmacy", "health"
+    if amenity in ("theatre", "cinema", "arts_centre", "library"):
+        return amenity, "culture"
+    if tourism in ("museum", "gallery"):
+        return tourism, "culture"
+    if tourism in ("hotel", "hostel", "guest_house"):
+        return tourism, "stay"
+    if shop and shop not in ("vacant", "no", "yes"):
+        return shop, SHOP_FAMILY.get(shop, "shop")
+    return None
+
+
+def richness(t):
+    """Une fiche OSM bien remplie signale un lieu connu et vivant."""
+    keys = {tag.k for tag in t}
+    # Les enseignes de chaîne reçoivent des traductions automatiques du nom : elles ne disent rien
+    # de la notoriété du lieu lui-même. On ne les compte pas, et on passe les lieux uniques devant.
+    chain = bool(keys & {"brand", "brand:wikidata"})
+    return ((8 if "wikidata" in keys else 0) + (0 if chain else min(fame(t), 10)) - (2 if chain else 0)
+            + (1.5 if keys & {"website", "contact:website"} else 0)
+            + (1 if keys & {"phone", "contact:phone"} else 0)
+            + (1 if "opening_hours" in keys else 0)
+            + (0.5 if keys & {"cuisine", "diet:vegetarian", "outdoor_seating"} else 0)
+            + min(len(keys) / 10, 2))
+
+
 def fame(t):
     return sum(1 for tag in t if tag.k.startswith("name:") and len(tag.k) <= 10)
 
@@ -53,6 +96,7 @@ class Landmarks(osmium.SimpleHandler):
     def __init__(self):
         super().__init__()
         self.items = {}
+        self.places = []
         self.fab = osmium.geom.WKBFactory()
 
     def _add(self, ref, tags, geom_fn):
@@ -60,10 +104,12 @@ class Landmarks(osmium.SimpleHandler):
             return
         c = classify(tags)
         if not c:
+            self._add_place(ref, tags, geom_fn)
             return
         family, weight = c
         f = fame(tags)
         if family != "train" and f < 3 and "wikidata" not in tags:
+            self._add_place(ref, tags, geom_fn)   # musée de quartier, etc. : traité comme une adresse
             return
         try:
             pt, area = geom_fn()
@@ -75,8 +121,24 @@ class Landmarks(osmium.SimpleHandler):
         prev = self.items.get(name)
         if prev and prev["score"] >= score:
             return
-        self.items[name] = {"name": name, "family": family, "score": round(score, 1), "osm": ref,
+        self.items[name] = {"name": name, "family": family, "subclass": tags.get("tourism") or tags.get("historic")
+                            or tags.get("amenity") or tags.get("leisure") or tags.get("railway") or "",
+                            "score": round(score, 1), "osm": ref, "kind": "landmark",
                             "lon": round(pt.x, 6), "lat": round(pt.y, 6)}
+
+    def _add_place(self, ref, tags, geom_fn):
+        c = commercial(tags)
+        if not c or tags.get("disused") or tags.get("abandoned"):
+            return
+        sub, family = c
+        try:
+            pt, _ = geom_fn()
+        except Exception:
+            return
+        score = richness(tags) + CAT_BONUS.get(family, 0)
+        self.places.append({"name": tags.get("name:fr") or tags["name"], "family": family, "subclass": sub,
+                            "score": round(score, 1), "osm": ref, "kind": "place",
+                            "lon": round(pt.x, 6), "lat": round(pt.y, 6)})
 
     def node(self, n):
         if n.location.valid():
@@ -178,8 +240,8 @@ def line_geometry(relations, geoms):
         for l in getattr(p, "geoms", [p]):
             if l.geom_type == "LineString":
                 lines.append(l)
-    # Simplification plus forte puis 4 passes d'arrondi : des courbes amples, façon plan de métro.
-    merged = linemerge(MultiLineString(lines)).simplify(0.00012, preserve_topology=False)
+    # Simplification forte puis 4 passes d'arrondi : des courbes amples, façon plan de métro.
+    merged = linemerge(MultiLineString(lines)).simplify(0.00016, preserve_topology=False)
     smooth = [LineString(chaikin(list(l.coords), 4)) for l in getattr(merged, "geoms", [merged]) if l.length > 0.0004]
     return MultiLineString(smooth) if len(smooth) > 1 else (smooth[0] if smooth else None)
 
@@ -187,18 +249,87 @@ def line_geometry(relations, geoms):
 DEFAULT_COLOURS = {"metro": "#5B6573", "rer": "#5B6573", "tram": "#5B6573"}
 
 
+# ——— Zoom d'apparition ———
+# Espacement minimal entre deux lieux, en pixels écran, selon le zoom : large en vue de quartier,
+# plus serré de près. Au-delà de MAX_Z, la carte affiche tous les lieux du fond de carte.
+SPACING = [(11.5, 150), (13, 140), (14, 125), (15, 105), (16, 85), (16.5, 75)]
+STEPS = [11.5 + 0.25 * i for i in range(int((16.75 - 11.5) / 0.25) + 1)]
+PLACES_FROM = 13.75   # les commerces n'apparaissent pas avant ce zoom (vue de ville : monuments seulement)
+MAX_Z = 17
+
+
+def spacing_px(z):
+    px = SPACING[0][1]
+    for zz, v in SPACING:
+        if z >= zz:
+            px = v
+    return px
+
+
+def assign_zoom(items, lat0=48.86):
+    """Pour chaque zoom (du plus large au plus serré), ajoute les lieux par notoriété décroissante
+    s'ils sont assez loin de tous ceux déjà affichés. Chaque lieu garde le premier zoom où il entre."""
+    import math
+    m_per_px0 = 156543.03 * math.cos(math.radians(lat0))
+    kx = 111320 * math.cos(math.radians(lat0))
+    xy = [(i["lon"] * kx, i["lat"] * 111320) for i in items]
+    order = sorted(range(len(items)), key=lambda k: -items[k]["score"])
+    # monuments : noms courts et repères essentiels, on les laisse plus serrés (0,45).
+    # Commerces : 1 pour un lieu ordinaire, jusqu'à 0,3 pour un lieu très connu (score des commerces ~0 à 20)
+    tight = [0.45 if i["kind"] == "landmark" else min(1.0, max(0.3, 1.2 - i["score"] / 20)) for i in items]
+    placed = []          # indices déjà affichés
+    for z in STEPS:
+        d = spacing_px(z) * m_per_px0 / 2 ** z
+        grid = {}
+        for k in placed:
+            x, y = xy[k]
+            grid.setdefault((int(x // d), int(y // d)), []).append(k)
+        for k in order:
+            it = items[k]
+            if "z" in it or (it["kind"] == "place" and z < PLACES_FROM):
+                continue
+            x, y = xy[k]
+            cx, cy = int(x // d), int(y // d)
+            # un commerce reste à bonne distance des autres commerces, mais peut côtoyer un monument
+            # (à demi-distance) : la vue mêle ainsi monuments et bonnes adresses, comme les cartes de référence.
+            # Et deux adresses très connues peuvent être voisines (Flore, Deux Magots, Lipp) : l'écart
+            # exigé diminue avec la notoriété des deux lieux.
+            near = any(math.hypot(xy[j][0] - x, xy[j][1] - y)
+                       < (d if items[j]["kind"] == it["kind"] else d / 2) * max(tight[k], tight[j])
+                       for gx in (cx - 1, cx, cx + 1) for gy in (cy - 1, cy, cy + 1) for j in grid.get((gx, gy), ()))
+            if not near:
+                it["z"] = z
+                placed.append(k)
+                grid.setdefault((cx, cy), []).append(k)
+    return [i for i in items if "z" in i]
+
+
 def main(pbf):
     OUT.mkdir(parents=True, exist_ok=True)
 
     lm = Landmarks()
     lm.apply_file(str(pbf), locations=True)
-    items = sorted(lm.items.values(), key=lambda x: -x["score"])[:1500]  # les 1500 plus connus
+    landmarks = sorted(lm.items.values(), key=lambda x: -x["score"])[:1500]  # les 1500 plus connus
+    for i in landmarks:
+        i["score"] += 1000   # un monument passe toujours avant un commerce
+    # un même commerce peut être cartographié deux fois (point et bâtiment) : on garde le mieux noté
+    seen = {}
+    for p in lm.places:
+        key = (p["name"].lower(), round(p["lat"], 3), round(p["lon"], 3))
+        if key not in seen or seen[key]["score"] < p["score"]:
+            seen[key] = p
+    items = assign_zoom(landmarks + list(seen.values()))
+    items.sort(key=lambda i: (i["z"], -i["score"]))
     feats = [{"type": "Feature", "geometry": {"type": "Point", "coordinates": [i["lon"], i["lat"]]},
-              "properties": {"name": i["name"], "family": i["family"], "rank": k + 1, "osm": i["osm"]}}
+              "properties": {"name": i["name"], "family": i["family"], "subclass": i["subclass"],
+                             "z": i["z"], "rank": k + 1, "osm": i["osm"]}}
              for k, i in enumerate(items)]
     (OUT / "landmarks.geojson").write_text(json.dumps({"type": "FeatureCollection", "features": feats},
                                                       ensure_ascii=False, separators=(",", ":")))
-    print(f"{len(feats)} lieux remarquables ; en tête : {[i['name'] for i in items[:12]]}")
+    from collections import Counter
+    print(f"{len(feats)} lieux ({sum(i['kind'] == 'place' for i in items)} commerces) ; par zoom :",
+          dict(sorted(Counter(i["z"] for i in items).items())))
+    print("premiers commerces :", [i["name"] for i in items if i["kind"] == "place"][:25])
 
     rt = Routes()
     rt.apply_file(str(pbf))

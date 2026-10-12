@@ -1192,5 +1192,8 @@
   }
 
   :global(.maplibregl-ctrl-attrib) { font-family: var(--ui); font-size: 11px; }
+  /* Flèche classique sur la carte, main fermée seulement pendant qu'on la fait glisser. */
+  :global(.maplibregl-canvas-container.maplibregl-interactive) { cursor: default; }
+  :global(.maplibregl-canvas-container.maplibregl-interactive:active) { cursor: grabbing; }
   :global(.maplibregl-ctrl-bottom-right) { margin-bottom: env(safe-area-inset-bottom); }
 </style>

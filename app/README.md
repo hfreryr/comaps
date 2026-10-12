@@ -21,7 +21,7 @@ Générées depuis l'extrait OpenStreetMap de Paris (`data/paris.osm.pbf`) :
 python app/scripts/build_overlays.py data/paris.osm.pbf
 ```
 
-- `landmarks.geojson` : les 900 lieux les plus connus (monuments, musées, parcs, gares, hôpitaux), classés par notoriété (nombre de traductions du nom + Wikidata). Affichés en vue large.
+- `landmarks.geojson` : ~7 300 lieux affichés jusqu'au zoom 18 : monuments, musées, parcs et gares, plus les adresses du quotidien (restaurants, cafés, boutiques, hôtels). Chaque lieu a un score de notoriété (traductions du nom, Wikidata, fiche OSM complète ; les enseignes de chaîne ne profitent pas de leurs traductions automatiques) et un **zoom d'apparition** `z`, calculé pour garder un écart régulier à l'écran (plus serré pour les lieux très connus). Au-delà du zoom 17, le fond de carte complète avec tous les lieux.
 - `transit-lines.geojson` : lignes de métro, RER et tram à leurs couleurs officielles (mode « Transports »).
 
 ## Briques utilisées (prototype)

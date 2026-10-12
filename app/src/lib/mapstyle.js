@@ -82,6 +82,18 @@ function darken(hex, k = 0.78) {
   return `#${c.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
 }
 
+// Familles du calque de lieux choisis (monuments compris) et filtre « z ≤ zoom courant ».
+const PLACE_FAMILIES = { ...FAMILIES, train: { color: '#2B4793', icon: 'train', text: '#2B4793' },
+  culture: { ...FAMILIES.culture, text: '#0E7681' }, sight: { ...FAMILIES.sight, text: '#0E7681' },
+  nature: { ...FAMILIES.nature, text: '#2F6E3F' }, health: { ...FAMILIES.health, text: '#A8392F' },
+  shop: { ...FAMILIES.shop, text: '#3253AA' } };
+// MapLibre ne sait pas comparer une donnée au zoom directement : on énumère les paliers de 0,25.
+const VISIBLE_AT_ZOOM = (() => {
+  const e = ['step', ['zoom'], ['<=', ['get', 'z'], 11.5]];
+  for (let z = 11.75; z <= 16.75; z += 0.25) e.push(z, ['<=', ['get', 'z'], z]);
+  return e;
+})();
+
 const NAME = ['coalesce', ['get', 'name:fr'], ['get', 'name'], ['get', 'name:latin']];
 const zoom = (stops, base = 1.5) => ['interpolate', ['exponential', base], ['zoom'], ...stops];
 const fade = (from, to) => ['interpolate', ['linear'], ['zoom'], from, 0, to, 1];
@@ -181,42 +193,13 @@ export function mapStyle(base = '') {
                   'text-letter-spacing': 0.02 },
         paint: { 'text-color': C.roadLabel, 'text-halo-color': C.halo, 'text-halo-width': 1.6 } },
 
-      // Lieux : pastille colorée à pictogramme blanc, nom de la même teinte.
-      { id: 'poi', type: 'symbol', source: 'omt', 'source-layer': 'poi', minzoom: 14.3,
-        filter: ['all', ['has', 'name'], ['match', ['get', 'subclass'], ALL_CLASSES, true, false],
-                 // de près, toutes les familles ; un peu plus loin, seulement manger, boire et culture
-                 ['<=', POI_PRI, ['step', ['zoom'], 1, 15.3, 3, 16.6, 9]]],
-        layout: { 'icon-image': POI_ICON, 'icon-size': zoom([14.3, 0.85, 17, 1]),
-                  'text-field': NAME, 'text-font': FONT.semibold, 'text-size': 11.5, 'text-anchor': 'left',
-                  'text-offset': [1.0, 0], 'text-max-width': 8, 'text-line-height': 1.15,
-                  'text-optional': false, 'symbol-sort-key': POI_SORT },
-        paint: { 'text-color': POI_TEXT, 'text-halo-color': C.halo, 'text-halo-width': 1.6 } },
-      // Lieux remarquables (vue large) : les plus connus d'abord, de plus en plus nombreux en zoomant.
-      { id: 'landmark', type: 'symbol', source: 'landmarks', minzoom: 11.5, maxzoom: 15,
-        filter: ['<=', ['get', 'rank'], ['step', ['zoom'], 45, 12, 110, 12.8, 260, 13.6, 600, 14.2, 1500]],
-        layout: { 'icon-image': ['match', ['get', 'family'], 'culture', 'poi-columns', 'sight', 'poi-star', 'nature', 'poi-tree',
-                                 'health', 'poi-cross', 'shop', 'poi-bag', 'train', 'poi-train', 'poi-dot'],
-                  'icon-size': zoom([11.5, 0.8, 14, 0.95]),
-                  'text-field': ['get', 'name'], 'text-font': FONT.semibold, 'text-size': zoom([11.5, 10.5, 14, 12]),
-                  'text-anchor': 'left', 'text-offset': [1.0, 0], 'text-max-width': 8, 'text-line-height': 1.1,
-                  'text-optional': false, 'symbol-sort-key': ['get', 'rank'] },
-        paint: { 'text-color': ['match', ['get', 'family'], 'culture', '#0E7681', 'sight', '#0E7681', 'nature', '#2F6E3F',
-                                'health', '#A8392F', 'shop', '#3253AA', 'train', '#2B4793', '#5F656C'],
-                 'text-halo-color': C.halo, 'text-halo-width': 1.6 } },
       // Autres lieux (banques, bureaux, services) : seulement de très près.
-      { id: 'poi-other', type: 'symbol', source: 'omt', 'source-layer': 'poi', minzoom: 17.5,
+      { id: 'poi-other', type: 'symbol', source: 'omt', 'source-layer': 'poi', minzoom: 18,
         filter: ['all', ['has', 'name'], ['!', ['match', ['get', 'subclass'], ALL_CLASSES, true, false]],
                  ['!', ['match', ['get', 'class'], ['bus', 'railway', 'entrance', 'ferry_terminal', 'school', 'college'], true, false]]],
         layout: { 'icon-image': 'poi-dot', 'icon-size': 0.85, 'text-field': NAME, 'text-font': FONT.semibold, 'text-size': 11.5,
                   'text-anchor': 'left', 'text-offset': [1.05, 0], 'text-max-width': 8, 'text-optional': true, 'symbol-sort-key': ['get', 'rank'] },
         paint: { 'text-color': '#5F656C', 'text-halo-color': C.halo, 'text-halo-width': 1.6 } },
-      // Lieux mis en avant par un raccourci de catégorie (filtre posé par l'app).
-      { id: 'poi-hit', type: 'symbol', source: 'omt', 'source-layer': 'poi', filter: ['==', ['get', 'subclass'], '__none__'],
-        layout: { 'icon-image': POI_ICON, 'icon-size': 1.2, 'icon-allow-overlap': true,
-                  'text-field': NAME, 'text-font': FONT.bold, 'text-size': 12.5, 'text-anchor': 'left',
-                  'text-offset': [1.3, 0], 'text-max-width': 8, 'text-optional': true },
-        paint: { 'text-color': POI_TEXT, 'text-halo-color': C.halo, 'text-halo-width': 1.8 } },
-
       // Stations de métro et RER : pastille « M », nom à partir du zoom 14,5.
       { id: 'metro', type: 'symbol', source: 'omt', 'source-layer': 'poi', minzoom: 13.8,
         filter: ['all', ['==', ['get', 'class'], 'railway'], ['match', ['get', 'subclass'], ['subway', 'station', 'halt'], true, false]],
@@ -234,6 +217,35 @@ export function mapStyle(base = '') {
         filter: ['match', ['get', 'class'], ['city', 'town'], true, false],
         layout: { 'text-field': NAME, 'text-font': FONT.bold, 'text-size': zoom([6, 13, 12, 22]) },
         paint: { 'text-color': C.label, 'text-halo-color': C.halo, 'text-halo-width': 2 } },
+      // Lieux en dernier : ils sont placés en premier et passent devant métro et noms de quartier.
+      // À partir du zoom 17 : les autres lieux du fond de carte (manger, boire, culture, hôtels),
+      // puis les boutiques à 17,5. Les lieux choisis ci-dessus gardent la priorité.
+      { id: 'poi', type: 'symbol', source: 'omt', 'source-layer': 'poi', minzoom: 17,
+        filter: ['all', ['has', 'name'], ['match', ['get', 'subclass'], ALL_CLASSES, true, false],
+                 ['<=', POI_PRI, ['step', ['zoom'], 2.5, 17.5, 9]]],
+        layout: { 'icon-image': POI_ICON, 'icon-size': 1,
+                  'text-field': NAME, 'text-font': FONT.semibold, 'text-size': 12, 'text-anchor': 'left',
+                  'text-offset': [1.0, 0], 'text-max-width': 8, 'text-line-height': 1.15,
+                  'text-optional': false, 'symbol-sort-key': POI_SORT },
+        paint: { 'text-color': POI_TEXT, 'text-halo-color': C.halo, 'text-halo-width': 1.6 } },
+      // Lieux choisis à l'avance (monuments et bonnes adresses), chacun avec son zoom
+      // d'apparition « z » calculé pour garder un écart régulier à l'écran (voir scripts/build_overlays.py).
+      { id: 'landmark', type: 'symbol', source: 'landmarks', minzoom: 11.5, maxzoom: 18.5,
+        filter: VISIBLE_AT_ZOOM,
+        layout: { 'icon-image': ['match', ['get', 'family'], ...Object.entries(PLACE_FAMILIES).flatMap(([k, f]) => [k, `poi-${f.icon}`]), 'poi-dot'],
+                  'icon-size': zoom([11.5, 0.8, 14, 0.9, 16.5, 1]),
+                  'text-field': ['get', 'name'], 'text-font': FONT.semibold, 'text-size': zoom([11.5, 10.5, 14, 11.5, 16, 12]),
+                  'text-anchor': 'left', 'text-offset': [1.0, 0], 'text-max-width': 8, 'text-line-height': 1.1,
+                  'text-optional': false, 'symbol-sort-key': ['get', 'rank'] },
+        paint: { 'text-color': ['match', ['get', 'family'], ...Object.entries(PLACE_FAMILIES).flatMap(([k, f]) => [k, f.text || darken(f.color)]), '#5F656C'],
+                 'text-halo-color': C.halo, 'text-halo-width': 1.6 } },
+      // Lieux mis en avant par un raccourci de catégorie (filtre posé par l'app).
+      { id: 'poi-hit', type: 'symbol', source: 'omt', 'source-layer': 'poi', filter: ['==', ['get', 'subclass'], '__none__'],
+        layout: { 'icon-image': POI_ICON, 'icon-size': 1.2, 'icon-allow-overlap': true,
+                  'text-field': NAME, 'text-font': FONT.bold, 'text-size': 12.5, 'text-anchor': 'left',
+                  'text-offset': [1.3, 0], 'text-max-width': 8, 'text-optional': true },
+        paint: { 'text-color': POI_TEXT, 'text-halo-color': C.halo, 'text-halo-width': 1.8 } },
+
       { id: 'housenumber', type: 'symbol', source: 'omt', 'source-layer': 'housenumber', minzoom: 18,
         layout: { 'text-field': ['get', 'housenumber'], 'text-font': FONT.regular, 'text-size': 10.5 },
         paint: { 'text-color': '#A2A6AB' } }
