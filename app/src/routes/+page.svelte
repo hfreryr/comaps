@@ -7,7 +7,7 @@
   import { hoursStatus, hoursTable } from '#lib/hours.js';
   import { draggable } from '#lib/sheet.js';
   import { wikiInfo } from '#lib/placeinfo.js';
-  import { mapStyle, provideImage, osmRef, FAMILIES, DARK_LAND, darken } from '#lib/mapstyle.js';
+  import { mapStyle, provideImage, osmRef, FAMILIES, DARK_LAND, darken, pinFor, pinImageId } from '#lib/mapstyle.js';
   import { streetRoute, transitRoutes, transitWithStop, departures, trafficEstimate, MODE_NAMES, fmtDuration, fmtTime, fmtWait, fmtDistance } from '#lib/routing.js';
   import { stationExits, bestExit, exitLabel, sortExits } from '#lib/exits.js';
   import { readGoogleExport } from '#lib/importgoogle.js';
@@ -324,14 +324,22 @@
                 'text-field': ['get', 'name'], 'text-font': ['Open Sans Bold'], 'text-size': 12.5, 'text-anchor': 'left',
                 'text-offset': [1.3, 0], 'text-max-width': 8, 'text-optional': true },
       paint: { 'text-color': ['get', 'tc'], 'text-halo-color': dark ? 'rgba(22,24,28,0.9)' : '#FFFFFF', 'text-halo-width': 1.8 } });
+    map.addSource('selected', { type: 'geojson', data: empty() });
     map.addSource('favs', { type: 'geojson', data: favData() });
     map.addLayer({ id: 'fav', type: 'symbol', source: 'favs',
       layout: { 'icon-image': 'fav', 'icon-allow-overlap': true, 'icon-size': ['interpolate', ['linear'], ['zoom'], 11, 0.8, 16, 1.05],
                 'text-field': ['step', ['zoom'], '', 14, ['get', 'name']], 'text-font': ['Open Sans Semibold'], 'text-size': 12,
                 'text-anchor': 'left', 'text-offset': [1.1, 0], 'text-optional': true, 'text-max-width': 8 },
       paint: { 'text-color': dark ? '#F08AB4' : '#A82C5F', 'text-halo-color': dark ? 'rgba(22,24,28,0.9)' : '#FFFFFF', 'text-halo-width': 1.6 } });
+    map.addLayer({ id: 'selected', type: 'symbol', source: 'selected',
+      layout: { 'icon-image': ['get', 'icon'], 'icon-allow-overlap': true, 'icon-ignore-placement': true,
+                'text-field': ['get', 'name'], 'text-font': ['Open Sans Bold'], 'text-size': 13.5, 'text-anchor': 'left',
+                'text-offset': [1.75, 0], 'text-max-width': 9, 'text-allow-overlap': true },
+      paint: { 'text-color': ['get', 'tc'], 'text-halo-color': dark ? 'rgba(22,24,28,0.95)' : '#FFFFFF', 'text-halo-width': 2 } });
+    dimPlaces(dimmed);
     // Après un changement de style : on remet l'état en cours (trajet, catégorie, mode transports).
-    if (directions) { drawRoute(); dimPlaces(true); }
+    if (directions) drawRoute();
+    else if (place) showSelection(place);
     if (category) applyHit(category);
     if (mapMode === 'transit') for (const id of ['transit-case', 'transit-line', 'transit-label']) map.setLayoutProperty(id, 'visibility', 'visible');
   }
@@ -389,11 +397,16 @@
     return '#' + [n >> 16, (n >> 8) & 255, n & 255].map((v) => Math.round(v * k).toString(16).padStart(2, '0')).join('');
   }
   // Pendant un itinéraire, les lieux de la carte s'effacent derrière le trajet.
+  // Le lieu sélectionné est masqué à sa place (état « sel ») : c'est sa version agrandie qui s'affiche.
+  let dimmed = false;
   function dimPlaces(on) {
-    for (const id of ['poi', 'poi-other', 'landmark', 'metro']) {
+    dimmed = on;
+    const v = on ? 0.35 : 1;
+    const op = ['case', ['boolean', ['feature-state', 'sel'], false], 0, v];
+    for (const id of ['poi', 'poi-other', 'landmark', 'metro', 'cat-hit']) {
       if (!map.getLayer(id)) continue;
-      map.setPaintProperty(id, 'icon-opacity', on ? 0.35 : 1);
-      map.setPaintProperty(id, 'text-opacity', on ? 0.35 : 1);
+      map.setPaintProperty(id, 'icon-opacity', id === 'cat-hit' ? ['case', ['boolean', ['feature-state', 'sel'], false], 0, 1] : op);
+      map.setPaintProperty(id, 'text-opacity', id === 'cat-hit' ? ['case', ['boolean', ['feature-state', 'sel'], false], 0, 1] : op);
     }
   }
   function setMapMode(m) {
@@ -425,7 +438,7 @@
     const fav = map.queryRenderedFeatures(e.point, { layers: ['fav'] })[0];
     if (fav) return openPlace({ ...favorites[fav.properties.i] });
     const hit = map.queryRenderedFeatures(e.point, { layers: ['cat-hit'] })[0];
-    if (hit && nearby[hit.properties.i]) return openFeature(nearby[hit.properties.i].f);
+    if (hit && nearby[hit.properties.i]) return openFeature(nearby[hit.properties.i].f, 'cat-hit');
     const f = map.queryRenderedFeatures(e.point, { layers: ['poi-hit', 'poi', 'poi-other', 'landmark', 'metro'] })[0];
     if (f) return openFeature(f);
     // Toucher un endroit vide : fiche de l'adresse (si une fiche est ouverte, le toucher la ferme d'abord).
@@ -444,11 +457,18 @@
     if (place === p || place?.id === p.id) { place = { ...p, name: label || 'Point sélectionné' }; remember(place); }
   }
 
-  function openFeature(f) {
+  function openFeature(f, layerId = f.layer?.id) {
     const [osmType, osmId] = (f.properties.osm || '').split('/');
     const ref = f.properties.osm ? { osmType, osmId: Number(osmId) } : osmRef(f.id);
     const [lon, lat] = f.geometry.coordinates;
+    const ci = category && !category.transit ? nearby.findIndex((n) => n.f === f || (n.f.id === f.id && f.id != null)) : -1;
+    const pin = ci >= 0 ? { glyph: catIcon(category), color: famColor(category) }
+      : pinFor({ subclass: f.properties.subclass, family: f.properties.family, layer: layerId });
+    const hide = [];
+    if (f.source && f.id != null) hide.push(f.sourceLayer ? { source: f.source, sourceLayer: f.sourceLayer, id: f.id } : { source: f.source, id: f.id });
+    if (ci >= 0) hide.push({ source: 'cat-hits', id: ci });
     openPlace({
+      pin, hide,
       id: String(f.id), ...ref, name: category && !category.transit ? displayName(f, category) : f.properties.name,
       type: typeLabel('', f.properties.subclass) || typeLabel('', f.properties.class)
         || { culture: 'Culture', sight: 'Lieu remarquable', nature: 'Parc ou jardin', health: 'Hôpital', train: 'Gare', shop: 'Grand magasin' }[f.properties.family],
@@ -499,6 +519,32 @@
     marker.setLngLat([lon, lat]).addTo(map);
   }
 
+  // Couleur du nom à côté d'une pastille : plus foncée sur fond clair, plus claire en mode sombre.
+  function labelColor(hex) {
+    if (!dark) return darken(hex);
+    const n = parseInt(hex.slice(1, 7), 16);
+    return '#' + [n >> 16, (n >> 8) & 255, n & 255].map((v) => Math.round(v + (255 - v) * 0.45).toString(16).padStart(2, '0')).join('');
+  }
+  // Sélection d'un lieu : sa propre pastille, agrandie, à la place de la petite (repère rouge pour une adresse).
+  let selStates = [];
+  function clearSelection() {
+    for (const t of selStates) { try { map.setFeatureState(t, { sel: false }); } catch { /* tuile déchargée */ } }
+    selStates = [];
+    map?.getSource('selected')?.setData(empty());
+  }
+  function showSelection(p) {
+    clearSelection();
+    const pin = p.pin || pinFor({ subclass: p.subclass });
+    if (!pin || !map?.getSource('selected')) { placeMarker(p.lon, p.lat); return; }
+    marker?.remove();
+    const color = pin === 'metro' ? '#2B4793' : pin.color;
+    map.getSource('selected').setData({ type: 'FeatureCollection', features: [{ type: 'Feature',
+      geometry: { type: 'Point', coordinates: [p.lon, p.lat] },
+      properties: { icon: pinImageId(pin), name: p.name || '', tc: labelColor(color) } }] });
+    selStates = p.hide || [];
+    for (const t of selStates) { try { map.setFeatureState(t, { sel: true }); } catch { /* rien */ } }
+  }
+
   function loadList(key, max) {
     try { return JSON.parse(localStorage.getItem(key) || '[]').slice(0, max); } catch { return []; }
   }
@@ -510,7 +556,7 @@
     try { localStorage.setItem(FAVS_KEY, JSON.stringify(favorites)); } catch { /* navigation privée */ }
   }
   function setShortcut(which, p) {
-    shortcuts = { ...shortcuts, [which]: p ? { id: p.id, name: p.name, type: p.type, address: p.address || '', lat: p.lat, lon: p.lon, osmType: p.osmType, osmId: p.osmId } : undefined };
+    shortcuts = { ...shortcuts, [which]: p ? { id: p.id, name: p.name, type: p.type, address: p.address || '', lat: p.lat, lon: p.lon, osmType: p.osmType, osmId: p.osmId, subclass: p.subclass, pin: p.pin } : undefined };
     try { localStorage.setItem(SHORTCUTS_KEY, JSON.stringify(shortcuts)); } catch { /* rien */ }
   }
   // Toucher « Maison » : itinéraire direct. S'il n'est pas encore défini, on le demande.
@@ -616,7 +662,7 @@
       favorites = favorites.filter((f) => !sameSpot(f, p));
       say('Retiré de vos favoris');
     } else {
-      const keep = { id: p.id, name: p.name, type: p.type, address: p.address || info?.address || '', lat: p.lat, lon: p.lon, osmType: p.osmType, osmId: p.osmId };
+      const keep = { id: p.id, name: p.name, type: p.type, address: p.address || info?.address || '', lat: p.lat, lon: p.lon, osmType: p.osmType, osmId: p.osmId, subclass: p.subclass, pin: p.pin };
       favorites = [keep, ...favorites];
       say('Ajouté à vos favoris · gardé sur cet appareil uniquement');
     }
@@ -629,7 +675,7 @@
   });
   function remember(p) {
     if (!p?.name || p.name === 'Point sélectionné') return;
-    const keep = { id: p.id, name: p.name, type: p.type, address: p.address, lat: p.lat, lon: p.lon, osmType: p.osmType, osmId: p.osmId };
+    const keep = { id: p.id, name: p.name, type: p.type, address: p.address, lat: p.lat, lon: p.lon, osmType: p.osmType, osmId: p.osmId, subclass: p.subclass, pin: p.pin };
     recents = [keep, ...recents.filter((r) => r.id !== p.id && r.name !== p.name)].slice(0, 8);
     try { localStorage.setItem(RECENTS_KEY, JSON.stringify(recents)); } catch { /* navigation privée : tant pis */ }
   }
@@ -648,7 +694,7 @@
     showWeek = false;
     focused = false;
     document.activeElement?.blur();
-    placeMarker(p.lon, p.lat);
+    showSelection(p);
     frame(p.lon, p.lat);
     exits = null;
     allExits = false;
@@ -663,7 +709,7 @@
     try { info = await details(p); } catch { info = {}; }
     if (place?.id !== p.id) return;
     // Lien partagé : on ne connaissait que l'identifiant du lieu, on récupère son nom.
-    if (!p.name && info.name) { place = { ...place, name: info.name, type: info.kind || place.type }; remember(place); }
+    if (!p.name && info.name) { place = { ...place, name: info.name, type: info.kind || place.type }; remember(place); showSelection(place); }
     if (info.wikidata || info.wikipedia) {
       const w = await wikiInfo(info).catch(() => null);
       if (place?.id === p.id) wiki = w;
@@ -714,6 +760,7 @@
     info = null;
     deps = null;
     marker?.remove();
+    clearSelection();
   }
 
   function clearSearch() {
@@ -736,7 +783,7 @@
     if (!c || c.transit) return src.setData(empty());
     src.setData({ type: 'FeatureCollection', features: nearby.map(({ f }, i) => ({
       type: 'Feature', id: i, geometry: { type: 'Point', coordinates: f.geometry.coordinates },
-      properties: { i, name: displayName(f, c), icon: `cat|${catIcon(c)}|${famColor(c)}`, tc: darken(famColor(c)) } })) });
+      properties: { i, name: displayName(f, c), icon: `cat|${catIcon(c)}|${famColor(c)}`, tc: labelColor(famColor(c)) } })) });
   }
   // Un lieu sans nom (toilettes, borne…) ou au nom de code (« G-040 ») prend le nom de sa catégorie.
   const displayName = (f, c) => {
@@ -948,6 +995,8 @@
     directions = true;
     dimPlaces(true);
     to = { label: place.name, lat: place.lat, lon: place.lon };
+    clearSelection();
+    placeMarker(to.lon, to.lat);
     via = null;
     showVia = false;
     routes = { walk: null, bike: null, transit: null };
@@ -971,7 +1020,7 @@
     routes = { walk: null, bike: null, transit: null };
     map.getSource('route')?.setData(empty());
     map.getSource('route-ends')?.setData(empty());
-    if (place) { placeMarker(place.lon, place.lat); frame(place.lon, place.lat); }
+    if (place) { showSelection(place); frame(place.lon, place.lat); }
   }
 
   const pointOf = (which) => ({ from, via, to })[which];

@@ -72,6 +72,7 @@ export async function search(query, near = PARIS, signal) {
       osmId: p.osm_id,
       name: p.name || address(p),
       type: isAddress ? 'Adresse' : typeLabel(p.osm_key, p.osm_value),
+      subclass: isAddress ? null : p.osm_value,
       address: isAddress ? [p.postcode, p.city].filter(Boolean).join(' ') : address(p),
       lat, lon
     };

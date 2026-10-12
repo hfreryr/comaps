@@ -159,7 +159,7 @@ function lightStyle(base) {
     version: 8,
     glyphs: `${base}fonts/{fontstack}/{range}.pbf`,
     sources: {
-      landmarks: { type: 'geojson', data: `${base}data/landmarks.geojson` },
+      landmarks: { type: 'geojson', data: `${base}data/landmarks.geojson`, promoteId: 'rank' },
       transit: { type: 'geojson', data: `${base}data/transit-lines.geojson` },
       omt: { type: 'vector', url: 'https://tiles.openfreemap.org/planet',
         attribution: '<a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> © <a href="https://www.openmaptiles.org/" target="_blank" rel="noopener">OpenMapTiles</a> © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">contributeurs OpenStreetMap</a>' }
@@ -411,6 +411,47 @@ export function metroImage(px = 18) {
   return { data: g.getImageData(0, 0, size, size), pixelRatio: s };
 }
 
+// Lieu sélectionné : son propre pictogramme, en grand (comme les cartes de référence).
+/** Pictogramme d'un lieu de la carte : { glyph, color } ou 'metro' ; null si inconnu (adresse, rue…). */
+export function pinFor({ subclass, family, layer } = {}) {
+  if (layer === 'metro' || ['subway', 'station', 'halt'].includes(subclass) && layer !== 'poi') return 'metro';
+  if (family && PLACE_FAMILIES[family]) return { glyph: PLACE_FAMILIES[family].icon, color: PLACE_FAMILIES[family].color };
+  const f = familyOf(subclass);
+  return f === OTHER ? null : { glyph: f.icon, color: f.color };
+}
+export const pinImageId = (pin) => (pin === 'metro' ? 'sel-metro' : `sel|${pin.glyph}|${pin.color}`);
+
+function bigPin(color, glyph) {
+  // même pastille que sur la carte, deux fois plus grande, avec une ombre plus marquée
+  const px = 34, s = 2, size = (px + 10) * s;
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const g = c.getContext('2d');
+  const r = (px / 2) * s, cx = size / 2;
+  g.shadowColor = 'rgba(0,0,0,0.35)'; g.shadowBlur = 6 * s; g.shadowOffsetY = 1.5 * s;
+  g.fillStyle = '#FFFFFF';
+  g.beginPath(); g.arc(cx, cx, r + 2.2 * s, 0, Math.PI * 2); g.fill();
+  g.shadowColor = 'transparent';
+  g.fillStyle = color;
+  g.beginPath(); g.arc(cx, cx, r, 0, Math.PI * 2); g.fill();
+  if (glyph === 'M') {
+    g.fillStyle = '#FFFFFF';
+    g.font = `700 ${Math.round(r * 1.2)}px -apple-system, "Segoe UI", Roboto, Arial, sans-serif`;
+    g.textAlign = 'center'; g.textBaseline = 'alphabetic';
+    const m = g.measureText('M');
+    g.fillText('M', cx, cx + (m.actualBoundingBoxAscent - (m.actualBoundingBoxDescent || 0)) / 2);
+  } else {
+    const scale = (r * 1.2) / 24;
+    g.save();
+    g.translate(cx - 12 * scale, cx - 12 * scale);
+    g.scale(scale, scale);
+    g.fillStyle = '#FFFFFF';
+    g.fill(new Path2D(GLYPHS[glyph] || GLYPHS.dot), 'evenodd');
+    g.restore();
+  }
+  return { data: g.getImageData(0, 0, size, size), pixelRatio: s };
+}
+
 // Fournit à la carte toute image demandée par le style.
 export function provideImage(map, id) {
   if (map.hasImage(id)) return;
@@ -429,6 +470,11 @@ export function provideImage(map, id) {
   }
   if (id === 'fav') {             // lieux enregistrés : pastille rose à cœur blanc
     const { data, pixelRatio } = poiImage(FAV_COLOR, 'heart', 20);
+    return map.addImage(id, data, { pixelRatio });
+  }
+  if (id === 'sel-metro' || id.startsWith('sel|')) {
+    const [, glyph, colour] = id === 'sel-metro' ? [null, 'M', '#2B4793'] : id.split('|');
+    const { data, pixelRatio } = bigPin(colour, glyph);
     return map.addImage(id, data, { pixelRatio });
   }
   if (id.startsWith('cat|')) {        // raccourci de catégorie : pictogramme et couleur propres
