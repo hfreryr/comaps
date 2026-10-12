@@ -1,1 +1,0 @@
-import{P as e,b as t,h as n,x as r}from"../chunks/m5ji46Fo.js";var i=Object.defineProperty,a=((e,t)=>{let n={};for(var r in e)i(n,r,{get:e[r],enumerable:!0});return t||i(n,Symbol.toStringTag,{value:`Module`}),n})({prerender:()=>!0,ssr:()=>!1});function o(i,a){var o=r(),s=e(o);n(s,()=>a.children),t(i,o)}export{o as component,a as universal};
