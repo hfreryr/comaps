@@ -336,6 +336,8 @@
       map.remove();
     };
   });
+  let topH = $state(120);
+  let searchH = $state(56);   // sur grand écran, les raccourcis sont à droite de la recherche : seule la recherche compte   // hauteur du haut d'écran (recherche, ou départ/arrivée + modes) : la fiche se place dessous
   let bearing = $state(0);
   let pitch = $state(0);
 
@@ -1701,12 +1703,12 @@
       </ul>
 {/snippet}
 
-<div class="app" class:routing={directions} class:navigating={!!nav}>
+<div class="app" class:routing={directions} class:navigating={!!nav} style:--top-h={`${directions ? topH : searchH + 16}px`}>
   <div class="map" bind:this={mapEl} aria-label="Carte"></div>
 
   {#if !directions}
     <header class="top">
-      <div class="search" class:open={showList}>
+      <div class="search" class:open={showList} bind:offsetHeight={searchH}>
         <svg class="lens" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="M15.5 15.5 20 20" /></svg>
         <input id="search" type="search" placeholder="Rechercher un lieu ou une adresse" aria-label="Rechercher un lieu ou une adresse"
           autocomplete="off" enterkeyhint="search" bind:value={query}
@@ -1733,7 +1735,7 @@
       {/if}
     </header>
   {:else if !nav}
-    <header class="top dir">
+    <header class="top dir" bind:offsetHeight={topH}>
       <div class="dir-card" class:open={editing}>
         <button class="icon-btn back" onclick={closeDirections} aria-label="Revenir à la fiche du lieu">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
@@ -2653,10 +2655,11 @@
     .search, .dir-card, .modes { width: 400px; flex: none; }
     .chips { flex: 1; min-width: 0; flex-wrap: wrap; overflow: visible; margin: 0; padding: 6px 0 0; -webkit-mask-image: none; mask-image: none; }
     .sheet {
-      left: 16px; right: auto; bottom: auto; top: 128px; width: 400px; max-height: calc(100vh - 150px);
+      left: 16px; right: auto; bottom: auto; top: calc(var(--top-h, 112px) + 16px); width: 400px;
+      max-height: calc(100vh - var(--top-h, 112px) - 32px);
       border-radius: 20px; padding: 18px 22px 22px; box-shadow: var(--shadow-float); animation-name: appear;
     }
-    .routing .sheet { top: 172px; max-height: calc(100vh - 194px); }
+
     @keyframes appear { from { transform: translateY(-6px); opacity: 0; } }
     .grip { display: none; }
     .locate { bottom: 40px; right: 16px; }
