@@ -14,11 +14,11 @@ Repérer automatiquement les lieux d'OSM qui ne sont plus à jour — en commen�
 - Aucune modification automatique d'OSM sans accord préalable de la communauté.
 - Toute amélioration repart dans OSM : toutes les apps libres en profitent.
 
-### 2. 🎨 Labo design (`design/`)
+### 2. 🗺️ L'app (`app/`)
 Concevoir et tester une expérience à la hauteur de Google Maps, d'abord sur le parcours **« faire un itinéraire »**.
 
 - Prototypes testés avec de vrais utilisateurs, comparés à Google Maps.
-- Les améliorations sont proposées à l'app libre [CoMaps](https://www.comaps.app) plutôt que de créer une app concurrente.
+- Notre propre app web, branchée sur des moteurs libres : https://hfreryr.github.io/comaps/
 
 ## Feuille de route
 
@@ -28,8 +28,8 @@ Concevoir et tester une expérience à la hauteur de Google Maps, d'abord sur le
 | 1. Cadrage | Ville : Paris ✅ — 6e arrondissement ✅ | Périmètre écrit ici |
 | 2. Détection ✅ | Lister les lieux OSM peut-être fermés (voir `pipeline/README.md`) | Liste reproductible + carte |
 | 3. Mesure | Vérifier 30 à 50 cas sur le terrain | Taux de fiabilité chiffré |
-| 4. Prototype itinéraire | Maquette interactive | Testée par 5 personnes face à Google Maps |
-| 5. Contribution CoMaps | Proposer une amélioration codée | Réponse de l'équipe CoMaps |
+| 4. App : carte, recherche, fiche lieu ✅ | Prototype en ligne (`app/`) | Testé sur téléphone |
+| 5. App : itinéraires ✅ | À pied, à vélo, en transports | Testé par 5 personnes face à Google Maps |
 | 6. Communauté OSM | Présenter les résultats du pipeline | Accord ou retour constructif |
 | 7. Bot | Corriger automatiquement les cas très sûrs | Corrections non annulées |
 
