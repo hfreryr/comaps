@@ -7,10 +7,13 @@
   import { hoursStatus, hoursTable } from '#lib/hours.js';
   import { draggable } from '#lib/sheet.js';
   import { wikiInfo } from '#lib/placeinfo.js';
-  import { mapStyle, provideImage, osmRef, FAMILIES, DARK_LAND, darken, pinFor, pinImageId } from '#lib/mapstyle.js';
+  import { mapStyle, provideImage, osmRef, FAMILIES, DARK_LAND, darken, pinFor, pinImageId, GLYPHS } from '#lib/mapstyle.js';
   import { streetRoute, transitRoutes, transitWithStop, departures, trafficEstimate, MODE_NAMES, fmtDuration, fmtTime, fmtWait, fmtDistance } from '#lib/routing.js';
   import { stationExits, bestExit, exitLabel, sortExits } from '#lib/exits.js';
   import { readGoogleExport } from '#lib/importgoogle.js';
+  import { DEFAULT_LISTS, LIST_ICONS, LIST_COLORS, migratePlaces, pack, unpack, packList, unpackList, snapshot, restore,
+    backupFile, readBackup, mergeInto } from '#lib/myplaces.js';
+  import qrcode from 'qrcode-generator';
   import { placeForExit, placeForTransfer, placeLabel } from '#lib/rame.js';
   import { prepare, progress, arrowAngle, isRoundabout, navDistance, spokenDistance } from '#lib/nav.js';
 
@@ -18,6 +21,7 @@
   // on : affiché d'origine (les autres s'ajoutent dans « Personnaliser les raccourcis ») ;
   // classes : sous-classes des lieux de la carte ; inc : catégories Photon pour compléter avec les lieux hors de la vue.
   const ALL_CATEGORIES = [
+    { key: 'saved', label: 'Mes lieux', saved: true, color: '#D63A7A', icon: 'heart', on: true },
     { key: "resto", label: "Restaurants", classes: ["restaurant", "fast_food"], inc: ["osm.amenity.restaurant"], family: "food", on: true },
     { key: "cafe", label: "Cafés", classes: ["cafe"], inc: ["osm.amenity.cafe"], family: "cafe", on: true },
     { key: 'metro', label: 'Métro', transit: true, color: '#2B4793', icon: 'train', on: true },
@@ -80,6 +84,7 @@
   ];
   // Taper un type de lieu (« pharmacie », « métro le plus proche », « fleuriste ») propose la liste triée par proximité.
   const CATEGORY_WORDS = Object.fromEntries(Object.entries({
+    saved: "favoris favori enregistres enregistre mes lieux liste listes",
     resto: "restaurant restaurants resto restos manger dejeuner diner brasserie brasseries",
     cafe: "cafe cafes coffee cafeteria",
     metro: "metro metros station stations rer subway transport transports arret",
@@ -146,6 +151,8 @@
     let saved = [];
     try { saved = JSON.parse(localStorage.getItem(CHIPS_KEY) || '[]'); } catch { /* rien */ }
     const known = saved.filter((p) => ALL_CATEGORIES.some((c) => c.key === p.key));
+    // « Mes lieux » arrive en tête chez ceux qui avaient déjà personnalisé leurs raccourcis
+    if (saved.length && !known.some((p) => p.key === 'saved')) known.unshift({ key: 'saved' });
     // une catégorie ajoutée après coup apparaît à la fin
     return [...known, ...ALL_CATEGORIES.filter((c) => !known.some((p) => p.key === c.key)).map((c) => (c.on ? { key: c.key } : { key: c.key, hidden: true }))];
   }
@@ -203,9 +210,28 @@
   const RECENTS_KEY = 'lieux-recents';
   let recents = $state(loadRecents());
   // Favoris : même principe, gardés uniquement dans ce navigateur.
+  // Mes lieux : lieux enregistrés (chacun dans une ou plusieurs listes), listes, lieux épinglés.
   const FAVS_KEY = 'lieux-favoris';
-  let favorites = $state(loadList(FAVS_KEY, 200));
-  const isFav = $derived(!!place && favorites.some((f) => sameSpot(f, place)));
+  const LISTS_KEY = 'mes-listes';
+  const PINS_KEY = 'lieux-epingles';
+  const BACKUP_KEY = 'derniere-sauvegarde';
+  let favorites = $state(migratePlaces(loadList(FAVS_KEY, 5000)));
+  let lists = $state((() => { const l = loadList(LISTS_KEY, 100); return l.length ? l : DEFAULT_LISTS; })());
+  let pins = $state(loadList(PINS_KEY, 30));
+  let showSaved = $state((() => { try { return localStorage.getItem('mes-lieux-carte') !== 'non'; } catch { return true; } })());
+  let lastBackup = $state((() => { try { return Number(localStorage.getItem(BACKUP_KEY)) || 0; } catch { return 0; } })());
+  let savedList = $state(null);      // liste ouverte dans « Mes lieux » (null : vue d'ensemble)
+  let listPicker = $state(false);    // fiche « Enregistrer dans… »
+  let hubPanel = $state(null);       // 'transfer' | 'backup' | 'restore' | 'newlist'
+  let incoming = $state(null);       // liste partagée ou transfert reçu par lien
+  const savedEntry = $derived(place ? favorites.find((f) => sameSpot(f, place)) : null);
+  const isFav = $derived(!!savedEntry);
+  const listOf = (id) => lists.find((l) => l.id === id) || DEFAULT_LISTS[0];
+  const listIcon = (l) => `cat|${l.icon}|${l.color}`;
+  // pictogramme blanc (mêmes dessins que la carte) en image, pour les listes dans les fiches
+  const glyphUrl = (g) => `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="#fff" fill-rule="evenodd" d="${GLYPHS[g] || GLYPHS.dot}"/></svg>`)}`;
+  const placeKey = (p) => (p.osmType ? `${p.osmType}/${p.osmId}` : `${(+p.lat).toFixed(5)},${(+p.lon).toFixed(5)}`);
+  const pinnedPlaces = $derived(pins.map((k) => favorites.find((f) => placeKey(f) === k)).filter(Boolean));
 
   // Maison et Travail : raccourcis gardés sur l'appareil.
   const SHORTCUTS_KEY = 'maison-travail';
@@ -303,6 +329,19 @@
     map.once('load', () => {
       document.querySelector('.maplibregl-ctrl-attrib')?.classList.remove('maplibregl-compact-show');
       if (fresh) startupLocate();
+      // Liste partagée (…#liste=…) ou transfert depuis un autre appareil (…#transfert=…) : tout est dans le lien.
+      const lm = /[#&]liste=([\w-]+)/.exec(location.hash), tm = /[#&]transfert=([\w-]+)/.exec(location.hash);
+      if (lm || tm) {
+        history.replaceState(history.state, '', location.href.replace(/[#&](liste|transfert)=[\w-]+/, ''));
+        if (tm) unpack(tm[1]).then((raw) => { incoming = { kind: 'transfer', raw, data: restore(raw) }; }).catch(() => say('Ce lien de transfert est incomplet.'));
+        else unpackList(lm[1]).then((r) => {
+          incoming = { kind: 'list', ...r };
+          category = { key: 'shared', saved: true, shared: true, label: r.list.name, name: r.list.name, icon: r.list.icon || 'star', color: r.list.color || '#2A5BD7' };
+          refreshSaved();
+          const pts = nearby.slice(0, 10).map((n) => n.f.geometry.coordinates);
+          if (pts.length) fitTo(pts);
+        }).catch(() => say('Ce lien de liste est incomplet.'));
+      }
       // Lien partagé vers un lieu (…#carte=…&lieu=node/123) : on rouvre sa fiche.
       const shared = /[#&]lieu=(node|way|relation)\/(\d+)/.exec(location.hash);
       if (shared) {
@@ -342,8 +381,11 @@
   let pitch = $state(0);
 
   let dark = $state(false);
-  const favData = () => ({ type: 'FeatureCollection', features: favorites.map((f, i) => ({
-    type: 'Feature', id: i, geometry: { type: 'Point', coordinates: [f.lon, f.lat] }, properties: { i, name: f.name } })) });
+  const favData = () => ({ type: 'FeatureCollection', features: favorites.map((f, i) => {
+    const l = listOf(f.lists?.[0]);
+    return { type: 'Feature', id: i, geometry: { type: 'Point', coordinates: [f.lon, f.lat] },
+      properties: { i, name: f.name, icon: listIcon(l), tc: labelColor(l.color) } };
+  }) });
 
   function addCustomLayers() {
     if (map.getSource('route')) return;
@@ -357,10 +399,10 @@
     map.addSource('selected', { type: 'geojson', data: empty() });
     map.addSource('favs', { type: 'geojson', data: favData() });
     map.addLayer({ id: 'fav', type: 'symbol', source: 'favs',
-      layout: { 'icon-image': 'fav', 'icon-allow-overlap': true, 'icon-size': ['interpolate', ['linear'], ['zoom'], 11, 0.8, 16, 1.05],
+      layout: { 'icon-image': ['get', 'icon'], 'icon-allow-overlap': true, 'icon-size': ['interpolate', ['linear'], ['zoom'], 11, 0.8, 16, 1.05],
                 'text-field': ['step', ['zoom'], '', 14, ['get', 'name']], 'text-font': ['Open Sans Semibold'], 'text-size': 12,
                 'text-anchor': 'left', 'text-offset': [1.1, 0], 'text-optional': true, 'text-max-width': 8 },
-      paint: { 'text-color': dark ? '#F08AB4' : '#A82C5F', 'text-halo-color': dark ? 'rgba(22,24,28,0.9)' : '#FFFFFF', 'text-halo-width': 1.6 } });
+      paint: { 'text-color': ['get', 'tc'], 'text-halo-color': dark ? 'rgba(22,24,28,0.9)' : '#FFFFFF', 'text-halo-width': 1.6 } });
     map.addLayer({ id: 'selected', type: 'symbol', source: 'selected',
       layout: { 'icon-image': ['get', 'icon'], 'icon-allow-overlap': true, 'icon-ignore-placement': true,
                 'text-field': ['get', 'name'], 'text-font': ['Open Sans Bold'], 'text-size': 13.5, 'text-anchor': 'left',
@@ -455,10 +497,11 @@
     dimmed = on;
     const v = on ? 0.35 : 1;
     const op = ['case', ['boolean', ['feature-state', 'sel'], false], 0, v];
-    for (const id of ['poi', 'poi-other', 'landmark', 'metro', 'cat-hit']) {
+    for (const id of ['poi', 'poi-other', 'landmark', 'metro', 'cat-hit', 'fav']) {
       if (!map.getLayer(id)) continue;
-      map.setPaintProperty(id, 'icon-opacity', id === 'cat-hit' ? ['case', ['boolean', ['feature-state', 'sel'], false], 0, 1] : op);
-      map.setPaintProperty(id, 'text-opacity', id === 'cat-hit' ? ['case', ['boolean', ['feature-state', 'sel'], false], 0, 1] : op);
+      const keep = id === 'cat-hit' || id === 'fav';   // nos propres repères ne s'estompent pas pendant un trajet
+      map.setPaintProperty(id, 'icon-opacity', keep ? ['case', ['boolean', ['feature-state', 'sel'], false], 0, 1] : op);
+      map.setPaintProperty(id, 'text-opacity', keep ? ['case', ['boolean', ['feature-state', 'sel'], false], 0, 1] : op);
     }
   }
   function setMapMode(m) {
@@ -494,8 +537,12 @@
     // Un panneau ou un menu ouvert : le premier toucher à côté le referme, sans rien ouvrir d'autre.
     if (showModes || editChips || importOpen) { showModes = false; editChips = false; importOpen = false; return; }
     const fav = map.queryRenderedFeatures(e.point, { layers: ['fav'] })[0];
-    if (fav) return openPlace({ ...favorites[fav.properties.i] });
+    if (fav) {
+      const f = favorites[fav.properties.i], l = listOf(f.lists?.[0]);
+      return openPlace({ ...f, pin: { glyph: l.icon, color: l.color }, hide: [{ source: 'favs', id: fav.properties.i }] });
+    }
     const hit = map.queryRenderedFeatures(e.point, { layers: ['cat-hit'] })[0];
+    if (hit && nearby[hit.properties.i]?.saved) return openPlace({ ...nearby[hit.properties.i].saved, pin: { glyph: listOf(nearby[hit.properties.i].saved.lists?.[0]).icon, color: listOf(nearby[hit.properties.i].saved.lists?.[0]).color } });
     if (hit && nearby[hit.properties.i]) return openFeature(nearby[hit.properties.i].f, 'cat-hit');
     const f = map.queryRenderedFeatures(e.point, { layers: ['poi-hit', 'poi', 'poi-other', 'landmark', 'metro'] })[0];
     if (f) return openFeature(f);
@@ -648,7 +695,15 @@
     try {
       const { places, home, work } = await readGoogleExport(file);
       let added = 0, missed = 0;
-      const todo = places.filter((p) => !favorites.some((f) => f.name === p.name && (!p.lat || Math.abs(f.lat - p.lat) < 0.0003)));
+      // chaque liste Google retrouve son équivalent : Favoris, À tester (« À visiter »), ou une liste à son nom
+      const listFor = (name) => {
+        if (!name || /favori|favorite/i.test(name)) return 'fav';
+        if (/want to go|visiter|envie/i.test(name)) return 'todo';
+        const l = createList(name);
+        if (l && /suivi|starred/i.test(name) && l.icon !== 'star') { lists = lists.map((x) => (x.id === l.id ? { ...x, icon: 'star', color: '#C7972B' } : x)); }
+        return l?.id || 'fav';
+      };
+      const todo = places;
       const kept = [];
       for (const [i, p] of todo.entries()) {
         let { lat, lon } = p;
@@ -659,11 +714,13 @@
           if (!r) { missed++; continue; }
           ({ lat, lon } = r);
         }
-        kept.push({ id: `g${lat},${lon}`, name: p.name || p.address, type: 'Importé de Google Maps', address: p.address || '', lat, lon });
-        added++;
+        kept.push({ id: `g${lat},${lon}`, name: p.name || p.address, type: 'Importé de Google Maps', address: p.address || '', lat, lon, lists: [listFor(p.listName)] });
       }
-      favorites = [...kept, ...favorites];
-      saveFavorites();
+      const m = mergeInto({ lists, places: favorites }, { lists: [], places: kept }, sameSpot);
+      favorites = m.places;
+      added = m.added;
+      saveAll();
+      refreshSaved();
       let extra = '';
       for (const [k, v] of [['home', home], ['work', work]]) {
         if (!v || shortcuts[k]) continue;
@@ -717,22 +774,197 @@
     if (a.osmType && b.osmType) return a.osmType === b.osmType && String(a.osmId) === String(b.osmId);
     return a.name === b.name && Math.abs(a.lat - b.lat) < 0.0002 && Math.abs(a.lon - b.lon) < 0.0003;
   }
-  function toggleFavorite() {
+  function saveAll() {
+    saveFavorites();
+    try {
+      localStorage.setItem(LISTS_KEY, JSON.stringify(lists));
+      localStorage.setItem(PINS_KEY, JSON.stringify(pins));
+    } catch { /* navigation privée */ }
+  }
+  const keepOf = (p) => ({ id: p.id, name: p.name, type: p.type, address: p.address || info?.address || '', lat: p.lat, lon: p.lon,
+    osmType: p.osmType, osmId: p.osmId, subclass: p.subclass, pin: p.pin });
+  // « Enregistrer » : un geste, dans Favoris ; le message propose de changer de liste. Déjà enregistré : choix des listes.
+  function saveTap() {
     const p = place;
     if (!p) return;
-    if (favorites.some((f) => sameSpot(f, p))) {
-      const before = favorites;
-      favorites = favorites.filter((f) => !sameSpot(f, p));
-      say('Retiré de vos favoris', { label: 'Annuler', run: () => { favorites = before; saveFavorites(); } });
-    } else {
-      const keep = { id: p.id, name: p.name, type: p.type, address: p.address || info?.address || '', lat: p.lat, lon: p.lon, osmType: p.osmType, osmId: p.osmId, subclass: p.subclass, pin: p.pin };
-      favorites = [keep, ...favorites];
-      say('Ajouté à vos favoris · gardé sur cet appareil uniquement');
-    }
-    saveFavorites();
+    if (savedEntry) { listPicker = true; return; }
+    favorites = [{ ...keepOf(p), lists: ['fav'] }, ...favorites];
+    saveAll();
+    say(`Enregistré dans ${listOf('fav').name}`, { label: 'Changer', run: () => (listPicker = true) });
   }
+  function setMembership(listId, on) {
+    const p = place;
+    if (!p) return;
+    const ex = favorites.find((f) => sameSpot(f, p));
+    if (on && !ex) favorites = [{ ...keepOf(p), lists: [listId] }, ...favorites];
+    else if (ex) {
+      const ls = on ? [...new Set([...ex.lists, listId])] : ex.lists.filter((x) => x !== listId);
+      if (!ls.length) {
+        const before = favorites, beforePins = pins;
+        favorites = favorites.filter((f) => f !== ex);
+        pins = pins.filter((k) => k !== placeKey(ex));
+        say('Retiré de Mes lieux', { label: 'Annuler', run: () => { favorites = before; pins = beforePins; saveAll(); } });
+      } else favorites = favorites.map((f) => (f === ex ? { ...f, lists: ls } : f));
+    }
+    saveAll();
+  }
+  function togglePin(p) {
+    const k = placeKey(p);
+    if (pins.includes(k)) pins = pins.filter((x) => x !== k);
+    else {
+      if (!favorites.some((f) => sameSpot(f, p))) favorites = [{ ...keepOf(p), lists: ['fav'] }, ...favorites];
+      pins = [...pins, k];
+    }
+    saveAll();
+  }
+  let newListName = $state('');
+  function createList(name, then) {
+    const n = name.trim();
+    if (!n) return null;
+    const ex = lists.find((l) => l.name.toLowerCase() === n.toLowerCase());
+    if (ex) { then?.(ex.id); return ex; }
+    const l = { id: `l${Date.now().toString(36)}`, name: n, icon: 'star',   // (pictogramme sobre ; la couleur distingue les listes)
+      color: LIST_COLORS[lists.length % LIST_COLORS.length] };
+    lists = [...lists, l];
+    saveAll();
+    then?.(l.id);
+    return l;
+  }
+  function renameList(l) {
+    const n = prompt('Nouveau nom de la liste', l.name)?.trim();
+    if (!n) return;
+    lists = lists.map((x) => (x.id === l.id ? { ...x, name: n } : x));
+    saveAll();
+  }
+  function deleteList(l) {
+    const before = { lists, favorites };
+    lists = lists.filter((x) => x.id !== l.id);
+    favorites = favorites.map((f) => ({ ...f, lists: f.lists.filter((x) => x !== l.id) })).filter((f) => f.lists.length);
+    savedList = null;
+    saveAll();
+    refreshSaved();
+    say(`Liste « ${l.name} » supprimée`, { label: 'Annuler', run: () => { lists = before.lists; favorites = before.favorites; saveAll(); refreshSaved(); } });
+  }
+  // Mes lieux sur la carte et dans la liste, triés par distance
+  function refreshSaved() {
+    if (!category?.saved) return;
+    const o = me || (map ? { lat: map.getCenter().lat, lon: map.getCenter().lng } : PARIS);
+    const src = category.shared ? incoming.places : favorites.filter((f) => !savedList || f.lists.includes(savedList));
+    nearby = src.map((f, i) => {
+      const l = category.shared ? category : listOf(f.lists?.[0]);
+      return { f: { id: `s${i}`, properties: { name: f.name, subclass: f.subclass }, geometry: { coordinates: [f.lon, f.lat] } },
+        d: dist(o.lat, o.lon, f.lat, f.lon), saved: f, icon: `cat|${l.icon}|${l.color}`, tc: labelColor(l.color) };
+    }).sort((a, b) => a.d - b.d);
+    nearbyFromMe = !!me;
+    nearbyDone = true;
+  }
+  function openSavedList(id) {
+    savedList = id;
+    refreshSaved();
+    const pts = nearby.slice(0, 8).map((n) => n.f.geometry.coordinates);
+    if (pts.length) fitTo(me ? [[me.lon, me.lat], ...pts] : pts);
+  }
+  async function shareList(l) {
+    const places = favorites.filter((f) => f.lists.includes(l.id));
+    const u = new URL(location.href);
+    u.hash = `liste=${await packList(l, places)}`;
+    const data = { title: l.name, text: `${l.name} · ${places.length} lieu${places.length > 1 ? 'x' : ''}`, url: u.toString() };
+    try {
+      if (navigator.share) await navigator.share(data);
+      else { await navigator.clipboard.writeText(data.url); say('Lien de la liste copié'); }
+    } catch { /* partage annulé */ }
+  }
+  // Ajouter une liste reçue par lien
+  function keepIncomingList() {
+    const { list, places } = incoming;
+    let name = list.name;
+    if (lists.some((l) => l.name.toLowerCase() === name.toLowerCase())) name = `${name} (partagée)`;
+    const l = { id: `l${Date.now().toString(36)}`, name, icon: list.icon || 'star', color: list.color || LIST_COLORS[2] };
+    const m = mergeInto({ lists, places: favorites }, { lists: [l], places: places.map((p) => ({ ...p, lists: [l.id] })) }, sameSpot);
+    lists = m.lists;
+    favorites = m.places;
+    saveAll();
+    incoming = null;
+    clearCategory();
+    say(`Liste « ${name} » ajoutée à Mes lieux`);
+  }
+
+  // ——— Transfert vers un autre appareil (lien ou QR code) et sauvegarde dans un fichier ———
+  let transfer = $state(null);       // { url, qr? }
+  async function makeTransfer() {
+    hubPanel = 'transfer';
+    transfer = null;
+    const data = await pack(snapshot({ lists, places: favorites, shortcuts, pins, chips: chipPrefs }));
+    const u = new URL(location.href);
+    u.hash = `transfert=${data}`;
+    const url = u.toString();
+    let qr = null;
+    if (url.length <= 1500) {             // au-delà, un QR code devient trop dense pour être lu sur un écran
+      const q = qrcode(0, 'L');
+      q.addData(url);
+      q.make();
+      qr = q.createSvgTag({ cellSize: 3, margin: 2, scalable: true });
+    }
+    transfer = { url, qr };
+  }
+  async function shareTransfer() {
+    try {
+      if (navigator.share) await navigator.share({ title: 'Mes lieux · Untracked Maps', url: transfer.url });
+      else { await navigator.clipboard.writeText(transfer.url); say('Lien copié'); }
+    } catch { /* annulé */ }
+  }
+  function applyIncoming(data) {
+    const r = restore(data);
+    const m = mergeInto({ lists, places: favorites }, r, sameSpot);
+    lists = m.lists;
+    favorites = m.places;
+    pins = [...new Set([...pins, ...r.pins])];
+    for (const k of ['home', 'work']) if (r.shortcuts[k] && !shortcuts[k]) setShortcut(k, r.shortcuts[k]);
+    if (r.chips?.length) { chipPrefs = r.chips; saveChips(); }
+    saveAll();
+    return m.added;
+  }
+  let backupPassword = $state('');
+  async function makeBackup() {
+    const file = await backupFile(snapshot({ lists, places: favorites, shortcuts, pins, chips: chipPrefs }), backupPassword.trim());
+    backupPassword = '';
+    try {
+      if (navigator.canShare?.({ files: [file] })) await navigator.share({ files: [file], title: 'Sauvegarde de Mes lieux' });
+      else {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(file);
+        a.download = file.name;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      }
+      lastBackup = Date.now();
+      try { localStorage.setItem(BACKUP_KEY, String(lastBackup)); } catch { /* rien */ }
+      hubPanel = null;
+      say('Sauvegarde créée : rangez-la dans votre iCloud, Proton Drive…');
+    } catch { /* partage annulé */ }
+  }
+  let restoreFile = null;
+  let restoreNeedsPw = $state(false);
+  let restorePassword = $state('');
+  async function doRestore(file = restoreFile) {
+    if (!file) return;
+    restoreFile = file;
+    try {
+      const r = await readBackup(file, restorePassword);
+      if (r.needsPassword) { restoreNeedsPw = true; return; }
+      const added = applyIncoming(r.data);
+      restoreFile = null; restoreNeedsPw = false; restorePassword = ''; hubPanel = null;
+      refreshSaved();
+      say(added ? `${added} lieu${added > 1 ? 'x' : ''} restauré${added > 1 ? 's' : ''}` : 'Tout était déjà là');
+    } catch (e) {
+      say(restoreNeedsPw ? 'Mot de passe incorrect' : 'Ce fichier n\'est pas une sauvegarde d\'Untracked Maps');
+    }
+  }
+  const backupAge = $derived(lastBackup ? Math.floor((Date.now() - lastBackup) / 86400000) : null);
+
   // Les favoris apparaissent aussi sur la carte (pastille rose à cœur).
   $effect(() => {
+    lists;
     const data = favData();
     map?.getSource('favs')?.setData(data);
   });
@@ -856,7 +1088,7 @@
     if (!c || c.transit) return src.setData(empty());
     src.setData({ type: 'FeatureCollection', features: nearby.map(({ f }, i) => ({
       type: 'Feature', id: i, geometry: { type: 'Point', coordinates: f.geometry.coordinates },
-      properties: { i, name: displayName(f, c), icon: `cat|${catIcon(c)}|${famColor(c)}`, tc: labelColor(famColor(c)) } })) });
+      properties: { i, name: displayName(f, c), icon: nearby[i].icon || `cat|${catIcon(c)}|${famColor(c)}`, tc: nearby[i].tc || labelColor(famColor(c)) } })) });
   }
   // Un lieu sans nom (toilettes, borne…) ou au nom de code (« G-040 ») prend le nom de sa catégorie.
   const displayName = (f, c) => {
@@ -869,6 +1101,15 @@
     editChips = false;
     importOpen = false;
     if (category?.key === c.key) return clearCategory();
+    if (c.saved) {
+      category = c;
+      closePlace();
+      savedList = null;
+      hubPanel = null;
+      nearby = [];
+      refreshSaved();
+      return;
+    }
     category = c;
     closePlace();
     nearby = [];
@@ -946,6 +1187,8 @@
 
   function clearCategory() {
     category = null;
+    savedList = null;
+    hubPanel = null;
     nearby = [];
     applyHit(null);
   }
@@ -1009,14 +1252,18 @@
     if (!map) return;
     const only = category && !directions;
     const vis = (id, on) => map.getLayer(id) && map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
-    for (const id of ['poi', 'poi-other', 'landmark', 'exit', 'fav']) vis(id, !only);
+    for (const id of ['poi', 'poi-other', 'landmark', 'exit']) vis(id, !only);
+    vis('fav', !only && showSaved);
     vis('metro', !only || !!category?.transit);
   }
-  $effect(() => { category; directions; isolate(); });
+  $effect(() => { category; directions; showSaved; isolate(); });
 
   // Fermer « ce qui est au-dessus » : Échap, ou le bouton Retour du téléphone.
   function closeTop() {
-    if (navList) navList = false;
+    if (listPicker) listPicker = false;
+    else if (hubPanel) hubPanel = null;
+    else if (savedList) { savedList = null; refreshSaved(); }
+    else if (navList) navList = false;
     else if (nav) endNav();
     else if (showModes) showModes = false;
     else if (editing) editing = null;
@@ -1030,7 +1277,7 @@
   }
   // Retour : une entrée d'historique tant qu'un panneau est ouvert, pour que « Retour » le ferme
   // au lieu de quitter l'app.
-  const anyOpen = $derived(!!(place || category || directions || editChips || importOpen));
+  const anyOpen = $derived(!!(place || category || directions || editChips || importOpen || listPicker));
   let skipPop = false;
   $effect(() => {
     if (anyOpen && !history.state?.ui) history.pushState({ ...(history.state || {}), ui: 1 }, '', location.href);
@@ -1522,6 +1769,34 @@
   {/if}
 {/snippet}
 
+{#snippet listDot(l, size = 34)}
+  <span class="list-dot" style:--lc={l.color} style:width={`${size}px`} style:height={`${size}px`} aria-hidden="true">
+    <img src={glyphUrl(l.icon)} alt="" />
+  </span>
+{/snippet}
+
+{#snippet pinnedRow(inSearch)}
+  <div class="pinned" role="list">
+    {#each ['home', 'work'] as k}
+      <button role="listitem" class="pin-btn" class:unset={!shortcuts[k]}
+        onmousedown={inSearch ? (e) => { e.preventDefault(); useShortcut(k); } : undefined}
+        onclick={inSearch ? undefined : () => useShortcut(k)}>
+        <span class="pin-circle home">{#if k === 'home'}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.5 12 5l8 6.5M6.5 10v9.5h11V10" /><path d="M10.2 19.5v-4.8h3.6v4.8" /></svg>{:else}<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="7.5" width="17" height="12" rx="2.5" /><path d="M9 7.5V6a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 6v1.5M3.5 12.5h17" /></svg>{/if}</span>
+        <span class="pin-name">{SHORT_NAMES[k]}</span>
+        <span class="pin-sub">{shortcuts[k] ? 'Itinéraire' : 'Ajouter'}</span>
+      </button>
+    {/each}
+    {#each pinnedPlaces as f (placeKey(f))}
+      <button role="listitem" class="pin-btn"
+        onmousedown={inSearch ? (e) => { e.preventDefault(); pickResult({ ...f }); } : undefined}
+        onclick={inSearch ? undefined : () => openPlace({ ...f, pin: { glyph: listOf(f.lists[0]).icon, color: listOf(f.lists[0]).color } })}>
+        {@render listDot(listOf(f.lists[0]), 44)}
+        <span class="pin-name">{f.name}</span>
+      </button>
+    {/each}
+  </div>
+{/snippet}
+
 {#snippet resultList()}
   <ul class="results" role="listbox">
     {#if editing}
@@ -1536,28 +1811,19 @@
       </li>
     {/if}
     {#if activeQuery.trim().length < 2}
-      <li class="shortcuts">
-        {#each ['home', 'work'] as k}
-          <button onmousedown={(e) => { e.preventDefault(); useShortcut(k); }} class:unset={!shortcuts[k]}>
-            <span class="sc-icon" aria-hidden="true">{#if k === 'home'}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.5 12 5l8 6.5M6.5 10v9.5h11V10" /><path d="M10.2 19.5v-4.8h3.6v4.8" /></svg>{:else}<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="7.5" width="17" height="12" rx="2.5" /><path d="M9 7.5V6a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 6v1.5M3.5 12.5h17" /></svg>{/if}</span>
-            <span class="r-text"><span class="r-name">{SHORT_NAMES[k]}</span>
-              <span class="r-meta">{shortcuts[k] ? (shortcuts[k].name || '').split(',')[0] : 'Ajouter'}</span></span>
-          </button>
-        {/each}
-      </li>
+      <li class="pinned-li">{@render pinnedRow(true)}</li>
     {/if}
     {#if assigning && activeQuery.trim().length < 2}
       <li class="note">Tapez l'adresse de votre {assigning === 'home' ? 'maison' : 'travail'}, puis choisissez-la dans la liste.
         <button class="link" onmousedown={(e) => { e.preventDefault(); assigning = null; }}>Annuler</button></li>
     {/if}
     {#if activeQuery.trim().length < 2 && favorites.length}
-      <li class="note recents-head"><span>Favoris</span></li>
-      {#each favorites.slice(0, editing ? 5 : 8) as r (r.id + r.lat)}
+      <li class="note recents-head"><span>Mes lieux</span>
+        {#if !editing}<button class="link" onmousedown={(e) => { e.preventDefault(); focused = false; document.activeElement?.blur(); pickCategory(ALL_CATEGORIES[0]); }}>Tout voir</button>{/if}</li>
+      {#each favorites.slice(0, 5) as r (r.id + r.lat)}
         <li role="option" aria-selected="false">
           <button onmousedown={() => pickResult(r)}>
-            <span class="r-icon fav-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24"><path d="M12 20.3l-1.3-1.2C6 14.9 3 12.2 3 8.9 3 6.2 5.1 4 7.8 4c1.5 0 3 .7 4.2 1.9C13.2 4.7 14.7 4 16.2 4 18.9 4 21 6.2 21 8.9c0 3.3-3 6-7.7 10.2z" class="solid" /></svg>
-            </span>
+            {@render listDot(listOf(r.lists?.[0]), 32)}
             <span class="r-text">
               <span class="r-name">{r.name}</span>
               <span class="r-meta">{[r.type, r.address].filter(Boolean).join(' · ')}</span>
@@ -1858,6 +2124,10 @@
           <button role="menuitemradio" aria-checked={mapMode === 'transit'} class:on={mapMode === 'transit'} onclick={() => setMapMode('transit')}>
             <span class="thumb transit" aria-hidden="true"></span>Transports
           </button>
+          <label class="saved-toggle">
+            <input type="checkbox" checked={showSaved} onchange={(e) => { showSaved = e.currentTarget.checked; try { localStorage.setItem('mes-lieux-carte', showSaved ? 'oui' : 'non'); } catch { /* rien */ } }} />
+            Mes lieux sur la carte
+          </label>
         </div>
       {/if}
       <button class="round-btn" onclick={() => (showModes = !showModes)} aria-label="Type de carte" aria-expanded={showModes}>
@@ -1930,7 +2200,50 @@
     </div>
   {/if}
 
-  {#if importOpen && !directions}
+  {#if listPicker && place && !directions}
+    <section class="sheet" aria-label="Enregistrer dans" use:draggable={{ key: 'picker', onDismiss: () => (listPicker = false) }}>
+      <button class="grip" aria-label="Agrandir la fiche"></button>
+      <button class="close" onclick={() => (listPicker = false)} aria-label="Fermer">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" /></svg>
+      </button>
+      <h1>Enregistrer dans</h1>
+      <p class="kind">{place.name}</p>
+      <ul class="pick-lists">
+        {#each lists as l (l.id)}
+          {@const on = !!savedEntry?.lists.includes(l.id)}
+          <li><label>
+            {@render listDot(l, 32)}
+            <span class="pl-name">{l.name}</span>
+            <span class="pl-count">{favorites.filter((f) => f.lists.includes(l.id)).length}</span>
+            <input type="checkbox" checked={on} onchange={(e) => setMembership(l.id, e.currentTarget.checked)} />
+          </label></li>
+        {/each}
+      </ul>
+      <form class="new-list" onsubmit={(e) => { e.preventDefault(); createList(newListName, (id) => setMembership(id, true)); newListName = ''; }}>
+        <input bind:value={newListName} placeholder="Nouvelle liste…" aria-label="Nom de la nouvelle liste" maxlength="40" />
+        <button class="link" disabled={!newListName.trim()}>Créer</button>
+      </form>
+      <label class="pin-toggle">
+        <input type="checkbox" checked={pins.includes(placeKey(place))} onchange={() => togglePin(place)} />
+        Épingler en haut de la recherche
+      </label>
+      <button class="go wide done" onclick={() => (listPicker = false)}>Terminé</button>
+    </section>
+  {:else if incoming?.kind === 'transfer' && !directions}
+    <section class="sheet" aria-label="Récupérer vos lieux">
+      <h1>Récupérer vos lieux</h1>
+      <p class="kind">Depuis un autre appareil</p>
+      <ul class="rows">
+        <li class="row">{@render listDot(DEFAULT_LISTS[0], 24)}<span>{incoming.data.places.length} lieu{incoming.data.places.length > 1 ? 'x' : ''} dans {incoming.data.lists.length} liste{incoming.data.lists.length > 1 ? 's' : ''}</span></li>
+        {#if incoming.data.shortcuts.home || incoming.data.shortcuts.work}
+          <li class="row"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.5 12 5l8 6.5M6.5 10v9.5h11V10" /><path d="M10.2 19.5v-4.8h3.6v4.8" /></svg><span>{[incoming.data.shortcuts.home && 'Maison', incoming.data.shortcuts.work && 'Travail'].filter(Boolean).join(' et ')}</span></li>
+        {/if}
+      </ul>
+      <p class="credit">Ils s'ajoutent à ceux de cet appareil (rien n'est effacé).</p>
+      <button class="go wide done" onclick={() => { const n = applyIncoming(incoming.raw); incoming = null; say(`${n} lieu${n > 1 ? 'x' : ''} ajouté${n > 1 ? 's' : ''} à Mes lieux`); }}>Ajouter à cet appareil</button>
+      <button class="link more" onclick={() => (incoming = null)}>Ignorer</button>
+    </section>
+  {:else if importOpen && !directions}
     <section class="sheet" aria-label="Importer vos lieux" use:draggable={{ key: 'import', onDismiss: () => (importOpen = false) }}>
       <button class="grip" aria-label="Agrandir la fiche"></button>
       <button class="close" onclick={() => (importOpen = false)} aria-label="Fermer">
@@ -2136,9 +2449,9 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8 21.2 12 12 21.2 2.8 12z" class="solid" /><path d="M9.5 14.5v-2.2a1.5 1.5 0 0 1 1.5-1.5h4M13 8.8l2 2-2 2" class="on-solid" /></svg>
           <span class="act-label">Itinéraire{#if walkEta}<small aria-label={walkEta}>{walkEta.replace(' à pied', '')}</small>{/if}</span>
         </button>
-        <button class="action" class:saved={isFav} onclick={toggleFavorite} aria-pressed={isFav}>
+        <button class="action" class:saved={isFav} onclick={saveTap} aria-pressed={isFav} style:--lc={isFav ? listOf(savedEntry.lists[0]).color : null}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.3l-1.3-1.2C6 14.9 3 12.2 3 8.9 3 6.2 5.1 4 7.8 4c1.5 0 3 .7 4.2 1.9C13.2 4.7 14.7 4 16.2 4 18.9 4 21 6.2 21 8.9c0 3.3-3 6-7.7 10.2z" /></svg>
-          {isFav ? 'Enregistré' : 'Enregistrer'}
+          {isFav ? (savedEntry.lists.length > 1 ? `${savedEntry.lists.length} listes` : listOf(savedEntry.lists[0]).name) : 'Enregistrer'}
         </button>
         {#if info?.phone}
           <a class="action" href={`tel:${info.phone.replace(/\s/g, '')}`}>
@@ -2173,13 +2486,99 @@
       <button class="close" onclick={clearCategory} aria-label="Fermer la liste">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" /></svg>
       </button>
+      {#if category.saved && !savedList && !category.shared && !hubPanel}
+        <h1>{chipList.find((c) => c.key === 'saved')?.label || 'Mes lieux'}</h1>
+        {@render pinnedRow(false)}
+        <h2 class="hub-h">Listes</h2>
+        <ul class="hub-lists">
+          {#each lists as l (l.id)}
+            <li><button onclick={() => openSavedList(l.id)}>
+              {@render listDot(l, 34)}
+              <span class="pl-name">{l.name}</span>
+              <span class="pl-count">{favorites.filter((f) => f.lists.includes(l.id)).length}</span>
+              <svg class="chev-r" viewBox="0 0 24 24" aria-hidden="true"><path d="m10 7 5 5-5 5" /></svg>
+            </button></li>
+          {/each}
+          <li>
+            {#if hubPanel === 'newlist'}{:else}
+              <form class="new-list" onsubmit={(e) => { e.preventDefault(); createList(newListName); newListName = ''; }}>
+                <input bind:value={newListName} placeholder="Nouvelle liste…" aria-label="Nom de la nouvelle liste" maxlength="40" />
+                <button class="link" disabled={!newListName.trim()}>Créer</button>
+              </form>
+            {/if}
+          </li>
+        </ul>
+        <h2 class="hub-h">Vos données</h2>
+        <ul class="rows hub-rows">
+          <li class="row"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14" /></svg>
+            <button class="row-btn" onclick={() => { importOpen = true; }}><span>Importer depuis Google Maps</span></button></li>
+          <li class="row"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="1" /><rect x="13.5" y="3.5" width="7" height="7" rx="1" /><rect x="3.5" y="13.5" width="7" height="7" rx="1" /><path d="M13.5 13.5h3v3h-3zM18 18h2.5M20.5 13.5V16" /></svg>
+            <button class="row-btn" onclick={makeTransfer}><span>Transférer vers un autre appareil</span></button></li>
+          <li class="row"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 18.5h10.5a4 4 0 0 0 .5-8 6 6 0 0 0-11.6-1.6A4.8 4.8 0 0 0 7 18.5z" /><path d="M12 11v5M9.8 13.2 12 11l2.2 2.2" /></svg>
+            <button class="row-btn" onclick={() => (hubPanel = 'backup')}><span>Sauvegarder<small class="why" class:warn={favorites.length >= 5 && (backupAge === null || backupAge > 30)}>{backupAge === null ? 'Jamais sauvegardé' : backupAge === 0 ? 'Dernière sauvegarde aujourd\'hui' : `Dernière sauvegarde il y a ${backupAge} jour${backupAge > 1 ? 's' : ''}`}</small></span></button></li>
+          <li class="row"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3M4.5 4.5v4h4" /></svg>
+            <button class="row-btn" onclick={() => (hubPanel = 'restore')}><span>Restaurer une sauvegarde</span></button></li>
+          <li class="row"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4" /></svg>
+            <button class="row-btn" onclick={() => { clearCategory(); editChips = true; }}><span>Personnaliser les raccourcis</span></button></li>
+        </ul>
+        <p class="credit">Vos lieux restent sur cet appareil : ni compte, ni serveur. Sauvegardez-les pour ne pas les perdre.</p>
+      {:else if category.saved && hubPanel === 'transfer'}
+        <button class="link back-link" onclick={() => (hubPanel = null)}>‹ Mes lieux</button>
+        <h1>Transférer</h1>
+        <p class="kind">Ouvrez ce lien ou scannez ce code sur l'autre appareil.</p>
+        {#if !transfer}<p class="muted">Préparation…</p>
+        {:else}
+          {#if transfer.qr}<div class="qr" aria-label="QR code de transfert">{@html transfer.qr}</div>
+          {:else}<p class="credit">Trop de lieux pour un QR code : envoyez-vous le lien (AirDrop, Signal à vous-même…).</p>{/if}
+          <button class="go wide done" onclick={shareTransfer}>Envoyer le lien</button>
+          <p class="credit">⚠️ Ce lien contient tous vos lieux : envoyez-le seulement à vous-même. Il n'est stocké sur aucun serveur.</p>
+        {/if}
+      {:else if category.saved && hubPanel === 'backup'}
+        <button class="link back-link" onclick={() => (hubPanel = null)}>‹ Mes lieux</button>
+        <h1>Sauvegarder</h1>
+        <p class="kind">Un fichier avec vos listes, Maison, Travail et vos raccourcis, à ranger où vous voulez : iCloud Drive, Proton Drive, un ordinateur…</p>
+        <label class="pw">Mot de passe (facultatif, pour chiffrer le fichier)
+          <input type="password" bind:value={backupPassword} autocomplete="new-password" placeholder="Aucun" /></label>
+        {#if backupPassword}<p class="credit">Sans ce mot de passe, personne ne pourra lire le fichier, vous non plus : notez-le.</p>{/if}
+        <button class="go wide done" onclick={makeBackup}>Créer la sauvegarde</button>
+      {:else if category.saved && hubPanel === 'restore'}
+        <button class="link back-link" onclick={() => { hubPanel = null; restoreNeedsPw = false; }}>‹ Mes lieux</button>
+        <h1>Restaurer</h1>
+        <p class="kind">Choisissez un fichier de sauvegarde d'Untracked Maps. Ses lieux s'ajoutent à ceux de cet appareil.</p>
+        {#if restoreNeedsPw}
+          <label class="pw">Ce fichier est protégé : mot de passe
+            <input type="password" bind:value={restorePassword} autocomplete="current-password" /></label>
+          <button class="go wide done" onclick={() => doRestore()}>Restaurer</button>
+        {:else}
+          <label class="action primary import-btn">
+            <input type="file" accept=".json,application/json" hidden onchange={(e) => { const f = e.currentTarget.files?.[0]; e.currentTarget.value = ''; doRestore(f); }} />
+            Choisir le fichier
+          </label>
+        {/if}
+      {:else if category.saved}
+        {@const l = category.shared ? category : listOf(savedList)}
+        {#if !category.shared}<button class="link back-link" onclick={() => { savedList = null; refreshSaved(); }}>‹ Mes lieux</button>{/if}
+        <h1 class="list-title">{@render listDot(l, 30)}{l.name || category.label}</h1>
+        <p class="kind">{category.shared ? `Liste partagée · ${nearby.length} lieu${nearby.length > 1 ? 'x' : ''}` : nearby.length ? `${nearby.length} lieu${nearby.length > 1 ? 'x' : ''}, ${nearbyFromMe ? 'les plus proches de vous d\'abord' : 'par distance'}` : 'Aucun lieu pour l\'instant : touchez « Enregistrer » sur la fiche d\'un lieu.'}</p>
+        <div class="list-actions">
+          {#if category.shared}
+            <button class="go" onclick={keepIncomingList}>Ajouter à Mes lieux</button>
+          {:else}
+            {#if nearby.length}<button class="link" onclick={() => shareList(l)}>Partager</button>{/if}
+            <button class="link" onclick={() => renameList(l)}>Renommer</button>
+            {#if !['fav', 'todo'].includes(l.id)}<button class="link danger" onclick={() => deleteList(l)}>Supprimer</button>{/if}
+          {/if}
+        </div>
+      {:else}
       <h1>{chipList.find((c) => c.key === category.key)?.label || category.label}</h1>
       <p class="kind">{nearby.length ? (nearbyFromMe ? 'Les plus proches de vous' : 'Autour du centre de la carte') : nearbyDone ? 'Aucun dans cette zone. Déplacez la carte pour chercher ailleurs.' : 'Recherche…'}</p>
+      {/if}
       <ul class="nearby">
         {#each nearby as { f, d, st, deps: sd } (f.id)}
           <li>
-            <button onclick={() => openFeature(f)}>
-              <span class="n-dot" style:--fam={famColor(category)} aria-hidden="true"></span>
+            {#if !(category.saved && (hubPanel || (!savedList && !category.shared)))}
+            <button onclick={() => (nearby.find((n) => n.f === f)?.saved ? openPlace({ ...nearby.find((n) => n.f === f).saved }) : openFeature(f))}>
+              <span class="n-dot" style:--fam={category.saved ? (category.shared ? category.color : listOf(nearby.find((n) => n.f === f)?.saved?.lists?.[0]).color) : famColor(category)} aria-hidden="true"></span>
               <span class="r-text">
                 <span class="r-name">{displayName(f, category)}</span>
                 {#if category.transit}
@@ -2199,11 +2598,12 @@
                     <span class="r-meta">{typeLabel('', f.properties.subclass) || 'Station'} · touchez pour les horaires</span>
                   {/if}
                 {:else}
-                <span class="r-meta">{typeLabel('', f.properties.subclass) || category.label}{#if st?.open != null}{' · '}<span class:is-open={st.open} class:is-closed={!st.open}>{st.label}</span>{/if}</span>
+                <span class="r-meta">{category.saved ? [nearby.find((n) => n.f === f)?.saved?.type, nearby.find((n) => n.f === f)?.saved?.address].filter(Boolean).join(' · ') || 'Lieu enregistré' : typeLabel('', f.properties.subclass) || category.label}{#if st?.open != null}{' · '}<span class:is-open={st.open} class:is-closed={!st.open}>{st.label}</span>{/if}</span>
                 {/if}
               </span>
               <span class="n-dist">{fmtDistance(d)}</span>
             </button>
+            {/if}
           </li>
         {/each}
       </ul>
@@ -2514,6 +2914,49 @@
     border-left: 13px solid transparent; border-right: 13px solid transparent; border-bottom: 30px solid var(--accent);
     filter: drop-shadow(0 0 2px #fff) drop-shadow(0 0 1px #fff) drop-shadow(0 2px 4px rgb(0 0 0 / 0.35));
   }
+  /* ——— Mes lieux ——— */
+  .list-dot { flex: none; display: grid; place-items: center; border-radius: 50%; background: var(--lc); justify-self: center; }
+  .list-dot img { width: 58%; height: 58%; }
+  .pinned { display: flex; gap: 14px; overflow-x: auto; padding: 8px 2px 6px; scrollbar-width: none; }
+  .pinned::-webkit-scrollbar { display: none; }
+  .results .pinned-li { padding: 4px 14px 2px; }
+  .results .pinned .pin-btn, .pin-btn { display: grid; justify-items: center; align-content: start; gap: 3px; width: 64px; flex: none;
+    padding: 0; border: 0; background: none; cursor: pointer; grid-template-columns: none; }
+  .pin-circle { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--accent-btn); color: #fff; }
+  .pin-circle svg { width: 22px; height: 22px; }
+  .pin-btn.unset .pin-circle { background: var(--fill); color: var(--accent); }
+  .pin-name { font-size: 12.5px; font-weight: 600; max-width: 64px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pin-sub { font-size: 11.5px; color: var(--muted); }
+  .pin-btn.unset .pin-sub { color: var(--accent); }
+  .hub-h { font-size: 15px; font-weight: 700; margin: 18px 0 4px; }
+  .hub-lists, .pick-lists { list-style: none; margin: 0; padding: 0; }
+  .hub-lists button, .pick-lists label { display: grid; grid-template-columns: 34px 1fr auto auto; gap: 12px; align-items: center; width: 100%;
+    min-height: 52px; border: 0; background: none; padding: 0; text-align: left; cursor: pointer; border-bottom: 1px solid var(--line); font-size: 16px; }
+  .pick-lists label { grid-template-columns: 32px 1fr auto 28px; }
+  .pick-lists input { width: 22px; height: 22px; accent-color: var(--accent-btn); }
+  .pl-count { color: var(--muted); font-size: 14px; font-variant-numeric: tabular-nums; }
+  .chev-r { width: 18px; height: 18px; color: var(--faint); }
+  .new-list { display: flex; gap: 8px; align-items: center; min-height: 50px; border-bottom: 1px solid var(--line); }
+  .new-list input { flex: 1; border: 0; background: none; font: inherit; font-size: 16px; color: var(--ink); padding: 10px 0; min-width: 0; }
+  .new-list .link:disabled { opacity: 0.4; }
+  .pin-toggle, .saved-toggle { display: flex; align-items: center; gap: 10px; font-size: 15px; padding: 14px 0 6px; cursor: pointer; }
+  .pin-toggle input, .saved-toggle input { width: 20px; height: 20px; accent-color: var(--accent-btn); }
+  .modes-pop .saved-toggle { grid-column: 1 / -1; font-size: 13px; font-weight: 600; padding: 4px 0 0; }
+  .modes-pop { flex-wrap: wrap; }
+  .go.wide.done { width: 100%; margin: 14px 0 4px; height: 46px; background: var(--accent-btn); }
+  .hub-rows .row-btn span { display: grid; }
+  .why.warn { color: #D0731B; font-weight: 600; }
+  .back-link { margin: 6px 0 2px; font-size: 15px; }
+  .list-title { display: flex; align-items: center; gap: 10px; }
+  .list-actions { display: flex; gap: 18px; align-items: center; margin-top: 8px; }
+  .list-actions .link { font-size: 15px; }
+  .link.danger { color: var(--closed); }
+  .qr { display: grid; place-items: center; margin: 14px auto 4px; width: min(260px, 70vw); background: #fff; border-radius: 12px; padding: 8px; }
+  .qr :global(svg) { width: 100%; height: auto; display: block; }
+  .pw { display: grid; gap: 6px; font-size: 14px; color: var(--muted); margin-top: 14px; }
+  .pw input { font: inherit; font-size: 16px; color: var(--ink); background: var(--fill); border: 0; border-radius: 12px; padding: 12px 14px; }
+  .action.saved { color: var(--lc, var(--fav)); }
+  .action.saved svg path { fill: var(--lc, var(--fav)); stroke: var(--lc, var(--fav)); }
   .chip.edit.on-edit { background: var(--accent-btn); color: #fff; }
   .compass svg { width: 24px; height: 24px; transition: transform 0.1s; }
   .compass .north { fill: var(--closed); }

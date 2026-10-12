@@ -90,13 +90,13 @@ function parseCsv(text) {
   return rows.filter((r) => r.some((c) => c.trim()));
 }
 
-function fromCsv(text) {
+function fromCsv(text, listName = '') {
   const [head, ...rows] = parseCsv(text.replace(/^﻿/, ''));
   if (!head) return [];
   const col = (re) => head.findIndex((h) => re.test(h.trim()));
   const iT = col(/^(title|titre)$/i), iU = col(/^url$/i);
   if (iT < 0) return [];
-  return rows.map((r) => ({ name: r[iT] || '', address: '', label: '', ...(coordsFromUrl(r[iU]) || {}) })).filter((p) => p.name);
+  return rows.map((r) => ({ name: r[iT] || '', address: '', label: '', listName, ...(coordsFromUrl(r[iU]) || {}) })).filter((p) => p.name);
 }
 
 const HOME = /^(home|domicile|maison)$/i;
@@ -115,8 +115,16 @@ export async function readGoogleExport(file) {
   const all = [];
   for (const f of files) {
     const text = await f.text().catch(() => '');
-    if (/\.csv$/i.test(f.name)) all.push(...fromCsv(text));
-    else { try { all.push(...fromGeoJSON(JSON.parse(text))); } catch { /* fichier ignoré */ } }
+    // chaque liste Google (« Lieux favoris », « À visiter », vos listes…) est un fichier .csv à son nom
+    const base = f.name.split('/').pop().replace(/\.(csv|json)$/i, '');
+    if (/\.csv$/i.test(f.name)) all.push(...fromCsv(text, base));
+    else {
+      try {
+        // « Lieux enregistrés.json » / « Saved Places.json » : les lieux suivis (étoile) de Google
+        const starred = /saved places|lieux enregistr/i.test(base) ? 'Lieux suivis' : '';
+        all.push(...fromGeoJSON(JSON.parse(text)).map((p) => ({ ...p, listName: starred })));
+      } catch { /* fichier ignoré */ }
+    }
   }
   const out = { places: [] };
   const seen = new Set();
@@ -124,7 +132,7 @@ export async function readGoogleExport(file) {
     if (!p.name && !p.address) continue;
     if (HOME.test(p.label)) { out.home = { ...p, name: p.address || p.name }; continue; }
     if (WORK.test(p.label)) { out.work = { ...p, name: p.address || p.name }; continue; }
-    const k = `${p.name}|${p.lat?.toFixed?.(4)}`;
+    const k = `${p.name}|${p.lat?.toFixed?.(4)}|${p.listName}`;
     if (seen.has(k)) continue;
     seen.add(k);
     out.places.push(p);
