@@ -204,7 +204,53 @@
   let viewer = $state(null);         // photo affichée en plein écran (indice), null : fermé
   let viewerEl = $state();
   let viewerIdx = $state(0);
+  // Zoom dans la visionneuse : pincer, double-toucher, déplacer ; glisser vers le bas (sans zoom) ferme.
+  let zoom = $state({ s: 1, x: 0, y: 0 });
+  let dragY = $state(0);
+  let gesture = null;
+  let lastTap = 0;
+  const clampZoom = (z) => {
+    const w = innerWidth, h = innerHeight, mx = (w * (z.s - 1)) / 2, my = (h * (z.s - 1)) / 2;
+    return { s: z.s, x: Math.max(-mx, Math.min(mx, z.x)), y: Math.max(-my, Math.min(my, z.y)) };
+  };
+  function toggleZoom(cx, cy) {
+    if (zoom.s > 1) zoom = { s: 1, x: 0, y: 0 };
+    else zoom = clampZoom({ s: 2.5, x: (innerWidth / 2 - cx) * 1.5, y: (innerHeight / 2 - cy) * 1.5 });
+  }
+  function zoomStart(e) {
+    const t = e.touches;
+    if (t.length === 2) {
+      gesture = { kind: 'pinch', d: Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY), s: zoom.s, x: zoom.x, y: zoom.y };
+    } else if (t.length === 1) {
+      const now = Date.now();
+      if (now - lastTap < 280) { toggleZoom(t[0].clientX, t[0].clientY); lastTap = 0; gesture = null; return; }
+      lastTap = now;
+      gesture = { kind: zoom.s > 1 ? 'pan' : 'maybe-down', x0: t[0].clientX, y0: t[0].clientY, x: zoom.x, y: zoom.y };
+    }
+  }
+  function zoomMove(e) {
+    if (!gesture) return;
+    const t = e.touches;
+    if (gesture.kind === 'pinch' && t.length === 2) {
+      const d = Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+      zoom = clampZoom({ s: Math.max(1, Math.min(5, gesture.s * (d / gesture.d))), x: gesture.x, y: gesture.y });
+    } else if (gesture.kind === 'pan' && t.length === 1) {
+      zoom = clampZoom({ s: zoom.s, x: gesture.x + t[0].clientX - gesture.x0, y: gesture.y + t[0].clientY - gesture.y0 });
+    } else if (gesture.kind === 'maybe-down' && t.length === 1) {
+      const dx = t[0].clientX - gesture.x0, dy = t[0].clientY - gesture.y0;
+      if (dy > 12 && dy > Math.abs(dx) * 1.3) gesture.kind = 'down';
+      else if (Math.abs(dx) > 12) gesture = null;       // glissement horizontal : photo suivante (défilement natif)
+    }
+    if (gesture?.kind === 'down') { dragY = Math.max(0, t[0].clientY - gesture.y0); }
+  }
+  function zoomEnd() {
+    if (gesture?.kind === 'down') { if (dragY > 110) viewer = null; dragY = 0; }
+    if (zoom.s < 1.05) zoom = { s: 1, x: 0, y: 0 };
+    gesture = null;
+  }
   $effect(() => {
+    zoom = { s: 1, x: 0, y: 0 };
+    dragY = 0;
     if (viewer == null || !viewerEl) return;
     viewerIdx = viewer;
     viewerEl.scrollTo({ left: viewer * viewerEl.clientWidth, behavior: 'instant' });
@@ -826,6 +872,19 @@
     saveAll();
   }
   let newListName = $state('');
+  let listEditing = $state(false);   // « Modifier » : une poubelle sur chaque lieu de la liste
+  let swiped = $state(null);         // lieu glissé vers la gauche (poubelle visible)
+  let swipeStart = null;
+  function removeFromList(saved, listId) {
+    const before = favorites, beforePins = pins;
+    const ls = saved.lists.filter((x) => x !== listId);
+    if (ls.length) favorites = favorites.map((f) => (f === saved ? { ...f, lists: ls } : f));
+    else { favorites = favorites.filter((f) => f !== saved); pins = pins.filter((k) => k !== placeKey(saved)); }
+    swiped = null;
+    saveAll();
+    refreshSaved();
+    say(`« ${saved.name} » retiré de ${listOf(listId).name}`, { label: 'Annuler', run: () => { favorites = before; pins = beforePins; saveAll(); refreshSaved(); } });
+  }
   function createList(name, then) {
     const n = name.trim();
     if (!n) return null;
@@ -868,6 +927,8 @@
   }
   function openSavedList(id) {
     savedList = id;
+    listEditing = false;
+    swiped = null;
     refreshSaved();
     const pts = nearby.slice(0, 8).map((n) => n.f.geometry.coordinates);
     if (pts.length) fitTo(me ? [[me.lon, me.lat], ...pts] : pts);
@@ -1371,6 +1432,8 @@
     if (e?.code === 2) return 'Position introuvable : vérifiez que le Service de localisation du téléphone est activé.';
     return 'Localisation indisponible sur cet appareil.';
   }
+  // Détail technique ajouté au message (pour diagnostiquer à distance une localisation qui ne marche pas)
+  const locDetail = (e) => ` [${matchMedia('(display-mode: standalone)').matches || navigator.standalone ? 'app' : 'navigateur'} · ${window.isSecureContext ? 'https' : 'non sécurisé'} · code ${e?.code ?? '?'}${e?.message ? ` · ${e.message}` : ''}]`;
 
   async function locate() {
     locating = true;
@@ -1378,7 +1441,7 @@
       const p = await getPosition();
       map.flyTo({ center: [p.lon, p.lat], zoom: 16, duration: 800 });
     } catch (e) {
-      say(locError(e), { label: 'Réessayer', run: locate });
+      say(locError(e) + locDetail(e), { label: 'Réessayer', run: locate });
     } finally {
       locating = false;
     }
@@ -2084,7 +2147,8 @@
         <nav class="chips" aria-label="Catégories">
           {#each chipList as c (c.key)}
             <button class="chip" class:on={category?.key === c.key} onclick={() => pickCategory(c)} style:--fam={famColor(c)} aria-pressed={category?.key === c.key}>
-              <span class="chip-dot" aria-hidden="true"></span>{c.label}
+              {#if c.saved}<svg class="chip-heart" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.3l-1.3-1.2C6 14.9 3 12.2 3 8.9 3 6.2 5.1 4 7.8 4c1.5 0 3 .7 4.2 1.9C13.2 4.7 14.7 4 16.2 4 18.9 4 21 6.2 21 8.9c0 3.3-3 6-7.7 10.2z" /></svg>
+              {:else}<span class="chip-dot" aria-hidden="true"></span>{/if}{c.label}
             </button>
           {/each}
           <button class="chip edit" class:on-edit={editChips} onclick={() => { editChips = !editChips; importOpen = false; }} aria-label="Personnaliser les raccourcis" aria-expanded={editChips}>
@@ -2236,10 +2300,13 @@
   {#if viewer != null && wiki?.photos?.length}
     {@const ph = wiki.photos[viewerIdx] || wiki.photos[0]}
     <div class="viewer" role="dialog" aria-modal="true" aria-label="Photos de {title}">
-      <div class="viewer-strip" bind:this={viewerEl}
-        onscroll={(e) => (viewerIdx = Math.round(e.currentTarget.scrollLeft / e.currentTarget.clientWidth))}>
+      <div class="viewer-strip" class:zoomed={zoom.s > 1} bind:this={viewerEl} style:transform={dragY ? `translateY(${dragY}px)` : null}
+        style:opacity={dragY ? Math.max(0.3, 1 - dragY / 500) : null}
+        ontouchstart={zoomStart} ontouchmove={zoomMove} ontouchend={zoomEnd} ondblclick={(e) => toggleZoom(e.clientX, e.clientY)}
+        onscroll={(e) => { const i = Math.round(e.currentTarget.scrollLeft / e.currentTarget.clientWidth); if (i !== viewerIdx) { viewerIdx = i; zoom = { s: 1, x: 0, y: 0 }; } }}>
         {#each wiki.photos as p, i (p.src)}
-          <div class="viewer-slide"><img src={Math.abs(i - viewerIdx) <= 1 ? p.full : p.src} alt={i === 0 ? title : ''} /></div>
+          <div class="viewer-slide"><img src={Math.abs(i - viewerIdx) <= 1 ? p.full : p.src} alt={i === 0 ? title : ''} draggable="false"
+            style:transform={i === viewerIdx && zoom.s > 1 ? `translate(${zoom.x}px, ${zoom.y}px) scale(${zoom.s})` : null} /></div>
         {/each}
       </div>
       <div class="viewer-top">
@@ -2632,7 +2699,8 @@
           {#if category.shared}
             <button class="go" onclick={keepIncomingList}>Ajouter à Mes lieux</button>
           {:else}
-            {#if nearby.length}<button class="link" onclick={() => shareList(l)}>Partager</button>{/if}
+            {#if nearby.length}<button class="link" onclick={() => { listEditing = !listEditing; swiped = null; }}>{listEditing ? 'Terminé' : 'Modifier'}</button>{/if}
+            {#if nearby.length && !listEditing}<button class="link" onclick={() => shareList(l)}>Partager</button>{/if}
             <button class="link" onclick={() => renameList(l)}>Renommer</button>
             {#if !['fav', 'todo'].includes(l.id)}<button class="link danger" onclick={() => deleteList(l)}>Supprimer</button>{/if}
           {/if}
@@ -2642,10 +2710,21 @@
       <p class="kind">{nearby.length ? (nearbyFromMe ? 'Les plus proches de vous' : 'Autour du centre de la carte') : nearbyDone ? 'Aucun dans cette zone. Déplacez la carte pour chercher ailleurs.' : 'Recherche…'}</p>
       {/if}
       <ul class="nearby">
-        {#each nearby as { f, d, st, deps: sd } (f.id)}
-          <li>
+        {#each nearby as { f, d, st, deps: sd, saved: sv } (f.id)}
+          <li class:swipe-row={category.saved && savedList && sv} class:swiped={swiped === f.id || (listEditing && savedList && sv)}
+            ontouchstart={category.saved && savedList && sv ? (e) => (swipeStart = { x: e.touches[0].clientX, y: e.touches[0].clientY, id: f.id }) : undefined}
+            ontouchmove={category.saved && savedList && sv ? (e) => {
+              if (!swipeStart) return;
+              const dx = e.touches[0].clientX - swipeStart.x, dy = e.touches[0].clientY - swipeStart.y;
+              if (Math.abs(dx) > 30 && Math.abs(dx) > Math.abs(dy) * 1.5) { swiped = dx < 0 ? swipeStart.id : null; swipeStart = null; }
+            } : undefined}>
+            {#if category.saved && savedList && sv}
+              <button class="swipe-del" onclick={() => removeFromList(sv, savedList)} aria-label={`Retirer ${sv.name} de la liste`}>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 7V5h4v2M7 7l1 13h8l1-13M10.5 10.5v6M13.5 10.5v6" /></svg>
+              </button>
+            {/if}
             {#if !(category.saved && (hubPanel || (!savedList && !category.shared)))}
-            <button onclick={() => (nearby.find((n) => n.f === f)?.saved ? openPlace({ ...nearby.find((n) => n.f === f).saved }) : openFeature(f))}>
+            <button class="n-main" onclick={() => { if (swiped) { swiped = null; return; } nearby.find((n) => n.f === f)?.saved ? openPlace({ ...nearby.find((n) => n.f === f).saved }) : openFeature(f); }}>
               <span class="n-dot" style:--fam={category.saved ? (category.shared ? category.color : listOf(nearby.find((n) => n.f === f)?.saved?.lists?.[0]).color) : famColor(category)} aria-hidden="true"></span>
               <span class="r-text">
                 <span class="r-name">{displayName(f, category)}</span>
@@ -3038,7 +3117,10 @@
   .ph-credit { font-size: 11.5px; color: var(--muted); margin: 5px 0 0; }
   .ph-credit a { color: inherit; text-decoration: none; }
   .viewer { position: fixed; inset: 0; z-index: 20; background: #000; color: #fff; }
-  .viewer-strip { position: absolute; inset: 0; display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; }
+  .viewer-strip { position: absolute; inset: 0; display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none;
+    touch-action: pan-x; transition: opacity 0.15s; }
+  .viewer-strip.zoomed { overflow: hidden; touch-action: none; }
+  .viewer-slide img { transition: transform 0.12s ease-out; will-change: transform; user-select: none; -webkit-user-drag: none; }
   .viewer-strip::-webkit-scrollbar { display: none; }
   .viewer-slide { flex: none; width: 100%; height: 100%; display: grid; place-items: center; scroll-snap-align: center; }
   .viewer-slide img { max-width: 100%; max-height: 100%; object-fit: contain; }
@@ -3056,6 +3138,15 @@
   .viewer-credit { position: absolute; left: 0; right: 0; bottom: 0; margin: 0; padding: 14px 18px calc(14px + env(safe-area-inset-bottom));
     font-size: 12.5px; background: linear-gradient(transparent, rgb(0 0 0 / 0.6)); }
   .viewer-credit a { color: rgb(255 255 255 / 0.85); text-decoration: none; }
+  .swipe-row { position: relative; overflow: hidden; }
+  .nearby button { box-sizing: border-box; }
+  .swipe-row .n-main { position: relative; z-index: 1; background: var(--card); transition: transform 0.2s ease; }
+  .swipe-row.swiped .n-main { transform: translateX(-76px); }
+  .nearby .swipe-del { position: absolute; padding: 0; right: 0; top: 0; bottom: 0; width: 76px; border: 0; background: var(--closed); color: #fff;
+    display: grid; place-items: center; cursor: pointer; }
+  .swipe-del svg { width: 22px; height: 22px; stroke-width: 2; }
+  .chip-heart { width: 15px; height: 15px; fill: var(--fam); stroke: none; }
+  .chip.on .chip-heart { fill: #fff; }
   .chip.edit.on-edit { background: var(--accent-btn); color: #fff; }
   .compass svg { width: 24px; height: 24px; transition: transform 0.1s; }
   .compass .north { fill: var(--closed); }
@@ -3088,9 +3179,11 @@
 
   .actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 10px; margin-top: 16px; }
   .action {
-    display: grid; justify-items: center; gap: 4px; padding: 10px 8px; border-radius: 14px; border: 0; cursor: pointer;
-    background: var(--fill); color: var(--accent); text-decoration: none; font-size: 13px; font-weight: 600;
+    display: grid; justify-items: center; align-content: start; gap: 4px; padding: 10px 4px; border-radius: 14px; border: 0; cursor: pointer;
+    background: var(--fill); color: var(--accent); text-decoration: none; font-size: 12.5px; font-weight: 600;
+    min-width: 0; text-align: center; white-space: nowrap; overflow: hidden; line-height: 1.2;
   }
+  .actions:has(> :nth-child(4)) { gap: 8px; }
   .action svg { width: 22px; height: 22px; }
   .action.primary { background: var(--accent-btn); color: #fff; }
   .action.saved { color: var(--fav); }
