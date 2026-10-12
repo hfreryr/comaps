@@ -737,6 +737,7 @@
     --open: #1e8e3e;
     --closed: #c5221f;
     --shadow-float: 0 0 0 0.5px rgb(0 0 0 / 0.06), 0 2px 6px rgb(0 0 0 / 0.08), 0 8px 24px rgb(0 0 0 / 0.08);
+    --shadow-chip: 0 0 0 0.5px rgb(0 0 0 / 0.07), 0 1px 4px rgb(0 0 0 / 0.12);
     --shadow-sheet: 0 -1px 0 rgb(0 0 0 / 0.04), 0 -8px 30px rgb(0 0 0 / 0.12);
     --ui: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   }
@@ -757,10 +758,11 @@
   .top {
     position: absolute; z-index: 3; left: 0; right: 0;
     top: env(safe-area-inset-top); padding: 10px 12px 0; pointer-events: none;
-    display: grid; gap: 10px; max-width: 440px;
+    display: grid; gap: 10px;
   }
   .top > * { pointer-events: auto; }
   .search {
+    max-width: 440px;
     background: var(--card); border-radius: 28px; box-shadow: var(--shadow-float);
     display: grid; grid-template-columns: 48px 1fr auto; align-items: center;
   }
@@ -790,12 +792,19 @@
   .r-meta { font-size: 14px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .note { padding: 12px 16px 12px 48px; color: var(--muted); font-size: 15px; line-height: 1.4; }
 
-  .chips { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; margin: 0 -12px; padding: 0 12px 8px; }
+  /* La zone qui défile garde de la place autour des boutons pour ne pas rogner leur ombre,
+     et s'estompe à droite pour indiquer qu'on peut faire défiler. */
+  .chips {
+    display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none;
+    margin: -4px -12px -16px; padding: 4px 12px 16px;
+    -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 32px), transparent);
+            mask-image: linear-gradient(90deg, #000 calc(100% - 32px), transparent);
+  }
   .chips::-webkit-scrollbar { display: none; }
   .chip {
     flex: none; display: inline-flex; align-items: center; gap: 7px;
     height: 36px; padding: 0 14px 0 12px; border: 0; border-radius: 18px;
-    background: var(--card); box-shadow: var(--shadow-float); font-size: 14.5px; font-weight: 500; cursor: pointer;
+    background: var(--card); box-shadow: var(--shadow-chip); font-size: 14.5px; font-weight: 500; cursor: pointer;
   }
   .chip-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--fam); }
   .chip.on { background: var(--fam); color: #fff; }
@@ -963,7 +972,8 @@
 
   /* ——— Grand écran : panneaux à gauche ——— */
   @media (min-width: 768px) {
-    .top { padding: 16px 16px 0; width: 400px; }
+    .top { padding: 16px 16px 0; width: min(calc(100vw - 32px), 760px); }
+    .search, .dir-card, .modes { width: 400px; }
     .sheet {
       left: 16px; right: auto; bottom: auto; top: 128px; width: 400px; max-height: calc(100vh - 150px);
       border-radius: 20px; padding: 18px 22px 22px; box-shadow: var(--shadow-float); animation-name: appear;
