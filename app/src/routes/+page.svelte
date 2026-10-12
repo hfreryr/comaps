@@ -378,21 +378,23 @@
   function addRouteLayers() {
     map.addSource('route', { type: 'geojson', data: empty() });
     const before = 'water-name-point';
-    const width = (a, b) => ['interpolate', ['exponential', 1.4], ['zoom'], 12, a, 18, b];
+    // épaisseurs proches de Plans et Google Maps ; les variantes grises un peu plus fines
+    const width = (a, b) => ['interpolate', ['exponential', 1.4], ['zoom'], 12, ['*', a, ['case', ['==', ['get', 'kind'], 'alt'], 0.8, 1]],
+      18, ['*', b, ['case', ['==', ['get', 'kind'], 'alt'], 0.8, 1]]];
     // Trajets à pied, à vélo et en transport : trait plein, liseré foncé puis bord blanc.
     map.addLayer({ id: 'route-halo', type: 'line', source: 'route', filter: ['!=', ['get', 'kind'], 'transfer'],
       layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: { 'line-color': dark ? DARK_LAND : '#FFFFFF', 'line-width': width(9, 17) } }, before);
+      paint: { 'line-color': dark ? DARK_LAND : '#FFFFFF', 'line-width': width(6.5, 12) } }, before);
     map.addLayer({ id: 'route-case', type: 'line', source: 'route', filter: ['!=', ['get', 'kind'], 'transfer'],
       layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: { 'line-color': ['get', 'edge'], 'line-width': width(6.5, 13) } }, before);
+      paint: { 'line-color': ['get', 'edge'], 'line-width': width(4.8, 9.5) } }, before);
     map.addLayer({ id: 'route-line', type: 'line', source: 'route', filter: ['!=', ['get', 'kind'], 'transfer'],
       layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: { 'line-color': ['get', 'color'], 'line-width': width(4.5, 9.5) } }, before);
+      paint: { 'line-color': ['get', 'color'], 'line-width': width(3.4, 7) } }, before);
     // Correspondances à pied dans un trajet en transport : points discrets.
     map.addLayer({ id: 'route-walk', type: 'line', source: 'route', filter: ['==', ['get', 'kind'], 'transfer'],
       layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: { 'line-color': '#6F7A88', 'line-width': width(4, 7), 'line-dasharray': [0, 1.7] } }, before);
+      paint: { 'line-color': '#6F7A88', 'line-width': width(3.2, 5.5), 'line-dasharray': [0, 1.7] } }, before);
     map.addSource('route-ends', { type: 'geojson', data: empty() });
     map.addLayer({ id: 'route-start', type: 'circle', source: 'route-ends',
       paint: { 'circle-radius': 7.5, 'circle-color': ['match', ['get', 'kind'], 'via', '#FFFFFF', '#2A5BD7'],
@@ -1208,6 +1210,13 @@
     drawRoute();
   }
   const streetOpts = (r) => (r ? [r, ...(r.alts || [])] : []);
+  // « 3 min de plus » ; à durée affichée égale : la différence de distance (sinon « 1 min de plus » sous deux « 22 min »)
+  function altTag(r, best) {
+    const dm = Math.round(r.duration / 60) - Math.round(best.duration / 60);
+    if (dm > 0) return `${dm} min de plus`;
+    const dd = r.distance - best.distance;
+    return dd > 50 ? `Même durée · ${fmtDistance(dd)} de plus` : 'Autre itinéraire, même durée';
+  }
   function pickStreet(i) {
     pickedStreet = i;
     drawRoute();
@@ -1936,7 +1945,7 @@
               <button class="rc-main" onclick={() => pickStreet(i)} aria-pressed={i === pickedStreet}>
                 <span class="rc-dur">{fmtDuration(r.duration)}</span>
                 <span class="rc-sub">Arrivée {arrival(r.duration)} · {fmtDistance(r.distance)}</span>
-                <span class="rc-tag">{i === 0 ? 'Le plus rapide' : `${Math.max(1, Math.round((r.duration - opts[0].duration) / 60))} min de plus`}</span>
+                <span class="rc-tag">{i === 0 ? 'Le plus rapide' : altTag(r, opts[0])}</span>
               </button>
               <button class="go" onclick={() => startNav(r)}>
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4 19 20l-7-4-7 4z" class="solid" /></svg>Aller
@@ -2392,18 +2401,19 @@
   .results .list-foot .link { min-height: 40px; }
   .rm-stop { width: 44px; height: 44px; }
   /* ——— Choix de l'itinéraire ——— */
-  .route-cards { list-style: none; margin: 4px 0 8px; padding: 0; display: grid; gap: 8px; }
-  .route-cards li { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px; padding: 12px 12px 12px 16px;
-    border-radius: 16px; background: var(--fill); border: 2px solid transparent; }
+  .route-cards { list-style: none; margin: 2px 0 6px; padding: 0; display: grid; gap: 6px; }
+  .route-cards li { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px; padding: 9px 10px 9px 14px;
+    border-radius: 14px; background: var(--fill); border: 1.5px solid transparent; }
   .route-cards li.on { border-color: var(--accent); background: var(--soft-accent); }
   .rc-main { display: grid; gap: 2px; text-align: left; border: 0; background: none; padding: 0; cursor: pointer; min-width: 0; }
-  .rc-dur { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
-  .rc-sub { font-size: 14px; color: var(--muted); }
-  .rc-tag { font-size: 13.5px; color: var(--open); font-weight: 600; }
+  .rc-main { gap: 0; }
+  .rc-dur { font-size: 19px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.25; }
+  .rc-sub { font-size: 13.5px; color: var(--muted); }
+  .rc-tag { font-size: 13px; color: var(--open); font-weight: 600; }
   .route-cards li:not(:first-child) .rc-tag { color: var(--muted); font-weight: 500; }
-  .go { display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: 14px; background: #1E9E4A; color: #fff;
-    font-size: 16px; font-weight: 700; padding: 0 18px; height: 48px; cursor: pointer; }
-  .go svg { width: 18px; height: 18px; }
+  .go { display: inline-flex; align-items: center; gap: 5px; border: 0; border-radius: 12px; background: #1E9E4A; color: #fff;
+    font-size: 15px; font-weight: 600; padding: 0 14px; height: 40px; cursor: pointer; }
+  .go svg { width: 14px; height: 14px; }
   .go.wide { width: calc(100% - 40px); justify-content: center; margin: 4px 20px 6px; }
   .traffic-note { margin-top: 8px; }
 
