@@ -1,0 +1,10 @@
+{
+  "name": "Projet Paris",
+  "short_name": "Paris",
+  "lang": "fr",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#EEF1EF",
+  "theme_color": "#1F6B4A",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}
