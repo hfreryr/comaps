@@ -2,7 +2,7 @@
 
 Carte de Paris centrée sur vous à l'ouverture, recherche de lieux et de types de lieux (« pharmacie », « resto près de moi »), fiche lieu avec horaires lisibles et prochains passages en station, listes par catégorie triées depuis votre position (distance, ouvert / fermé), favoris et lieux récents (gardés sur l'appareil uniquement), mode sombre automatique, itinéraires à pied, à vélo et en transports en commun.
 
-En ligne : https://hfreryr.github.io/untracked/
+En ligne : https://untrackedmaps.app
 
 ## Lancer
 

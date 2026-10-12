@@ -18,7 +18,7 @@ Repérer automatiquement les lieux d'OSM qui ne sont plus à jour — en commen�
 Concevoir et tester une expérience à la hauteur de Google Maps, d'abord sur le parcours **« faire un itinéraire »**.
 
 - Prototypes testés avec de vrais utilisateurs, comparés à Google Maps.
-- Notre propre app web, branchée sur des moteurs libres : https://hfreryr.github.io/untracked/
+- Notre propre app web, branchée sur des moteurs libres : https://untrackedmaps.app
 
 ## Feuille de route
 
