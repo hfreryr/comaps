@@ -6,6 +6,48 @@
 const VALHALLA = 'https://valhalla1.openstreetmap.de/route';
 const TRANSITOUS = 'https://api.transitous.org/api/v5/plan';
 
+// ——— Lissage des tracés ———
+// Les trottoirs de Paris sont cartographiés à part : un trajet brut fait des crochets à chaque
+// traversée. On simplifie (Douglas-Peucker, en mètres) puis on arrondit les angles (Chaikin).
+const M_PER_DEG_LAT = 111320;
+function perpDist([x, y], [x1, y1], [x2, y2], k) {
+  const ax = (x - x1) * k, ay = y - y1, bx = (x2 - x1) * k, by = y2 - y1;
+  const len = Math.hypot(bx, by);
+  if (!len) return Math.hypot(ax, ay) * M_PER_DEG_LAT;
+  const t = Math.max(0, Math.min(1, (ax * bx + ay * by) / (len * len)));
+  return Math.hypot(ax - t * bx, ay - t * by) * M_PER_DEG_LAT;
+}
+function simplify(coords, tolMeters) {
+  if (coords.length < 3) return coords;
+  const k = Math.cos((coords[0][1] * Math.PI) / 180);
+  const keep = new Uint8Array(coords.length);
+  keep[0] = keep[coords.length - 1] = 1;
+  const stack = [[0, coords.length - 1]];
+  while (stack.length) {
+    const [a, b] = stack.pop();
+    let max = 0, idx = -1;
+    for (let i = a + 1; i < b; i++) {
+      const d = perpDist(coords[i], coords[a], coords[b], k);
+      if (d > max) { max = d; idx = i; }
+    }
+    if (max > tolMeters) { keep[idx] = 1; stack.push([a, idx], [idx, b]); }
+  }
+  return coords.filter((_, i) => keep[i]);
+}
+function chaikin(coords, iterations = 2) {
+  for (let n = 0; n < iterations && coords.length > 2; n++) {
+    const out = [coords[0]];
+    for (let i = 0; i < coords.length - 1; i++) {
+      const [x0, y0] = coords[i], [x1, y1] = coords[i + 1];
+      out.push([0.75 * x0 + 0.25 * x1, 0.75 * y0 + 0.25 * y1], [0.25 * x0 + 0.75 * x1, 0.25 * y0 + 0.75 * y1]);
+    }
+    out.push(coords[coords.length - 1]);
+    coords = out;
+  }
+  return coords;
+}
+export const smooth = (coords, tol = 7) => chaikin(simplify(coords, tol));
+
 export function decodePolyline(str, precision = 6) {
   const factor = 10 ** precision;
   const coords = [];
@@ -44,24 +86,35 @@ export async function streetRoute(from, to, mode, signal) {
   return {
     duration: trip.summary.time,
     distance: trip.summary.length * 1000,
-    coords: decodePolyline(leg.shape, 6),
-    steps: leg.maneuvers
-      .filter((m) => m.type !== 4 && m.type !== 5 && m.type !== 6) // on retire « Vous êtes arrivé »
-      .map((m) => ({ text: tidy(m.instruction), distance: m.length * 1000 }))
-      // fusionne les consignes identiques qui se suivent (« Tournez à droite. » × 2)
-      .reduce((acc, s) => {
-        const last = acc[acc.length - 1];
-        if (last && last.text === s.text && s.distance < 40) last.distance += s.distance;
-        else acc.push(s);
-        return acc;
-      }, [])
+    coords: smooth(decodePolyline(leg.shape, 6), mode === 'bike' ? 4 : 7),
+    steps: simplifySteps(leg.maneuvers)
   };
 }
 
+// Des consignes à l'échelle de la rue, pas du trottoir : les petits tronçons sans nom
+// (traversées, bouts de trottoir) sont fondus dans la consigne précédente.
+function simplifySteps(maneuvers) {
+  const steps = [];
+  for (const m of maneuvers) {
+    if (m.type === 4 || m.type === 5 || m.type === 6) continue; // « Vous êtes arrivé »
+    const street = m.street_names?.[0];
+    const named = street && !/^(allée|trottoir|chemin|passage piéton)$/i.test(street);
+    const s = { text: tidy(m.instruction), distance: m.length * 1000, named };
+    const last = steps[steps.length - 1];
+    if (last && !named && s.distance < 80) { last.distance += s.distance; continue; }
+    if (last && last.text === s.text) { last.distance += s.distance; continue; }
+    steps.push(s);
+  }
+  return steps;
+}
+
 // Les trottoirs sans nom deviennent « l'allée » dans les consignes : on les retire.
+// … et « Tournez à gauche dans Rue du Four » devient « Tournez à gauche rue du Four ».
 function tidy(text) {
   return text
     .replace(/ (dans|sur|vers) (l'allée|le trottoir|le chemin|le passage piéton)/g, '')
+    .replace(/ (dans|sur) (Rue|Avenue|Boulevard|Place|Quai|Passage|Impasse|Cours|Square|Pont|Villa|Cité|Allée) /g,
+      (_, __, type) => ` ${type.toLowerCase()} `)
     .replace(/\s+\./g, '.');
 }
 
@@ -72,18 +125,18 @@ export async function transitRoutes(from, to, signal, when = new Date()) {
     fromPlace: `${from.lat},${from.lon}`,
     toPlace: `${to.lat},${to.lon}`,
     time: when.toISOString(),
-    numItineraries: '5'
+    numItineraries: '10'
   });
   const res = await fetch(url, { signal });
   if (!res.ok) throw new Error(`transitous-${res.status}`);
   const data = await res.json();
-  const seen = new Set();
-  return (data.itineraries || [])
-    .map((it) => ({
-      duration: it.duration,
-      start: new Date(it.startTime),
-      end: new Date(it.endTime),
-      legs: it.legs.map((l) => ({
+  const groups = new Map();
+  for (const raw of data.itineraries || []) {
+    const it = {
+      duration: raw.duration,
+      start: new Date(raw.startTime),
+      end: new Date(raw.endTime),
+      legs: raw.legs.map((l) => ({
         mode: l.mode,
         line: l.routeShortName || '',
         color: l.routeColor ? `#${l.routeColor}` : '#5B6573',
@@ -97,17 +150,20 @@ export async function transitRoutes(from, to, signal, when = new Date()) {
         distance: l.distance || 0,
         stops: (l.intermediateStops || []).length,
         realTime: l.realTime,
-        coords: l.legGeometry ? decodePolyline(l.legGeometry.points, l.legGeometry.precision || 6) : []
+        coords: l.legGeometry
+          ? smooth(decodePolyline(l.legGeometry.points, l.legGeometry.precision || 6), l.mode === 'WALK' ? 7 : 3)
+          : []
       }))
-    }))
-    // une même combinaison de lignes n'apparaît qu'une fois (la plus tôt)
-    .filter((it) => {
-      const key = it.legs.filter((l) => l.mode !== 'WALK').map((l) => l.line).join('>') + it.legs.length;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    })
-    .slice(0, 4);
+    };
+    it.board = it.legs.find((l) => l.mode !== 'WALK') || null; // premier véhicule : arrêt et heure de départ
+    if (!it.board) continue; // trajet entièrement à pied : l'onglet « À pied » s'en charge
+    // une même combinaison de lignes = une seule proposition, avec ses prochains départs
+    const key = it.legs.filter((l) => l.mode !== 'WALK').map((l) => `${l.mode}:${l.line}`).join('>');
+    const g = groups.get(key);
+    if (!g) { it.next = []; groups.set(key, it); }
+    else if (g.next.length < 3 && +it.board.start !== +g.board.start) g.next.push(it.board.start);
+  }
+  return [...groups.values()].sort((a, b) => a.end - b.end).slice(0, 4);
 }
 
 export const MODE_NAMES = {

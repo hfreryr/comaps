@@ -120,11 +120,11 @@ class Routes(osmium.SimpleHandler):
         if not mode or not ref:
             return
         key = (mode, ref)
-        entry = self.lines.setdefault(key, {"colour": None, "ways": set()})
+        entry = self.lines.setdefault(key, {"colour": None, "ways": set(), "relations": []})
         entry["colour"] = entry["colour"] or t.get("colour")
-        for m in r.members:
-            if m.type == "w" and m.role in ("", "forward", "backward"):
-                entry["ways"].add(m.ref)
+        ways = [m.ref for m in r.members if m.type == "w" and m.role in ("", "forward", "backward")]
+        entry["relations"].append(ways)
+        entry["ways"].update(ways)
 
 
 class Ways(osmium.SimpleHandler):
@@ -141,6 +141,48 @@ class Ways(osmium.SimpleHandler):
                 pass
 
 
+def chaikin(coords, iterations=3):
+    """Arrondit une ligne brisée (découpe des angles de Chaikin), extrémités conservées."""
+    for _ in range(iterations):
+        if len(coords) < 3:
+            return coords
+        out = [coords[0]]
+        for (x0, y0), (x1, y1) in zip(coords, coords[1:]):
+            out.append((0.75 * x0 + 0.25 * x1, 0.75 * y0 + 0.25 * y1))
+            out.append((0.25 * x0 + 0.75 * x1, 0.25 * y0 + 0.75 * y1))
+        out.append(coords[-1])
+        coords = out
+    return coords
+
+
+def line_geometry(relations, geoms):
+    """Une seule voie par tronçon : chaque sens de circulation (relation) n'ajoute que ce qui
+    n'est pas déjà dessiné à moins de ~25 m. Puis simplification et arrondi des courbes."""
+    drawn = None
+    parts = []
+    rels = []
+    for ways in relations:
+        segs = [LineString(geoms[w]) for w in ways if w in geoms and len(geoms[w]) > 1]
+        if segs:
+            rels.append(linemerge(MultiLineString(segs)))
+    for g in sorted(rels, key=lambda g: -g.length):
+        new = g if drawn is None else g.difference(drawn.buffer(0.00032))
+        if new.is_empty or new.length < 0.0008:
+            continue
+        parts.append(new)
+        drawn = new.buffer(0.00001) if drawn is None else drawn.union(new.buffer(0.00001))
+    if not parts:
+        return None
+    lines = []
+    for p in parts:
+        for l in getattr(p, "geoms", [p]):
+            if l.geom_type == "LineString":
+                lines.append(l)
+    merged = linemerge(MultiLineString(lines)).simplify(0.00006, preserve_topology=False)
+    smooth = [LineString(chaikin(list(l.coords))) for l in getattr(merged, "geoms", [merged]) if l.length > 0.0004]
+    return MultiLineString(smooth) if len(smooth) > 1 else (smooth[0] if smooth else None)
+
+
 DEFAULT_COLOURS = {"metro": "#5B6573", "rer": "#5B6573", "tram": "#5B6573"}
 
 
@@ -149,7 +191,7 @@ def main(pbf):
 
     lm = Landmarks()
     lm.apply_file(str(pbf), locations=True)
-    items = sorted(lm.items.values(), key=lambda x: -x["score"])[:900]  # les 900 plus connus suffisent
+    items = sorted(lm.items.values(), key=lambda x: -x["score"])[:1500]  # les 1500 plus connus
     feats = [{"type": "Feature", "geometry": {"type": "Point", "coordinates": [i["lon"], i["lat"]]},
               "properties": {"name": i["name"], "family": i["family"], "rank": k + 1, "osm": i["osm"]}}
              for k, i in enumerate(items)]
@@ -164,10 +206,9 @@ def main(pbf):
     wy.apply_file(str(pbf), locations=True)
     lines = []
     for (mode, ref), e in sorted(rt.lines.items()):
-        segs = [LineString(wy.geoms[w]) for w in e["ways"] if w in wy.geoms and len(wy.geoms[w]) > 1]
-        if not segs:
+        merged = line_geometry(e["relations"], wy.geoms)
+        if merged is None:
             continue
-        merged = linemerge(MultiLineString(segs)).simplify(0.00004, preserve_topology=False)
         geom = mapping(merged)
         geom["coordinates"] = json.loads(json.dumps(geom["coordinates"]), parse_float=lambda v: round(float(v), 5))
         colour = e["colour"] or DEFAULT_COLOURS[mode]

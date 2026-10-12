@@ -66,7 +66,9 @@
   const week = $derived(showWeek && info?.hours ? hoursTable(info.hours, place.lat, place.lon) : null);
   const activeQuery = $derived(editing ? fieldQuery : query);
   const showList = $derived(editing ? true : focused && query.trim().length >= 2);
-  const address = $derived(info?.address || place?.address || '');
+  const isAddress = $derived(place?.type === 'Adresse');
+  const title = $derived(isAddress ? place.name.split(',')[0] : place?.name);
+  const address = $derived(isAddress ? '' : (info?.address && info.address.includes(' ') ? info.address : '') || place?.address || '');
   const current = $derived(routes[mode]);
 
   onMount(() => {
@@ -83,6 +85,7 @@
       fadeDuration: 200
     });
     map.setMissingStyleImageResolver((id) => provideImage(map, id));
+    if (location.hostname === 'localhost') window.__map = map; // pour les tests locaux
     map.once('load', () => {
       document.querySelector('.maplibregl-ctrl-attrib')?.classList.remove('maplibregl-compact-show');
       addRouteLayers();
@@ -617,6 +620,9 @@
         <p class="empty">Choisissez un point de départ pour calculer l'itinéraire.</p>
       {:else if !current || current.status === 'loading'}
         <p class="empty">Calcul de l'itinéraire…</p>
+      {:else if current.status === 'none' && mode === 'transit' && routes.walk?.status === 'ok'}
+        <p class="empty">Pas de transport utile sur ce trajet : à pied, c'est {fmtDuration(routes.walk.data.duration)}.</p>
+        <button class="retry" onclick={() => chooseMode('walk')}>Voir le trajet à pied</button>
       {:else if current.status === 'none'}
         <p class="empty">Aucun itinéraire {mode === 'transit' ? 'en transports en commun' : mode === 'bike' ? 'à vélo' : 'à pied'} trouvé entre ces deux points.</p>
       {:else if current.status === 'error'}
@@ -653,7 +659,13 @@
                   </span>
                   <span class="opt-dur">{fmtDuration(it.duration)}</span>
                 </span>
-                <span class="opt-sub">{fmtTime(it.start)} – {fmtTime(it.end)} · départ {inMinutes(it.start)}</span>
+                <span class="opt-sub">
+                  <strong>{fmtTime(it.board.start)}</strong> à {it.board.from}{#if it.board.realTime}<span class="live" title="Horaire en temps réel"> ● </span>{:else} · {/if}{inMinutes(it.board.start)}
+                </span>
+                {#if it.next.length}
+                  <span class="opt-sub">Puis {it.next.map(fmtTime).join(' · ')}</span>
+                {/if}
+                <span class="opt-sub">Arrivée {fmtTime(it.end)}</span>
               </button>
               {#if picked === i}
                 <ol class="legs">
@@ -702,8 +714,10 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" /></svg>
       </button>
 
-      <h1>{place.name}</h1>
-      <p class="kind">{[place.type, info?.cuisine && info.cuisine.split(';')[0].replace(/_/g, ' ')].filter(Boolean).join(' · ') || 'Lieu'}</p>
+      <h1>{title}</h1>
+      <p class="kind">{isAddress
+        ? (place.name.split(',').slice(1).join(',').trim() || place.address || 'Adresse')
+        : [place.type, info?.cuisine && info.cuisine.split(';')[0].replace(/_/g, ' ')].filter(Boolean).join(' · ') || 'Lieu'}</p>
       {#if info === null}
         <p class="status muted">Chargement…</p>
       {:else if status}
@@ -751,7 +765,7 @@
               </tbody></table>
             </li>
           {/if}
-        {:else if info && place.type !== 'Adresse' && place.type !== 'Rue'}
+        {:else if info && !isAddress && place.type !== 'Rue'}
           <li class="row muted">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></svg>
             <span>Horaires non renseignés</span>
@@ -1047,6 +1061,8 @@
   .badge.small { height: 20px; min-width: 22px; font-size: 12px; padding: 0 6px; margin-right: 4px; }
   .opt-dur { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .opt-sub { color: var(--muted); font-size: 14px; font-variant-numeric: tabular-nums; }
+  .opt-sub strong { color: var(--ink); font-weight: 600; }
+  .live { color: var(--open); font-size: 10px; vertical-align: 2px; }
 
   .legs { list-style: none; margin: 0; padding: 4px 20px 14px; background: #f5f8ff; }
   .leg { display: grid; grid-template-columns: 44px 16px 1fr; gap: 10px; min-height: 52px; }

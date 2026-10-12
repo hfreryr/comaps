@@ -65,6 +65,16 @@ function matchBy(prop, pick, fallback) {
 }
 const POI_ICON = matchBy('subclass', (f) => `poi-${f.icon}`, 'poi-dot');
 const POI_TEXT = matchBy('subclass', (f) => darken(f.color), darken(OTHER.color));
+// Priorité d'affichage quand les lieux se chevauchent : manger et boire d'abord, puis culture,
+// santé, hébergement, nature, commerces (comme les cartes de référence en ville).
+const PRIORITY = { food: 0, cafe: 0, bar: 0.5, bakery: 0.5, culture: 1, sight: 1, health: 2, stay: 2.5, nature: 3, shop: 4 };
+const POI_PRI = (() => {
+  const m = ['match', ['get', 'subclass']];
+  for (const [k, f] of Object.entries(FAMILIES)) m.push(f.classes, PRIORITY[k] ?? 5);
+  m.push(5);
+  return m;
+})();
+const POI_SORT = ['+', POI_PRI, ['/', ['min', ['get', 'rank'], 999], 1000]];
 
 function darken(hex, k = 0.78) {
   const n = parseInt(hex.slice(1), 16);
@@ -172,22 +182,23 @@ export function mapStyle(base = '') {
         paint: { 'text-color': C.roadLabel, 'text-halo-color': C.halo, 'text-halo-width': 1.6 } },
 
       // Lieux : pastille colorée à pictogramme blanc, nom de la même teinte.
-      { id: 'poi', type: 'symbol', source: 'omt', 'source-layer': 'poi', minzoom: 15,
+      { id: 'poi', type: 'symbol', source: 'omt', 'source-layer': 'poi', minzoom: 14.3,
         filter: ['all', ['has', 'name'], ['match', ['get', 'subclass'], ALL_CLASSES, true, false],
-                 ['<=', ['get', 'rank'], ['step', ['zoom'], 10, 15.5, 30, 16.3, 999]]],
-        layout: { 'icon-image': POI_ICON, 'icon-size': zoom([14.5, 0.8, 17, 1]),
-                  'text-field': NAME, 'text-font': FONT.semibold, 'text-size': 12, 'text-anchor': 'left',
-                  'text-offset': [1.15, 0], 'text-max-width': 8, 'text-line-height': 1.15,
-                  'text-optional': true, 'symbol-sort-key': ['get', 'rank'] },
+                 // de près, toutes les familles ; un peu plus loin, seulement manger, boire et culture
+                 ['<=', POI_PRI, ['step', ['zoom'], 1, 15.3, 3, 16.6, 9]]],
+        layout: { 'icon-image': POI_ICON, 'icon-size': zoom([14.3, 0.85, 17, 1]),
+                  'text-field': NAME, 'text-font': FONT.semibold, 'text-size': 11.5, 'text-anchor': 'left',
+                  'text-offset': [1.0, 0], 'text-max-width': 8, 'text-line-height': 1.15,
+                  'text-optional': false, 'symbol-sort-key': POI_SORT },
         paint: { 'text-color': POI_TEXT, 'text-halo-color': C.halo, 'text-halo-width': 1.6 } },
       // Lieux remarquables (vue large) : les plus connus d'abord, de plus en plus nombreux en zoomant.
       { id: 'landmark', type: 'symbol', source: 'landmarks', minzoom: 11.5, maxzoom: 15,
-        filter: ['<=', ['get', 'rank'], ['step', ['zoom'], 20, 12.5, 60, 13.5, 180, 14.2, 900]],
+        filter: ['<=', ['get', 'rank'], ['step', ['zoom'], 45, 12, 110, 12.8, 260, 13.6, 600, 14.2, 1500]],
         layout: { 'icon-image': ['match', ['get', 'family'], 'culture', 'poi-columns', 'sight', 'poi-star', 'nature', 'poi-tree',
                                  'health', 'poi-cross', 'shop', 'poi-bag', 'train', 'poi-train', 'poi-dot'],
-                  'icon-size': zoom([11.5, 0.85, 14, 1]),
-                  'text-field': ['get', 'name'], 'text-font': FONT.semibold, 'text-size': zoom([11.5, 11, 14, 12.5]),
-                  'text-anchor': 'left', 'text-offset': [1.15, 0], 'text-max-width': 8, 'text-line-height': 1.1,
+                  'icon-size': zoom([11.5, 0.8, 14, 0.95]),
+                  'text-field': ['get', 'name'], 'text-font': FONT.semibold, 'text-size': zoom([11.5, 10.5, 14, 12]),
+                  'text-anchor': 'left', 'text-offset': [1.0, 0], 'text-max-width': 8, 'text-line-height': 1.1,
                   'text-optional': false, 'symbol-sort-key': ['get', 'rank'] },
         paint: { 'text-color': ['match', ['get', 'family'], 'culture', '#0E7681', 'sight', '#0E7681', 'nature', '#2F6E3F',
                                 'health', '#A8392F', 'shop', '#3253AA', 'train', '#2B4793', '#5F656C'],
@@ -201,7 +212,7 @@ export function mapStyle(base = '') {
         paint: { 'text-color': '#5F656C', 'text-halo-color': C.halo, 'text-halo-width': 1.6 } },
       // Lieux mis en avant par un raccourci de catégorie (filtre posé par l'app).
       { id: 'poi-hit', type: 'symbol', source: 'omt', 'source-layer': 'poi', filter: ['==', ['get', 'subclass'], '__none__'],
-        layout: { 'icon-image': POI_ICON, 'icon-size': 1.15, 'icon-allow-overlap': true,
+        layout: { 'icon-image': POI_ICON, 'icon-size': 1.2, 'icon-allow-overlap': true,
                   'text-field': NAME, 'text-font': FONT.bold, 'text-size': 12.5, 'text-anchor': 'left',
                   'text-offset': [1.3, 0], 'text-max-width': 8, 'text-optional': true },
         paint: { 'text-color': POI_TEXT, 'text-halo-color': C.halo, 'text-halo-width': 1.8 } },
@@ -211,7 +222,7 @@ export function mapStyle(base = '') {
         filter: ['all', ['==', ['get', 'class'], 'railway'], ['match', ['get', 'subclass'], ['subway', 'station', 'halt'], true, false]],
         layout: { 'icon-image': 'metro', 'icon-size': zoom([13.8, 0.7, 16, 1]),
                   'text-field': ['step', ['zoom'], '', 14.5, NAME], 'text-font': FONT.semibold,
-                  'text-size': 12, 'text-anchor': 'left', 'text-offset': [1.15, 0], 'text-optional': true },
+                  'text-size': 12, 'text-anchor': 'left', 'text-offset': [1.0, 0], 'text-optional': true },
         paint: { 'text-color': '#2B4793', 'text-halo-color': C.halo, 'text-halo-width': 1.6 } },
 
       { id: 'place-small', type: 'symbol', source: 'omt', 'source-layer': 'place', minzoom: 12, maxzoom: 17,
@@ -247,7 +258,7 @@ const GLYPHS = {
 };
 
 // Pastille : disque coloré, liseré blanc, ombre douce, pictogramme blanc. Rendu en 2× pour l'écran.
-export function poiImage(color, glyph, px = 22) {
+export function poiImage(color, glyph, px = 18) {
   const s = 2, size = (px + 6) * s;
   const c = document.createElement('canvas');
   c.width = c.height = size;
