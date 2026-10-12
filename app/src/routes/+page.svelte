@@ -302,14 +302,32 @@
       }
     });
     map.on('click', onMapClick);
+    window.addEventListener('popstate', onPopState);
+    window.addEventListener('keydown', onKeyDown);
+    const offline = () => say('Pas de connexion. La recherche et les itinéraires reprendront dès le retour du réseau.');
+    const online = () => say('Connexion rétablie');
+    window.addEventListener('offline', offline);
+    window.addEventListener('online', online);
+    // Boussole : visible seulement quand la carte est tournée ou inclinée.
+    const orient = () => { bearing = map.getBearing(); pitch = map.getPitch(); };
+    map.on('rotate', orient);
+    map.on('pitch', orient);
     // Appui long (ou clic droit) : adresse du point, même si une fiche est ouverte.
     map.on('contextmenu', (e) => { if (!directions) openPoint(e.lngLat); });
     for (const id of ['poi', 'poi-other', 'poi-hit', 'landmark', 'metro', 'fav']) {
       map.on('mouseenter', id, () => (map.getCanvas().style.cursor = 'pointer'));
       map.on('mouseleave', id, () => (map.getCanvas().style.cursor = ''));
     }
-    return () => map.remove();
+    return () => {
+      window.removeEventListener('popstate', onPopState);
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('offline', offline);
+      window.removeEventListener('online', online);
+      map.remove();
+    };
   });
+  let bearing = $state(0);
+  let pitch = $state(0);
 
   let dark = $state(false);
   const favData = () => ({ type: 'FeatureCollection', features: favorites.map((f, i) => ({
@@ -337,6 +355,7 @@
                 'text-offset': [1.75, 0], 'text-max-width': 9, 'text-allow-overlap': true },
       paint: { 'text-color': ['get', 'tc'], 'text-halo-color': dark ? 'rgba(22,24,28,0.95)' : '#FFFFFF', 'text-halo-width': 2 } });
     dimPlaces(dimmed);
+    isolate();
     // Après un changement de style : on remet l'état en cours (trajet, catégorie, mode transports).
     if (directions) drawRoute();
     else if (place) showSelection(place);
@@ -434,7 +453,8 @@
       if (which) pickOnMap(which, e.lngLat);
       return;
     }
-    showModes = false;
+    // Un panneau ou un menu ouvert : le premier toucher à côté le referme, sans rien ouvrir d'autre.
+    if (showModes || editChips || importOpen) { showModes = false; editChips = false; importOpen = false; return; }
     const fav = map.queryRenderedFeatures(e.point, { layers: ['fav'] })[0];
     if (fav) return openPlace({ ...favorites[fav.properties.i] });
     const hit = map.queryRenderedFeatures(e.point, { layers: ['cat-hit'] })[0];
@@ -659,8 +679,9 @@
     const p = place;
     if (!p) return;
     if (favorites.some((f) => sameSpot(f, p))) {
+      const before = favorites;
       favorites = favorites.filter((f) => !sameSpot(f, p));
-      say('Retiré de vos favoris');
+      say('Retiré de vos favoris', { label: 'Annuler', run: () => { favorites = before; saveFavorites(); } });
     } else {
       const keep = { id: p.id, name: p.name, type: p.type, address: p.address || info?.address || '', lat: p.lat, lon: p.lon, osmType: p.osmType, osmId: p.osmId, subclass: p.subclass, pin: p.pin };
       favorites = [keep, ...favorites];
@@ -680,8 +701,13 @@
     try { localStorage.setItem(RECENTS_KEY, JSON.stringify(recents)); } catch { /* navigation privée : tant pis */ }
   }
   function forgetRecents() {
+    const before = recents;
     recents = [];
     try { localStorage.removeItem(RECENTS_KEY); } catch { /* rien à effacer */ }
+    say('Lieux récents effacés', { label: 'Annuler', run: () => {
+      recents = before;
+      try { localStorage.setItem(RECENTS_KEY, JSON.stringify(recents)); } catch { /* rien */ }
+    } });
   }
 
   async function openPlace(p) {
@@ -793,6 +819,8 @@
   $effect(() => { nearby; category; applyHit(category); });
 
   async function pickCategory(c) {
+    editChips = false;
+    importOpen = false;
     if (category?.key === c.key) return clearCategory();
     category = c;
     closePlace();
@@ -920,9 +948,60 @@
     openPlace(r);
   }
 
-  function say(msg) {
+  // Message bref ; avec une action (« Annuler ») pour revenir sur un geste qui efface quelque chose.
+  let toastAction = $state(null);
+  let toastTimer;
+  function say(msg, action = null) {
     toast = msg;
-    setTimeout(() => (toast = ''), 3500);
+    toastAction = action;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { toast = ''; toastAction = null; }, action ? 6000 : 3500);
+  }
+  // Une catégorie choisie : on n'affiche plus qu'elle sur la carte (les autres lieux s'effacent).
+  function isolate() {
+    if (!map) return;
+    const only = category && !directions;
+    const vis = (id, on) => map.getLayer(id) && map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
+    for (const id of ['poi', 'poi-other', 'landmark', 'exit', 'fav']) vis(id, !only);
+    vis('metro', !only || !!category?.transit);
+  }
+  $effect(() => { category; directions; isolate(); });
+
+  // Fermer « ce qui est au-dessus » : Échap, ou le bouton Retour du téléphone.
+  function closeTop() {
+    if (showModes) showModes = false;
+    else if (editing) editing = null;
+    else if (editChips || importOpen) { editChips = false; importOpen = false; }
+    else if (directions) closeDirections();
+    else if (place) closePlace();
+    else if (category) clearCategory();
+    else if (focused) { focused = false; document.activeElement?.blur(); }
+    else return false;
+    return true;
+  }
+  // Retour : une entrée d'historique tant qu'un panneau est ouvert, pour que « Retour » le ferme
+  // au lieu de quitter l'app.
+  const anyOpen = $derived(!!(place || category || directions || editChips || importOpen));
+  let skipPop = false;
+  $effect(() => {
+    if (anyOpen && !history.state?.ui) history.pushState({ ...(history.state || {}), ui: 1 }, '', location.href);
+    else if (!anyOpen && history.state?.ui) { skipPop = true; history.back(); }
+  });
+  function onPopState() {
+    if (skipPop) { skipPop = false; return; }
+    closeTop();
+    // encore un panneau dessous (une fiche ouverte depuis une liste) : Retour le fermera aussi
+    if (anyOpen) history.pushState({ ...(history.state || {}), ui: 1 }, '', location.href);
+  }
+  function onKeyDown(e) {
+    if (e.key === 'Escape' && closeTop()) e.preventDefault();
+  }
+
+  function undoToast() {
+    const a = toastAction;
+    toast = '';
+    toastAction = null;
+    a?.run();
   }
 
   // La position reste sur l'appareil : elle n'est envoyée qu'aux moteurs d'itinéraire, au moment du calcul.
@@ -1368,7 +1447,7 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.5 12 5l8 6.5M6.5 10v9.5h11V10" /><path d="M10.2 19.5v-4.8h3.6v4.8" /></svg>
             {#if placeShortcut}
               <span>Votre {SHORT_NAMES[placeShortcut].toLowerCase()}</span>
-              <button class="link" onclick={() => { setShortcut(placeShortcut, null); say('Raccourci retiré'); }}>Retirer</button>
+              <button class="link" onclick={() => { const k = placeShortcut, old = shortcuts[k]; setShortcut(k, null); say(`${SHORT_NAMES[k]} retiré`, { label: 'Annuler', run: () => setShortcut(k, old) }); }}>Retirer</button>
             {:else}
               <span>Définir comme</span>
               <button class="link" onclick={() => { setShortcut('home', place); say('Maison enregistrée · gardée sur cet appareil'); }}>Maison</button>
@@ -1400,7 +1479,7 @@
         <svg class="lens" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="M15.5 15.5 20 20" /></svg>
         <input id="search" type="search" placeholder="Rechercher un lieu ou une adresse" aria-label="Rechercher un lieu ou une adresse"
           autocomplete="off" enterkeyhint="search" bind:value={query}
-          onfocus={() => (focused = true)} onblur={() => setTimeout(() => (focused = false), 150)} onkeydown={onKey} />
+          onfocus={() => { focused = true; editChips = false; importOpen = false; showModes = false; }} onblur={() => setTimeout(() => (focused = false), 150)} onkeydown={onKey} />
         {#if query}
           <button class="icon-btn" onclick={clearSearch} aria-label="Effacer la recherche">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" /></svg>
@@ -1416,7 +1495,7 @@
               <span class="chip-dot" aria-hidden="true"></span>{c.label}
             </button>
           {/each}
-          <button class="chip edit" onclick={() => (editChips = true)} aria-label="Personnaliser les raccourcis">
+          <button class="chip edit" class:on-edit={editChips} onclick={() => { editChips = !editChips; importOpen = false; }} aria-label="Personnaliser les raccourcis" aria-expanded={editChips}>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4" /></svg>
           </button>
         </nav>
@@ -1481,6 +1560,11 @@
 
   {#if !directions}
     <div class="modes-ctl">
+      {#if Math.abs(bearing) > 1 || pitch > 1}
+        <button class="round-btn compass" onclick={() => map.easeTo({ bearing: 0, pitch: 0, duration: 500 })} aria-label="Remettre le nord en haut">
+          <svg viewBox="0 0 24 24" aria-hidden="true" style:transform={`rotate(${-bearing}deg)`}><path d="M12 3 15.5 12h-7z" class="solid north" /><path d="M8.5 12h7L12 21z" /></svg>
+        </button>
+      {/if}
       {#if showModes}
         <div class="modes-pop" role="menu" aria-label="Type de carte">
           <button role="menuitemradio" aria-checked={mapMode === 'plan'} class:on={mapMode === 'plan'} onclick={() => setMapMode('plan')}>
@@ -1499,7 +1583,7 @@
   <button class="locate" class:busy={locating} onclick={locate} aria-label="Me localiser">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 4 4 11l7 2 2 7z" class="solid" /></svg>
   </button>
-  {#if toast}<p class="toast" role="status">{toast}</p>{/if}
+  {#if toast}<p class="toast" role="status">{toast}{#if toastAction}<button onclick={undoToast}>{toastAction.label}</button>{/if}</p>{/if}
   {#if showPromise && !place && !category && !directions && !importOpen && !editChips}
     <div class="promise" role="note">
       <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2.5" /><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" /></svg>
@@ -1920,7 +2004,7 @@
   .field.editing { background: var(--fill); border-radius: 10px; }
   .swap svg { width: 22px; height: 22px; color: var(--ink); }
   .dir-card .results { margin-top: 4px; }
-  .field.via-field { grid-template-columns: 22px 1fr 36px; }
+  .field.via-field { grid-template-columns: 22px 1fr 44px; }
   .field-mark.via { width: 7px; height: 7px; border-radius: 2px; border: 2.5px solid var(--muted); background: var(--card); }
   .rm-stop { width: 36px; height: 36px; color: var(--muted); }
   .rm-stop svg { width: 18px; height: 18px; }
@@ -1972,7 +2056,9 @@
   .toast {
     position: absolute; z-index: 4; left: 12px; right: 72px; bottom: calc(52px + env(safe-area-inset-bottom));
     margin: 0; padding: 13px 16px; background: rgb(28 29 31 / 0.92); color: #fff; border-radius: 14px; font-size: 14px; max-width: 360px;
+    display: flex; align-items: center; gap: 12px;
   }
+  .toast button { margin-left: auto; border: 0; background: none; color: #8fb4ff; font-weight: 700; font-size: 14px; padding: 6px 2px; min-height: 36px; cursor: pointer; }
 
   :global(.pin) {
     width: 30px; height: 40px;
@@ -2009,6 +2095,13 @@
     border: 0; background: var(--fill); cursor: pointer; display: grid; place-items: center; color: var(--muted);
   }
   .close svg { width: 16px; height: 16px; stroke-width: 2.4; }
+  /* Zone de toucher d'au moins 44 px autour des petits boutons ronds */
+  .close::after, .share::after { content: ''; position: absolute; inset: -6px; }
+  .results .list-foot .link { min-height: 40px; }
+  .rm-stop { width: 44px; height: 44px; }
+  .chip.edit.on-edit { background: var(--accent-btn); color: #fff; }
+  .compass svg { width: 24px; height: 24px; transition: transform 0.1s; }
+  .compass .north { fill: var(--closed); }
   .share {
     position: absolute; top: 14px; right: 54px; width: 32px; height: 32px; border-radius: 50%;
     border: 0; background: var(--fill); cursor: pointer; display: grid; place-items: center; color: var(--muted);
