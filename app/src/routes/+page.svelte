@@ -5,6 +5,7 @@
   import 'maplibre-gl/dist/maplibre-gl.css';
   import { search, details, reverse, reverseAddress, typeLabel, PARIS } from '#lib/places.js';
   import { hoursStatus, hoursTable } from '#lib/hours.js';
+  import { draggable } from '#lib/sheet.js';
   import { mapStyle, provideImage, osmRef, FAMILIES } from '#lib/mapstyle.js';
   import { streetRoute, transitRoutes, departures, MODE_NAMES, fmtDuration, fmtTime, fmtWait, fmtDistance } from '#lib/routing.js';
 
@@ -49,6 +50,9 @@
   let locating = $state(false);
   let toast = $state('');
   let me = $state(null); // dernière position connue de l'utilisateur, gardée sur l'appareil
+  // Lieux récents : gardés uniquement dans ce navigateur, jamais envoyés ; effaçables d'un geste.
+  const RECENTS_KEY = 'lieux-recents';
+  let recents = $state(loadRecents());
 
   // ——— Itinéraire ———
   let directions = $state(false);
@@ -67,7 +71,7 @@
   const status = $derived(info?.hours ? hoursStatus(info.hours, place.lat, place.lon) : null);
   const week = $derived(showWeek && info?.hours ? hoursTable(info.hours, place.lat, place.lon) : null);
   const activeQuery = $derived(editing ? fieldQuery : query);
-  const showList = $derived(editing ? true : focused && query.trim().length >= 2);
+  const showList = $derived(editing ? true : focused && (query.trim().length >= 2 || (!query.trim() && recents.length > 0)));
   const isAddress = $derived(place?.type === 'Adresse');
   const title = $derived(isAddress ? place.name.split(',')[0] : place?.name);
   const address = $derived(isAddress ? '' : (info?.address && info.address.includes(' ') ? info.address : '') || place?.address || '');
@@ -211,7 +215,7 @@
     deps = null;
     showWeek = false;
     const label = await reverseAddress(lat, lng).catch(() => null);
-    if (place === p || place?.id === p.id) place = { ...p, name: label || 'Point sélectionné' };
+    if (place === p || place?.id === p.id) { place = { ...p, name: label || 'Point sélectionné' }; remember(place); }
   }
 
   function openFeature(f) {
@@ -269,7 +273,22 @@
     marker.setLngLat([lon, lat]).addTo(map);
   }
 
+  function loadRecents() {
+    try { return JSON.parse(localStorage.getItem(RECENTS_KEY) || '[]').slice(0, 8); } catch { return []; }
+  }
+  function remember(p) {
+    if (!p?.name || p.name === 'Point sélectionné') return;
+    const keep = { id: p.id, name: p.name, type: p.type, address: p.address, lat: p.lat, lon: p.lon, osmType: p.osmType, osmId: p.osmId };
+    recents = [keep, ...recents.filter((r) => r.id !== p.id && r.name !== p.name)].slice(0, 8);
+    try { localStorage.setItem(RECENTS_KEY, JSON.stringify(recents)); } catch { /* navigation privée : tant pis */ }
+  }
+  function forgetRecents() {
+    recents = [];
+    try { localStorage.removeItem(RECENTS_KEY); } catch { /* rien à effacer */ }
+  }
+
   async function openPlace(p) {
+    remember(p);
     place = p;
     info = null;
     deps = null;
@@ -545,6 +564,23 @@
         </button>
       </li>
     {/if}
+    {#if activeQuery.trim().length < 2 && recents.length}
+      <li class="note recents-head"><span>Récents</span>
+        <button class="link" onmousedown={(e) => { e.preventDefault(); forgetRecents(); }}>Effacer</button></li>
+      {#each recents as r (r.id)}
+        <li role="option" aria-selected="false">
+          <button onmousedown={() => pickResult(r)}>
+            <span class="r-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></svg>
+            </span>
+            <span class="r-text">
+              <span class="r-name">{r.name}</span>
+              <span class="r-meta">{[r.type, r.address].filter(Boolean).join(' · ')}</span>
+            </span>
+          </button>
+        </li>
+      {/each}
+    {/if}
     {#each results as r, i (r.id)}
       <li role="option" aria-selected={i === active}>
         <button class:active={i === active} onmousedown={() => pickResult(r)}>
@@ -664,8 +700,8 @@
   {#if toast}<p class="toast" role="status">{toast}</p>{/if}
 
   {#if directions && !editing}
-    <section class="sheet" aria-label="Itinéraire">
-      <div class="grip" aria-hidden="true"></div>
+    <section class="sheet" aria-label="Itinéraire" use:draggable={{ key: `${from?.lat},${to?.lat}` }}>
+      <button class="grip" aria-label="Agrandir la fiche"></button>
       {#if !from}
         <p class="empty">Choisissez un point de départ pour calculer l'itinéraire.</p>
       {:else if !current || current.status === 'loading'}
@@ -758,8 +794,8 @@
       {/if}
     </section>
   {:else if place && !directions}
-    <section class="sheet" aria-label={place.name}>
-      <div class="grip" aria-hidden="true"></div>
+    <section class="sheet" aria-label={place.name} use:draggable={{ key: place.id, onDismiss: closePlace }}>
+      <button class="grip" aria-label="Agrandir la fiche"></button>
       <button class="close" onclick={closePlace} aria-label="Fermer la fiche">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" /></svg>
       </button>
@@ -866,8 +902,8 @@
       {/if}
     </section>
   {:else if category && !directions}
-    <section class="sheet" aria-label={category.label}>
-      <div class="grip" aria-hidden="true"></div>
+    <section class="sheet" aria-label={category.label} use:draggable={{ key: category.label, onDismiss: clearCategory }}>
+      <button class="grip" aria-label="Agrandir la fiche"></button>
       <button class="close" onclick={clearCategory} aria-label="Fermer la liste">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" /></svg>
       </button>
@@ -1052,16 +1088,26 @@
     border: 3px solid #fff; box-shadow: 0 0 0 10px rgb(42 91 215 / 0.16), 0 1px 4px rgb(0 0 0 / 0.3);
   }
 
+  .results .recents-head { display: flex; padding-right: 16px; justify-content: space-between; align-items: center; font-weight: 600; color: var(--ink) !important; }
+  .results .link { width: auto; flex: none; display: inline; padding: 4px 0; }
+  .link { border: 0; background: none; color: var(--accent); font: inherit; font-weight: 500; cursor: pointer; padding: 4px 0; }
+
   /* ——— Fiches ——— */
   .sheet {
-    position: absolute; z-index: 3; left: 0; right: 0; bottom: 0;
+    position: absolute; z-index: 3; left: 0; right: 0; bottom: 0; box-sizing: border-box;
     max-height: 46vh; overflow-y: auto; overscroll-behavior: contain;
     background: var(--card); border-radius: 26px 26px 0 0; box-shadow: var(--shadow-sheet);
     padding: 8px 20px calc(24px + env(safe-area-inset-bottom));
     animation: rise 280ms cubic-bezier(0.2, 0.9, 0.25, 1);
   }
   @keyframes rise { from { transform: translateY(60px); opacity: 0.4; } }
-  .grip { width: 36px; height: 5px; border-radius: 3px; background: #d8d8dc; margin: 0 auto 12px; }
+  /* Poignée : barre discrète, mais zone de toucher confortable (44 px) */
+  .grip {
+    display: block; width: 72px; height: 22px; margin: -6px auto 4px; padding: 0; border: 0; background: none; cursor: pointer;
+    position: relative;
+  }
+  .grip::before { content: ''; position: absolute; left: 18px; right: 18px; top: 8px; height: 5px; border-radius: 3px; background: #d8d8dc; }
+  .grip[hidden] { visibility: hidden; display: block; }
   .close {
     position: absolute; top: 14px; right: 14px; width: 32px; height: 32px; border-radius: 50%;
     border: 0; background: var(--fill); cursor: pointer; display: grid; place-items: center; color: var(--muted);

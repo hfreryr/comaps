@@ -1,0 +1,140 @@
+// Fiche du bas d'écran qu'on fait glisser du doigt (téléphone uniquement), comme dans les apps
+// de cartes de référence : aperçu (titre seul), mi-hauteur (par défaut) et plein écran.
+// Glisser vers le bas depuis l'aperçu ferme la fiche ; toucher la poignée agrandit ou réduit.
+
+const PEEK = 150;          // hauteur de l'aperçu, en pixels
+const TOP_GAP = 64;        // marge laissée en haut en plein écran, pour voir qu'on est sur une carte
+
+/**
+ * Action Svelte : use:draggable={{ key, onDismiss }}
+ *  - key : change quand la fiche affiche autre chose (elle revient alors à mi-hauteur) ;
+ *  - onDismiss : appelée quand on fait glisser la fiche hors de l'écran (facultatif).
+ */
+export function draggable(node, params = {}) {
+  const mobile = matchMedia('(max-width: 767px)');
+  let { key, onDismiss } = params;
+  let snap = 'half';
+  let drag = null;
+
+  // Hauteur naturelle du contenu (sans contrainte), pour ne jamais ouvrir plus grand que nécessaire.
+  function natural() {
+    const { height, maxHeight, transition } = node.style;
+    node.style.transition = 'none';
+    node.style.height = 'auto';
+    node.style.maxHeight = 'none';
+    const h = node.scrollHeight;
+    Object.assign(node.style, { height, maxHeight, transition });
+    return h;
+  }
+  function heights() {
+    const n = natural();
+    const vh = window.innerHeight;
+    const full = Math.min(n, vh - TOP_GAP);
+    const half = Math.min(n, Math.round(vh * 0.46));
+    // L'aperçu s'arrête juste au-dessus des boutons d'action quand il y en a (titre, type, statut).
+    const actions = node.querySelector('.actions');
+    const peek = actions ? actions.offsetTop - 6 : PEEK;
+    return { peek: Math.min(peek, half), half, full };
+  }
+  function apply(animate = true) {
+    if (!mobile.matches) {
+      for (const p of ['height', 'maxHeight', 'overflowY', 'transition']) node.style[p] = '';
+      return;
+    }
+    const h = heights();
+    if (snap === 'full' && h.full <= h.half) snap = 'half';
+    node.style.transition = animate ? 'height 280ms cubic-bezier(0.2, 0.9, 0.25, 1)' : 'none';
+    node.style.maxHeight = 'none';
+    node.style.height = `${h[snap]}px`;
+    node.style.overflowY = snap === 'full' ? 'auto' : 'hidden';
+    if (snap !== 'full') node.scrollTop = 0;
+    node.dataset.snap = snap;
+    const grip = node.querySelector('.grip');
+    if (grip) {
+      grip.setAttribute('aria-label', snap === 'full' ? 'Réduire la fiche' : 'Agrandir la fiche');
+      grip.toggleAttribute('hidden', h.full <= h.peek);
+    }
+  }
+
+  function onStart(e) {
+    if (!mobile.matches || e.touches.length !== 1) return;
+    drag = { y0: e.touches[0].clientY, t0: performance.now(), h0: node.getBoundingClientRect().height, active: false, dy: 0 };
+  }
+  function onMove(e) {
+    if (!drag) return;
+    const dy = e.touches[0].clientY - drag.y0;
+    if (!drag.active) {
+      if (Math.abs(dy) < 6) return;
+      // En plein écran, le contenu défile normalement ; on ne reprend la main que pour redescendre
+      // depuis le haut du contenu.
+      if (snap === 'full' && !(dy > 0 && node.scrollTop <= 0)) { drag = null; return; }
+      drag.active = true;
+      drag.limits = heights();
+      node.style.transition = 'none';
+    }
+    e.preventDefault();
+    drag.dy = dy;
+    const h = Math.max(40, Math.min(drag.limits.full + 24, drag.h0 - dy));
+    node.style.height = `${h}px`;
+  }
+  function onEnd() {
+    if (!drag?.active) { drag = null; return; }
+    const { limits, h0, dy, t0 } = drag;
+    drag = null;
+    const h = h0 - dy;
+    const v = dy / Math.max(1, performance.now() - t0);          // px/ms, positif vers le bas
+    if (onDismiss && (h < limits.peek * 0.7 || (snap === 'peek' && v > 0.5))) {
+      node.style.transition = 'height 200ms ease-in';
+      node.style.height = '0px';
+      setTimeout(onDismiss, 180);
+      return;
+    }
+    const order = ['peek', 'half', 'full'].filter((s, i, a) => i === 0 || limits[s] > limits[a[i - 1]]);
+    let i = order.reduce((best, s, k) => (Math.abs(limits[s] - h) < Math.abs(limits[order[best]] - h) ? k : best), 0);
+    if (v < -0.45) i = Math.min(order.length - 1, order.indexOf(snap) + 1);   // geste vif vers le haut
+    if (v > 0.45) i = Math.max(0, order.indexOf(snap) - 1);                   // geste vif vers le bas
+    snap = order[i];
+    apply();
+  }
+  function onGrip(e) {
+    if (!e.target.closest('.grip') || !mobile.matches) return;
+    snap = snap === 'full' ? 'half' : 'full';
+    apply();
+  }
+  function onWheel(e) {             // petite fenêtre d'ordinateur : la molette agrandit la fiche
+    if (mobile.matches && snap !== 'full' && e.deltaY > 0) { snap = 'full'; apply(); }
+  }
+
+  // Le contenu change (horaires chargés, liste de trajets…) : on réajuste sans à-coup.
+  let raf = 0;
+  const watch = new MutationObserver(() => {
+    if (drag) return;
+    cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(() => apply());
+  });
+  watch.observe(node, { childList: true, subtree: true, characterData: true });
+  const onResize = () => apply(false);
+
+  node.addEventListener('touchstart', onStart, { passive: true });
+  node.addEventListener('touchmove', onMove, { passive: false });
+  node.addEventListener('touchend', onEnd);
+  node.addEventListener('touchcancel', onEnd);
+  node.addEventListener('click', onGrip);
+  node.addEventListener('wheel', onWheel, { passive: true });
+  window.addEventListener('resize', onResize);
+  mobile.addEventListener('change', onResize);
+  requestAnimationFrame(() => apply(false));
+
+  return {
+    update(p = {}) {
+      onDismiss = p.onDismiss;
+      if (p.key !== key) { key = p.key; snap = 'half'; apply(); }
+    },
+    destroy() {
+      watch.disconnect();
+      cancelAnimationFrame(raf);
+      window.removeEventListener('resize', onResize);
+      mobile.removeEventListener('change', onResize);
+    }
+  };
+}
