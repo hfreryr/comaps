@@ -1,4 +1,5 @@
 // Recherche de lieux (Photon) et détails d'un lieu (OpenStreetMap).
+import { kindOf, expectsHours, practical } from './placeinfo.js';
 // Prototype : serveurs publics, à remplacer par des instances auto-hébergées.
 
 const PHOTON = 'https://photon.komoot.io/api/';
@@ -99,6 +100,11 @@ export async function details(place, signal) {
     phone: t.phone || t['contact:phone'],
     website: t.website || t['contact:website'],
     wheelchair: t.wheelchair,
-    checkDate: t.check_date || t['check_date:opening_hours']
+    checkDate: t.check_date || t['check_date:opening_hours'],
+    kind: kindOf(t),
+    expectsHours: expectsHours(t),
+    practical: practical(t),
+    wikidata: t.wikidata,
+    wikipedia: t.wikipedia
   };
 }

@@ -6,6 +6,7 @@
   import { search, details, reverse, reverseAddress, typeLabel, PARIS } from '#lib/places.js';
   import { hoursStatus, hoursTable } from '#lib/hours.js';
   import { draggable } from '#lib/sheet.js';
+  import { wikiInfo } from '#lib/placeinfo.js';
   import { mapStyle, provideImage, osmRef, FAMILIES, DARK_LAND } from '#lib/mapstyle.js';
   import { streetRoute, transitRoutes, departures, MODE_NAMES, fmtDuration, fmtTime, fmtWait, fmtDistance } from '#lib/routing.js';
 
@@ -70,6 +71,8 @@
   let place = $state(null);
   let info = $state(null);
   let showWeek = $state(false);
+  let wiki = $state(null);           // extrait Wikipédia et photo Commons
+  let moreText = $state(false);
   let deps = $state(null);           // prochains passages d'une station : { status, data? }
   let now = $state(Date.now());
   let locating = $state(false);
@@ -143,6 +146,12 @@
     map.once('load', () => {
       document.querySelector('.maplibregl-ctrl-attrib')?.classList.remove('maplibregl-compact-show');
       if (fresh) startupLocate();
+      // Lien partagé vers un lieu (…#carte=…&lieu=node/123) : on rouvre sa fiche.
+      const shared = /[#&]lieu=(node|way|relation)\/(\d+)/.exec(location.hash);
+      if (shared) {
+        const c = map.getCenter();
+        openPlace({ id: `${shared[1]}${shared[2]}`, osmType: shared[1], osmId: Number(shared[2]), name: '', type: '', address: '', lat: c.lat, lon: c.lng });
+      }
     });
     map.on('click', onMapClick);
     // Appui long (ou clic droit) : adresse du point, même si une fiche est ouverte.
@@ -371,9 +380,11 @@
   }
 
   async function openPlace(p) {
-    remember(p);
+    if (p.name) remember(p);
     place = p;
     info = null;
+    wiki = null;
+    moreText = false;
     deps = null;
     showWeek = false;
     focused = false;
@@ -382,6 +393,33 @@
     frame(p.lon, p.lat);
     if (STATION_TYPES.includes(p.type)) loadDepartures(p);
     try { info = await details(p); } catch { info = {}; }
+    if (place?.id !== p.id) return;
+    // Lien partagé : on ne connaissait que l'identifiant du lieu, on récupère son nom.
+    if (!p.name && info.name) { place = { ...place, name: info.name, type: info.kind || place.type }; remember(place); }
+    if (info.wikidata || info.wikipedia) {
+      const w = await wikiInfo(info).catch(() => null);
+      if (place?.id === p.id) wiki = w;
+    }
+  }
+
+  // Temps de marche estimé sur le téléphone (distance à vol d'oiseau × 1,3, à 4,8 km/h) : rien n'est envoyé.
+  const walkEta = $derived.by(() => {
+    if (!me || !place) return null;
+    const m = dist(me.lat, me.lon, place.lat, place.lon) * 1.3;
+    if (m < 60) return null;
+    const min = Math.round(m / 80);
+    return min <= 45 ? `≈ ${min} min à pied` : `≈ ${fmtDistance(m)}`;   // (texte complet pour l’accessibilité)
+  });
+
+  // Partager : lien qui rouvre directement la fiche du lieu (feuille de partage du téléphone, sinon copie).
+  async function sharePlace() {
+    const u = new URL(location.href);
+    u.hash = `carte=17/${place.lat.toFixed(5)}/${place.lon.toFixed(5)}` + (place.osmType ? `&lieu=${place.osmType}/${place.osmId}` : '&point=1');
+    const data = { title: place.name, text: place.name, url: u.toString() };
+    try {
+      if (navigator.share) await navigator.share(data);
+      else { await navigator.clipboard.writeText(data.url); say('Lien copié'); }
+    } catch { /* partage annulé */ }
   }
 
   // Prochains passages d'une station, rafraîchis toutes les 30 s tant que la fiche est ouverte.
@@ -958,6 +996,9 @@
   {:else if place && !directions}
     <section class="sheet" aria-label={place.name} use:draggable={{ key: place.id, onDismiss: closePlace }}>
       <button class="grip" aria-label="Agrandir la fiche"></button>
+      <button class="share" onclick={sharePlace} aria-label="Partager ce lieu">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5v11M8 7.5l4-4 4 4M6 11.5H5v8h14v-8h-1" /></svg>
+      </button>
       <button class="close" onclick={closePlace} aria-label="Fermer la fiche">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" /></svg>
       </button>
@@ -965,7 +1006,7 @@
       <h1>{title}</h1>
       <p class="kind">{isAddress
         ? (place.name.split(',').slice(1).join(',').trim() || place.address || 'Adresse')
-        : [stationKind || place.type, info?.cuisine && info.cuisine.split(';')[0].replace(/_/g, ' ')].filter(Boolean).join(' · ') || 'Lieu'}</p>
+        : [stationKind || info?.kind || place.type, info?.cuisine && info.cuisine.split(';')[0].replace(/_/g, ' ')].filter(Boolean).join(' · ') || 'Lieu'}</p>
       {#if info === null}
         <p class="status muted">Chargement…</p>
       {:else if status}
@@ -975,7 +1016,7 @@
       <div class="actions">
         <button class="action primary" onclick={startDirections}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8 21.2 12 12 21.2 2.8 12z" class="solid" /><path d="M9.5 14.5v-2.2a1.5 1.5 0 0 1 1.5-1.5h4M13 8.8l2 2-2 2" class="on-solid" /></svg>
-          Itinéraire
+          <span class="act-label">Itinéraire{#if walkEta}<small aria-label={walkEta}>{walkEta.replace(' à pied', '')}</small>{/if}</span>
         </button>
         <button class="action" class:saved={isFav} onclick={toggleFavorite} aria-pressed={isFav}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.3l-1.3-1.2C6 14.9 3 12.2 3 8.9 3 6.2 5.1 4 7.8 4c1.5 0 3 .7 4.2 1.9C13.2 4.7 14.7 4 16.2 4 18.9 4 21 6.2 21 8.9c0 3.3-3 6-7.7 10.2z" /></svg>
@@ -994,6 +1035,21 @@
           </a>
         {/if}
       </div>
+
+      {#if wiki?.photo}
+        <figure class="photo">
+          <img src={wiki.photo.src} alt={title} loading="lazy" />
+          <figcaption><a href={wiki.photo.page} target="_blank" rel="noopener">Photo : {wiki.photo.credit || 'Wikimedia Commons'} · Wikimedia Commons</a></figcaption>
+        </figure>
+      {/if}
+      {#if wiki?.extract}
+        <div class="about">
+          <h2>Informations</h2>
+          <p class:clamped={!moreText}>{wiki.extract}</p>
+          {#if !moreText && wiki.extract.length > 180}<button class="link more" onclick={() => (moreText = true)}>Plus</button>{/if}
+          <p class="credit">Plus d'infos sur <a href={wiki.url} target="_blank" rel="noopener">Wikipédia</a></p>
+        </div>
+      {/if}
 
       {#if isStation}
         <div class="deps" aria-live="polite">
@@ -1044,7 +1100,7 @@
               </tbody></table>
             </li>
           {/if}
-        {:else if info && !isAddress && !isStation && place.type !== 'Rue'}
+        {:else if info?.expectsHours && !isStation}
           <li class="row muted">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></svg>
             <span>Horaires non renseignés</span>
@@ -1062,6 +1118,18 @@
             <a class="row-link" href={href(info.website)} target="_blank" rel="noopener">{host(info.website)}</a>
           </li>
         {/if}
+        {#each info?.practical || [] as d}
+          <li class="row">
+            {#if d.icon === 'wheelchair'}
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="4.5" r="1.8" /><path d="M11 7.5v6h5l2 5M11 10h4M8.5 11.2a5 5 0 1 0 6.3 6.3" /></svg>
+            {:else if d.icon === 'ticket'}
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16v3a2 2 0 0 0 0 4v3H4v-3a2 2 0 0 0 0-4z" /><path d="M14 7v10" stroke-dasharray="2 2" /></svg>
+            {:else}
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 20.5h17M5 20.5v-9M19 20.5v-9M9 20.5v-9M15 20.5v-9M3.5 11.5h17L12 4z" /></svg>
+            {/if}
+            <span>{d.text}</span>
+          </li>
+        {/each}
       </ul>
       {#if info?.checkDate}
         <p class="fresh">Informations vérifiées le {new Date(info.checkDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
@@ -1318,6 +1386,25 @@
     border: 0; background: var(--fill); cursor: pointer; display: grid; place-items: center; color: var(--muted);
   }
   .close svg { width: 16px; height: 16px; stroke-width: 2.4; }
+  .share {
+    position: absolute; top: 14px; right: 54px; width: 32px; height: 32px; border-radius: 50%;
+    border: 0; background: var(--fill); cursor: pointer; display: grid; place-items: center; color: var(--muted);
+  }
+  .share svg { width: 17px; height: 17px; stroke-width: 2.1; }
+  .share ~ h1 { margin-right: 88px; }
+  .act-label { display: flex; flex-direction: column; align-items: center; line-height: 1.15; }
+  .act-label small { font-size: 11.5px; font-weight: 500; opacity: 0.9; margin-top: 1px; }
+  .photo { margin: 16px 0 0; }
+  .photo img { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; border-radius: 14px; background: var(--fill); display: block; }
+  .photo figcaption { font-size: 11.5px; color: var(--muted); margin-top: 5px; }
+  .photo figcaption a { color: inherit; text-decoration: none; }
+  .about { margin-top: 18px; }
+  .about h2 { font-size: 17px; font-weight: 700; margin: 0 0 6px; }
+  .about p { margin: 0; font-size: 15px; line-height: 1.45; }
+  .about p.clamped { display: -webkit-box; -webkit-line-clamp: 4; line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+  .about .more { font-weight: 700; margin-top: 2px; }
+  .about .credit { margin-top: 6px; }
+  .about .credit a { color: var(--accent); text-decoration: none; }
   h1 { font-size: 24px; line-height: 1.2; font-weight: 700; letter-spacing: -0.02em; margin: 2px 44px 2px 0; text-wrap: balance; }
   .kind { margin: 0; color: var(--muted); font-size: 15px; }
   .kind::first-letter { text-transform: uppercase; }
