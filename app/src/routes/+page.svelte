@@ -169,7 +169,7 @@
     { id: 'car', label: 'Voiture' }
   ];
   const WALK_COLOR = '#2A5BD7';
-  const BIKE_COLOR = '#1E8E3E';
+  const BIKE_COLOR = WALK_COLOR;   // une seule couleur pour « mon itinéraire », comme Plans
 
   let mapEl;
   let map;
@@ -425,7 +425,7 @@
       const sel = opts[pickedStreet] || r;
       // variantes en gris dessous (touchables), le trajet choisi en couleur par-dessus
       opts.forEach((o, i) => { if (o !== sel) feats.push({ ...line(o.coords, 'alt', '#A3ADBA', '#7F8A98'), properties: { kind: 'alt', color: '#A3ADBA', edge: '#7F8A98', i } }); });
-      feats.push(mode === 'bike' ? line(sel.coords, 'bike', BIKE_COLOR, '#13612A') : line(sel.coords, mode, WALK_COLOR, '#1B3F9E'));
+      feats.push(mode === 'bike' ? line(sel.coords, 'bike', BIKE_COLOR, '#1B3F9E') : line(sel.coords, mode, WALK_COLOR, '#1B3F9E'));
     } else if (r && mode === 'transit' && r[picked]) {
       for (const leg of r[picked].legs) {
         if (leg.coords.length < 2) continue;
@@ -1331,7 +1331,7 @@
       map.getSource('route-tags')?.setData(empty());
       // pendant le trajet, seul l'itinéraire choisi reste sur la carte
       map.getSource('route')?.setData({ type: 'FeatureCollection', features: [line(option.coords, mode,
-        mode === 'bike' ? BIKE_COLOR : WALK_COLOR, mode === 'bike' ? '#13612A' : '#1B3F9E')] });
+        mode === 'bike' ? BIKE_COLOR : WALK_COLOR, mode === 'bike' ? '#1B3F9E' : '#1B3F9E')] });
     }
     nav = { ...base, kind, mode, option, s: 0, k: 0, off: 0, arrived: false, startedAt: Date.now() };
     navFollow = true;
@@ -1419,7 +1419,7 @@
       offCount = 0;
       say('Nouvel itinéraire');
       speak('Nouvel itinéraire. ' + (route.steps[0]?.speak || ''));
-      map.getSource('route')?.setData({ type: 'FeatureCollection', features: [line(route.coords, nav.mode, nav.mode === 'bike' ? BIKE_COLOR : WALK_COLOR, nav.mode === 'bike' ? '#13612A' : '#1B3F9E')] });
+      map.getSource('route')?.setData({ type: 'FeatureCollection', features: [line(route.coords, nav.mode, nav.mode === 'bike' ? BIKE_COLOR : WALK_COLOR, nav.mode === 'bike' ? '#1B3F9E' : '#1B3F9E')] });
     } catch { /* on réessaiera au prochain écart */ }
     rerouting = false;
   }
