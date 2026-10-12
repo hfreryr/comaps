@@ -1329,8 +1329,17 @@
           meMarker.setLngLat([me.lon, me.lat]).addTo(map);
           resolve(me);
         },
-        reject,
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+        (err) => {
+          // délai dépassé en haute précision (intérieur, GPS froid) : on retente avec la position approximative
+          if (err.code !== 3) return reject(err);
+          navigator.geolocation.getCurrentPosition(({ coords }) => {
+            me = { label: 'Votre position', lat: coords.latitude, lon: coords.longitude, isMe: true };
+            if (!meMarker) { const el = document.createElement('div'); el.className = 'me'; meMarker = new maplibregl.Marker({ element: el }); }
+            meMarker.setLngLat([me.lon, me.lat]).addTo(map);
+            resolve(me);
+          }, reject, { enableHighAccuracy: false, timeout: 15000, maximumAge: 300000 });
+        },
+        { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 }
       );
     });
   }
@@ -1349,13 +1358,27 @@
     } catch { /* on reste sur Paris */ }
   }
 
+  // Un message qui dit la vraie cause (refus, page non sécurisée, signal introuvable, délai dépassé)
+  function locError(e) {
+    if (!window.isSecureContext) return 'Localisation impossible : la page n\'est pas sécurisée. Ouvrez https://untrackedmaps.app.';
+    if (e?.code === 1) {
+      const app = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+      return app
+        ? 'Localisation refusée pour cette app. Supprimez-la de l\'écran d\'accueil, réinstallez-la depuis Safari, puis touchez « Autoriser ».'
+        : 'Localisation refusée. Autorisez-la dans les réglages du navigateur.';
+    }
+    if (e?.code === 3) return 'Position pas encore trouvée (délai dépassé). Réessayez, idéalement près d\'une fenêtre.';
+    if (e?.code === 2) return 'Position introuvable : vérifiez que le Service de localisation du téléphone est activé.';
+    return 'Localisation indisponible sur cet appareil.';
+  }
+
   async function locate() {
     locating = true;
     try {
       const p = await getPosition();
       map.flyTo({ center: [p.lon, p.lat], zoom: 16, duration: 800 });
-    } catch {
-      say('Localisation refusée. Autorisez-la dans les réglages du navigateur.');
+    } catch (e) {
+      say(locError(e), { label: 'Réessayer', run: locate });
     } finally {
       locating = false;
     }
@@ -1441,7 +1464,7 @@
   function useMyPosition() {
     editing = null;
     getPosition().then((p) => { from = p; computeRoutes(); })
-      .catch(() => say('Localisation refusée. Choisissez un point de départ.'));
+      .catch((e) => say(`${locError(e)} En attendant, choisissez un point de départ.`));
   }
 
   function swap() {
