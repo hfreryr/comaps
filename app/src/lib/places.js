@@ -23,6 +23,7 @@ const TYPES = {
 };
 
 export function typeLabel(key, value) {
+  if (key === 'railway' && value === 'station') return 'Station';
   return TYPES[value] || (key === 'highway' ? 'Rue' : key === 'place' ? 'Lieu' : null);
 }
 
@@ -56,6 +57,15 @@ export async function search(query, near = PARIS, signal) {
       lat, lon
     };
   });
+}
+
+/** Adresse la plus proche d'un point (pour un point choisi sur la carte). */
+export async function reverse(lat, lon) {
+  const res = await fetch(`https://photon.komoot.io/reverse?lat=${lat}&lon=${lon}&lang=fr&limit=1`);
+  if (!res.ok) return null;
+  const p = (await res.json()).features?.[0]?.properties;
+  if (!p) return null;
+  return p.name && !p.housenumber ? p.name : address(p) || p.name || null;
 }
 
 export async function details(place, signal) {

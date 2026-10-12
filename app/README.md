@@ -13,6 +13,17 @@ npm run dev      # développement
 npm run build    # site statique dans app/build/
 ```
 
+## Couches maison (`static/data/`)
+
+Générées depuis l'extrait OpenStreetMap de Paris (`data/paris.osm.pbf`) :
+
+```bash
+python app/scripts/build_overlays.py data/paris.osm.pbf
+```
+
+- `landmarks.geojson` : les 900 lieux les plus connus (monuments, musées, parcs, gares, hôpitaux), classés par notoriété (nombre de traductions du nom + Wikidata). Affichés en vue large.
+- `transit-lines.geojson` : lignes de métro, RER et tram à leurs couleurs officielles (mode « Transports »).
+
 ## Briques utilisées (prototype)
 
 | Brique | Service | Remarque |

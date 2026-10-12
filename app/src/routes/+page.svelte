@@ -3,7 +3,7 @@
   import * as maplibregl from 'maplibre-gl';
   import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
   import 'maplibre-gl/dist/maplibre-gl.css';
-  import { search, details, typeLabel, PARIS } from '#lib/places.js';
+  import { search, details, reverse, typeLabel, PARIS } from '#lib/places.js';
   import { hoursStatus, hoursTable } from '#lib/hours.js';
   import { mapStyle, provideImage, osmRef, FAMILIES } from '#lib/mapstyle.js';
   import { streetRoute, transitRoutes, MODE_NAMES, fmtDuration, fmtTime, fmtDistance } from '#lib/routing.js';
@@ -58,6 +58,9 @@
   let fieldEl = $state();
   let routes = $state({ walk: null, bike: null, transit: null }); // { status, data?, error? }
   let picked = $state(0);            // proposition de transport choisie
+  let mapMode = $state('plan');      // 'plan' | 'transit'
+  let showModes = $state(false);
+  let lastEdit = { which: null, at: 0 }; // champ quitté juste avant un toucher sur la carte
 
   const status = $derived(info?.hours ? hoursStatus(info.hours, place.lat, place.lon) : null);
   const week = $derived(showWeek && info?.hours ? hoursTable(info.hours, place.lat, place.lon) : null);
@@ -85,7 +88,7 @@
       addRouteLayers();
     });
     map.on('click', onMapClick);
-    for (const id of ['poi', 'poi-other', 'poi-hit', 'metro']) {
+    for (const id of ['poi', 'poi-other', 'poi-hit', 'landmark', 'metro']) {
       map.on('mouseenter', id, () => (map.getCanvas().style.cursor = 'pointer'));
       map.on('mouseleave', id, () => (map.getCanvas().style.cursor = ''));
     }
@@ -96,19 +99,24 @@
   function addRouteLayers() {
     map.addSource('route', { type: 'geojson', data: empty() });
     const before = 'water-name-point';
-    map.addLayer({ id: 'route-case', type: 'line', source: 'route', filter: ['!=', ['get', 'kind'], 'walk'],
+    const width = (a, b) => ['interpolate', ['exponential', 1.4], ['zoom'], 12, a, 18, b];
+    // Trajets à pied, à vélo et en transport : trait plein, liseré foncé puis bord blanc.
+    map.addLayer({ id: 'route-halo', type: 'line', source: 'route', filter: ['!=', ['get', 'kind'], 'transfer'],
       layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: { 'line-color': '#FFFFFF', 'line-width': ['interpolate', ['linear'], ['zoom'], 12, 7, 18, 14] } }, before);
-    map.addLayer({ id: 'route-line', type: 'line', source: 'route', filter: ['!=', ['get', 'kind'], 'walk'],
+      paint: { 'line-color': '#FFFFFF', 'line-width': width(9, 17) } }, before);
+    map.addLayer({ id: 'route-case', type: 'line', source: 'route', filter: ['!=', ['get', 'kind'], 'transfer'],
       layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: { 'line-color': ['get', 'color'], 'line-width': ['interpolate', ['linear'], ['zoom'], 12, 4.5, 18, 9] } }, before);
-    map.addLayer({ id: 'route-walk', type: 'line', source: 'route', filter: ['==', ['get', 'kind'], 'walk'],
+      paint: { 'line-color': ['get', 'edge'], 'line-width': width(6.5, 13) } }, before);
+    map.addLayer({ id: 'route-line', type: 'line', source: 'route', filter: ['!=', ['get', 'kind'], 'transfer'],
       layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: { 'line-color': ['get', 'color'], 'line-width': ['interpolate', ['linear'], ['zoom'], 12, 4, 18, 8],
-               'line-dasharray': [0, 1.8] } }, before);
+      paint: { 'line-color': ['get', 'color'], 'line-width': width(4.5, 9.5) } }, before);
+    // Correspondances à pied dans un trajet en transport : points discrets.
+    map.addLayer({ id: 'route-walk', type: 'line', source: 'route', filter: ['==', ['get', 'kind'], 'transfer'],
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-color': '#6F7A88', 'line-width': width(4, 7), 'line-dasharray': [0, 1.7] } }, before);
     map.addSource('route-ends', { type: 'geojson', data: empty() });
     map.addLayer({ id: 'route-start', type: 'circle', source: 'route-ends',
-      paint: { 'circle-radius': 6.5, 'circle-color': '#FFFFFF', 'circle-stroke-color': '#1D1F22', 'circle-stroke-width': 3 } });
+      paint: { 'circle-radius': 7.5, 'circle-color': '#2A5BD7', 'circle-stroke-color': '#FFFFFF', 'circle-stroke-width': 3.5 } });
   }
   const empty = () => ({ type: 'FeatureCollection', features: [] });
 
@@ -118,11 +126,11 @@
     const feats = [];
     const r = current?.status === 'ok' ? current.data : null;
     if (r && mode !== 'transit') {
-      feats.push(line(r.coords, mode === 'walk' ? 'walk' : 'bike', mode === 'walk' ? WALK_COLOR : BIKE_COLOR));
+      feats.push(mode === 'walk' ? line(r.coords, 'walk', WALK_COLOR, '#1B3F9E') : line(r.coords, 'bike', BIKE_COLOR, '#13612A'));
     } else if (r && mode === 'transit' && r[picked]) {
       for (const leg of r[picked].legs) {
         if (leg.coords.length < 2) continue;
-        feats.push(leg.mode === 'WALK' ? line(leg.coords, 'walk', '#7C8794') : line(leg.coords, 'transit', leg.color));
+        feats.push(leg.mode === 'WALK' ? line(leg.coords, 'transfer', '#6F7A88') : line(leg.coords, 'transit', leg.color, shade(leg.color)));
       }
     }
     src.setData({ type: 'FeatureCollection', features: feats });
@@ -130,7 +138,26 @@
       { type: 'Feature', geometry: { type: 'Point', coordinates: [from.lon, from.lat] }, properties: {} }] } : empty());
     if (feats.length) fitTo(feats.flatMap((f) => f.geometry.coordinates));
   }
-  const line = (coords, kind, color) => ({ type: 'Feature', properties: { kind, color }, geometry: { type: 'LineString', coordinates: coords } });
+  const line = (coords, kind, color, edge = color) => ({ type: 'Feature', properties: { kind, color, edge }, geometry: { type: 'LineString', coordinates: coords } });
+  // Teinte plus foncée d'une couleur, pour le liseré d'un trait.
+  function shade(hex, k = 0.7) {
+    const n = parseInt(hex.slice(1, 7), 16);
+    return '#' + [n >> 16, (n >> 8) & 255, n & 255].map((v) => Math.round(v * k).toString(16).padStart(2, '0')).join('');
+  }
+  // Pendant un itinéraire, les lieux de la carte s'effacent derrière le trajet.
+  function dimPlaces(on) {
+    for (const id of ['poi', 'poi-other', 'landmark', 'metro']) {
+      if (!map.getLayer(id)) continue;
+      map.setPaintProperty(id, 'icon-opacity', on ? 0.35 : 1);
+      map.setPaintProperty(id, 'text-opacity', on ? 0.35 : 1);
+    }
+  }
+  function setMapMode(m) {
+    mapMode = m;
+    showModes = false;
+    for (const id of ['transit-case', 'transit-line', 'transit-label']) map.setLayoutProperty(id, 'visibility', m === 'transit' ? 'visible' : 'none');
+    if (m === 'transit' && map.getZoom() > 14.5) map.easeTo({ zoom: 13.5, duration: 600 });
+  }
 
   function fitTo(coords) {
     const b = new maplibregl.LngLatBounds(coords[0], coords[0]);
@@ -145,18 +172,25 @@
   }
 
   function onMapClick(e) {
-    if (directions) return;
-    const f = map.queryRenderedFeatures(e.point, { layers: ['poi-hit', 'poi', 'poi-other', 'metro'] })[0];
+    if (directions) {
+      const which = editing || (Date.now() - lastEdit.at < 800 ? lastEdit.which : null);
+      if (which) pickOnMap(which, e.lngLat);
+      return;
+    }
+    showModes = false;
+    const f = map.queryRenderedFeatures(e.point, { layers: ['poi-hit', 'poi', 'poi-other', 'landmark', 'metro'] })[0];
     if (!f) { if (place) closePlace(); return; }
     openFeature(f);
   }
 
   function openFeature(f) {
-    const ref = osmRef(f.id);
+    const [osmType, osmId] = (f.properties.osm || '').split('/');
+    const ref = f.properties.osm ? { osmType, osmId: Number(osmId) } : osmRef(f.id);
     const [lon, lat] = f.geometry.coordinates;
     openPlace({
       id: String(f.id), ...ref, name: f.properties.name,
-      type: typeLabel('', f.properties.subclass) || typeLabel('', f.properties.class),
+      type: typeLabel('', f.properties.subclass) || typeLabel('', f.properties.class)
+        || { culture: 'Culture', sight: 'Lieu remarquable', nature: 'Parc ou jardin', health: 'Hôpital', train: 'Gare', shop: 'Grand magasin' }[f.properties.family],
       address: '', lat, lon
     });
   }
@@ -320,9 +354,28 @@
     }
   }
 
+  // Point choisi en touchant la carte : on retrouve l'adresse la plus proche.
+  async function pickOnMap(which, { lng, lat }) {
+    const pt = { label: 'Point sur la carte', lat, lon: lng };
+    if (which === 'from') from = pt; else { to = pt; placeMarker(lng, lat); }
+    editing = null;
+    lastEdit = { which: null, at: 0 };
+    fieldQuery = '';
+    results = [];
+    computeRoutes();
+    const label = await reverse(lat, lng).catch(() => null);
+    if (label) {
+      // (les objets d'état sont des copies : on compare les coordonnées)
+      const same = (q) => q && q.lat === lat && q.lon === lng;
+      if (which === 'from' && same(from)) from = { ...pt, label };
+      if (which === 'to' && same(to)) to = { ...pt, label };
+    }
+  }
+
   // ——— Itinéraire ———
   async function startDirections() {
     directions = true;
+    dimPlaces(true);
     to = { label: place.name, lat: place.lat, lon: place.lon };
     routes = { walk: null, bike: null, transit: null };
     picked = 0;
@@ -339,6 +392,7 @@
 
   function closeDirections() {
     directions = false;
+    dimPlaces(false);
     editing = null;
     routeCtrl?.abort();
     routes = { walk: null, bike: null, transit: null };
@@ -427,6 +481,9 @@
 
 {#snippet resultList()}
   <ul class="results" role="listbox">
+    {#if editing}
+      <li class="note map-hint">Ou touchez la carte pour choisir un point.</li>
+    {/if}
     {#if editing === 'from'}
       <li role="option" aria-selected="false">
         <button onmousedown={useMyPosition}>
@@ -497,7 +554,7 @@
               {#if editing === which}
                 <input id={`field-${which}`} bind:this={fieldEl} bind:value={fieldQuery} placeholder={ph} autocomplete="off"
                   aria-label={which === 'from' ? 'Départ' : 'Arrivée'} onkeydown={onKey}
-                  onblur={() => setTimeout(() => { if (editing === which && (which === 'from' ? from : to)) editing = null; }, 200)} />
+                  onblur={() => { lastEdit = { which, at: Date.now() }; setTimeout(() => { if (editing === which && (which === 'from' ? from : to)) editing = null; }, 250); }} />
               {:else}
                 <button class="field-btn" class:placeholder={!pt} onclick={() => editField(which)}>
                   {pt ? pt.label : ph}
@@ -531,6 +588,23 @@
     </header>
   {/if}
 
+  {#if !directions}
+    <div class="modes-ctl">
+      {#if showModes}
+        <div class="modes-pop" role="menu" aria-label="Type de carte">
+          <button role="menuitemradio" aria-checked={mapMode === 'plan'} class:on={mapMode === 'plan'} onclick={() => setMapMode('plan')}>
+            <span class="thumb plan" aria-hidden="true"></span>Plan
+          </button>
+          <button role="menuitemradio" aria-checked={mapMode === 'transit'} class:on={mapMode === 'transit'} onclick={() => setMapMode('transit')}>
+            <span class="thumb transit" aria-hidden="true"></span>Transports
+          </button>
+        </div>
+      {/if}
+      <button class="round-btn" onclick={() => (showModes = !showModes)} aria-label="Type de carte" aria-expanded={showModes}>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3.5 8.5 4.5L12 12.5 3.5 8z" /><path d="m3.5 12 8.5 4.5 8.5-4.5M3.5 16l8.5 4.5 8.5-4.5" /></svg>
+      </button>
+    </div>
+  {/if}
   <button class="locate" class:busy={locating} onclick={locate} aria-label="Me localiser">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 4 4 11l7 2 2 7z" class="solid" /></svg>
   </button>
@@ -853,6 +927,22 @@
     display: grid; place-items: center; cursor: pointer; color: var(--accent);
   }
   .routing .locate { display: none; }
+  .modes-ctl { position: absolute; z-index: 2; right: 12px; bottom: calc(110px + env(safe-area-inset-bottom)); display: grid; justify-items: end; gap: 10px; }
+  .round-btn {
+    width: 48px; height: 48px; border-radius: 50%; border: 0; background: var(--card); box-shadow: var(--shadow-float);
+    display: grid; place-items: center; cursor: pointer; color: var(--ink);
+  }
+  .round-btn svg { width: 22px; height: 22px; }
+  .modes-pop { display: flex; gap: 10px; padding: 12px; background: var(--card); border-radius: 18px; box-shadow: var(--shadow-float); }
+  .modes-pop button {
+    display: grid; justify-items: center; gap: 6px; border: 0; background: none; cursor: pointer; font-size: 13px; font-weight: 600; padding: 0;
+  }
+  .thumb { width: 76px; height: 54px; border-radius: 12px; border: 2px solid transparent; background-size: cover; }
+  .modes-pop .on .thumb { border-color: var(--accent); }
+  .modes-pop .on { color: var(--accent); }
+  .thumb.plan { background: linear-gradient(115deg, transparent 45%, #fff 45% 52%, transparent 52%), linear-gradient(25deg, transparent 60%, #fff 60% 66%, transparent 66%), radial-gradient(circle at 25% 70%, #d4ebcb 0 18%, transparent 19%), #f1eee8; }
+  .thumb.transit { background: linear-gradient(110deg, transparent 40%, #ffbe00 40% 46%, transparent 46%), linear-gradient(20deg, transparent 52%, #0055c8 52% 58%, transparent 58%), linear-gradient(160deg, transparent 62%, #e3051c 62% 68%, transparent 68%), linear-gradient(75deg, transparent 28%, #00643c 28% 34%, transparent 34%), #f1eee8; }
+  .map-hint { color: var(--accent); font-size: 14px; padding-top: 10px; padding-bottom: 6px; }
   .locate svg { width: 21px; height: 21px; }
   .locate.busy svg { animation: pulse 1s ease-in-out infinite; }
   @keyframes pulse { 50% { opacity: 0.35; } }
@@ -972,8 +1062,11 @@
 
   /* ——— Grand écran : panneaux à gauche ——— */
   @media (min-width: 768px) {
-    .top { padding: 16px 16px 0; width: min(calc(100vw - 32px), 760px); }
-    .search, .dir-card, .modes { width: 400px; }
+    /* Grand écran : raccourcis à droite de la recherche, sur une ou deux lignes, sans défilement. */
+    .top { padding: 16px 16px 0; display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px; right: 76px; }
+    .top.dir { flex-direction: column; flex-wrap: nowrap; right: auto; }
+    .search, .dir-card, .modes { width: 400px; flex: none; }
+    .chips { flex: 1; min-width: 0; flex-wrap: wrap; overflow: visible; margin: 0; padding: 6px 0 0; -webkit-mask-image: none; mask-image: none; }
     .sheet {
       left: 16px; right: auto; bottom: auto; top: 128px; width: 400px; max-height: calc(100vh - 150px);
       border-radius: 20px; padding: 18px 22px 22px; box-shadow: var(--shadow-float); animation-name: appear;
@@ -982,6 +1075,7 @@
     @keyframes appear { from { transform: translateY(-6px); opacity: 0; } }
     .grip { display: none; }
     .locate { bottom: 40px; right: 16px; }
+    .modes-ctl { bottom: 100px; right: 16px; }
   }
 
   @media (prefers-reduced-motion: reduce) {

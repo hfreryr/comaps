@@ -48,6 +48,8 @@ export const FAMILIES = {
   stay:    { color: '#9A55A0', icon: 'bed',      classes: ['hotel', 'hostel', 'guest_house', 'lodging', 'motel'] }
 };
 const OTHER = { color: '#7D838A', icon: 'dot' };
+const TRAIN = { color: '#2B4793', icon: 'train' };
+const LANDMARK_FAMILY = { culture: 'culture', sight: 'sight', nature: 'nature', health: 'health', shop: 'shop' };
 const ALL_CLASSES = [...new Set(Object.values(FAMILIES).flatMap((f) => f.classes))];
 
 export function familyOf(subclass) {
@@ -92,6 +94,8 @@ export function mapStyle(base = '') {
     version: 8,
     glyphs: `${base}fonts/{fontstack}/{range}.pbf`,
     sources: {
+      landmarks: { type: 'geojson', data: `${base}data/landmarks.geojson` },
+      transit: { type: 'geojson', data: `${base}data/transit-lines.geojson` },
       omt: { type: 'vector', url: 'https://tiles.openfreemap.org/planet',
         attribution: '<a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> © <a href="https://www.openmaptiles.org/" target="_blank" rel="noopener">OpenMapTiles</a> © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">contributeurs OpenStreetMap</a>' }
     },
@@ -137,12 +141,29 @@ export function mapStyle(base = '') {
         filter: ['==', ['get', 'admin_level'], 8],
         paint: { 'line-color': '#C9C3BA', 'line-width': 1, 'line-dasharray': [3, 2] } },
 
+      // Plan des transports : masqué par défaut, affiché par le bouton de modes.
+      { id: 'transit-case', type: 'line', source: 'transit', layout: { visibility: 'none', 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': '#FFFFFF', 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 3.5, 16, 9] } },
+      { id: 'transit-line', type: 'line', source: 'transit', layout: { visibility: 'none', 'line-cap': 'round', 'line-join': 'round',
+          'line-sort-key': ['match', ['get', 'mode'], 'rer', 2, 'metro', 1, 0] },
+        paint: { 'line-color': ['get', 'colour'],
+                 'line-width': ['interpolate', ['linear'], ['zoom'], 11, ['match', ['get', 'mode'], 'rer', 2.6, 1.8], 16, ['match', ['get', 'mode'], 'rer', 6.5, 5]] } },
+      { id: 'transit-label', type: 'symbol', source: 'transit', minzoom: 12.5,
+        layout: { visibility: 'none', 'symbol-placement': 'line', 'symbol-spacing': 500,
+                  'text-field': ['concat', ['match', ['get', 'mode'], 'metro', 'M', 'rer', 'RER ', 'tram', '', ''], ['get', 'ref']],
+                  'text-font': FONT.bold, 'text-size': 11, 'text-keep-upright': true },
+        paint: { 'text-color': ['get', 'colour'], 'text-halo-color': C.halo, 'text-halo-width': 2.2 } },
       ...['Point', 'LineString'].map((g) => ({
         id: `water-name-${g === 'Point' ? 'point' : 'line'}`, type: 'symbol', source: 'omt', 'source-layer': 'water_name',
         filter: ['==', ['geometry-type'], g],
         layout: { 'text-field': NAME, 'text-font': FONT.italic, 'text-size': zoom([12, 12, 16, 15]), 'text-letter-spacing': 0.08,
                   'symbol-placement': g === 'Point' ? 'point' : 'line' },
         paint: { 'text-color': C.waterLabel, 'text-halo-color': 'rgba(255,255,255,0.6)', 'text-halo-width': 1 } })),
+      { id: 'road-name-major', type: 'symbol', source: 'omt', 'source-layer': 'transportation_name', minzoom: 12.5, maxzoom: 14,
+        filter: ['match', ['get', 'class'], ['motorway', 'trunk', 'primary', 'secondary'], true, false],
+        layout: { 'symbol-placement': 'line', 'text-field': NAME, 'text-font': FONT.semibold, 'text-size': 9.5,
+                  'text-transform': 'uppercase', 'text-letter-spacing': 0.08, 'text-max-angle': 25, 'symbol-spacing': 400 },
+        paint: { 'text-color': '#8C9096', 'text-halo-color': C.halo, 'text-halo-width': 1.4 } },
       { id: 'road-name', type: 'symbol', source: 'omt', 'source-layer': 'transportation_name', minzoom: 14,
         filter: ['match', ['get', 'class'], ['motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'minor'], true, false],
         layout: { 'symbol-placement': 'line', 'text-field': NAME, 'text-font': FONT.regular,
@@ -151,14 +172,26 @@ export function mapStyle(base = '') {
         paint: { 'text-color': C.roadLabel, 'text-halo-color': C.halo, 'text-halo-width': 1.6 } },
 
       // Lieux : pastille colorée à pictogramme blanc, nom de la même teinte.
-      { id: 'poi', type: 'symbol', source: 'omt', 'source-layer': 'poi', minzoom: 14.5,
+      { id: 'poi', type: 'symbol', source: 'omt', 'source-layer': 'poi', minzoom: 15,
         filter: ['all', ['has', 'name'], ['match', ['get', 'subclass'], ALL_CLASSES, true, false],
                  ['<=', ['get', 'rank'], ['step', ['zoom'], 10, 15.5, 30, 16.3, 999]]],
         layout: { 'icon-image': POI_ICON, 'icon-size': zoom([14.5, 0.8, 17, 1]),
                   'text-field': NAME, 'text-font': FONT.semibold, 'text-size': 12, 'text-anchor': 'left',
                   'text-offset': [1.15, 0], 'text-max-width': 8, 'text-line-height': 1.15,
                   'text-optional': true, 'symbol-sort-key': ['get', 'rank'] },
-        paint: { 'text-color': POI_TEXT, 'text-halo-color': C.halo, 'text-halo-width': 1.6, 'icon-opacity': fade(14.5, 15) } },
+        paint: { 'text-color': POI_TEXT, 'text-halo-color': C.halo, 'text-halo-width': 1.6 } },
+      // Lieux remarquables (vue large) : les plus connus d'abord, de plus en plus nombreux en zoomant.
+      { id: 'landmark', type: 'symbol', source: 'landmarks', minzoom: 11.5, maxzoom: 15,
+        filter: ['<=', ['get', 'rank'], ['step', ['zoom'], 20, 12.5, 60, 13.5, 180, 14.2, 900]],
+        layout: { 'icon-image': ['match', ['get', 'family'], 'culture', 'poi-columns', 'sight', 'poi-star', 'nature', 'poi-tree',
+                                 'health', 'poi-cross', 'shop', 'poi-bag', 'train', 'poi-train', 'poi-dot'],
+                  'icon-size': zoom([11.5, 0.85, 14, 1]),
+                  'text-field': ['get', 'name'], 'text-font': FONT.semibold, 'text-size': zoom([11.5, 11, 14, 12.5]),
+                  'text-anchor': 'left', 'text-offset': [1.15, 0], 'text-max-width': 8, 'text-line-height': 1.1,
+                  'text-optional': false, 'symbol-sort-key': ['get', 'rank'] },
+        paint: { 'text-color': ['match', ['get', 'family'], 'culture', '#0E7681', 'sight', '#0E7681', 'nature', '#2F6E3F',
+                                'health', '#A8392F', 'shop', '#3253AA', 'train', '#2B4793', '#5F656C'],
+                 'text-halo-color': C.halo, 'text-halo-width': 1.6 } },
       // Autres lieux (banques, bureaux, services) : seulement de très près.
       { id: 'poi-other', type: 'symbol', source: 'omt', 'source-layer': 'poi', minzoom: 17.5,
         filter: ['all', ['has', 'name'], ['!', ['match', ['get', 'subclass'], ALL_CLASSES, true, false]],
@@ -209,6 +242,7 @@ const GLYPHS = {
   tree: 'M12 2.8 6.6 10h2.6l-3.7 5h5.3v5.2h2.4V15h5.3l-3.7-5h2.6z',
   cross: 'M9.6 4h4.8v5.6H20v4.8h-5.6V20H9.6v-5.6H4V9.6h5.6z',
   bed: 'M3 6h2v6.5h6V9h6.5a3.5 3.5 0 0 1 3.5 3.5V19h-2v-2.5H5V19H3zM8 8.4a1.9 1.9 0 1 1 0 3.8 1.9 1.9 0 0 1 0-3.8z',
+  train: 'M7.5 3h9A2.5 2.5 0 0 1 19 5.5v9a2.5 2.5 0 0 1-2.5 2.5h-9A2.5 2.5 0 0 1 5 14.5v-9A2.5 2.5 0 0 1 7.5 3zM7 6v4h10V6zm1.8 6.3a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 0 0 0-2.4zm6.4 0a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 0 0 0-2.4zM8 18h2l-1.5 3H6.5zm6 0h2l1.5 3h-2z',
   dot: 'M12 8.2a3.8 3.8 0 1 1 0 7.6 3.8 3.8 0 0 1 0-7.6z'
 };
 
@@ -262,7 +296,7 @@ export function provideImage(map, id) {
   }
   if (id.startsWith('poi-')) {
     const glyph = id.slice(4);
-    const fam = Object.values(FAMILIES).find((f) => f.icon === glyph) || OTHER;
+    const fam = glyph === 'train' ? TRAIN : Object.values(FAMILIES).find((f) => f.icon === glyph) || OTHER;
     const { data, pixelRatio } = poiImage(fam.color, glyph);
     map.addImage(id, data, { pixelRatio });
   }
