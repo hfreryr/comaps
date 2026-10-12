@@ -2,7 +2,7 @@
 
 Carte de Paris, recherche de lieux, fiche lieu avec horaires lisibles, raccourcis de catégories, itinéraires à pied, à vélo et en transports en commun.
 
-En ligne : https://hfreryr.github.io/comaps/
+En ligne : https://hfreryr.github.io/projet-paris/
 
 ## Lancer
 
