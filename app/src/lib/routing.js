@@ -70,7 +70,7 @@ export function decodePolyline(str, precision = 6) {
 
 /** À pied ou à vélo. @returns {{duration:number, distance:number, coords:number[][], steps:{text:string, distance:number}[]}} */
 export async function streetRoute(from, to, mode, signal) {
-  const costing = mode === 'bike' ? 'bicycle' : 'pedestrian';
+  const costing = mode === 'bike' ? 'bicycle' : mode === 'car' ? 'auto' : 'pedestrian';
   const body = {
     locations: [{ lat: from.lat, lon: from.lon }, { lat: to.lat, lon: to.lon }],
     costing,
@@ -86,7 +86,7 @@ export async function streetRoute(from, to, mode, signal) {
   return {
     duration: trip.summary.time,
     distance: trip.summary.length * 1000,
-    coords: smooth(decodePolyline(leg.shape, 6), mode === 'bike' ? 4 : 7),
+    coords: smooth(decodePolyline(leg.shape, 6), mode === 'walk' ? 7 : 4),
     steps: simplifySteps(leg.maneuvers)
   };
 }
@@ -116,6 +116,31 @@ function tidy(text) {
     .replace(/ (dans|sur) (Rue|Avenue|Boulevard|Place|Quai|Passage|Impasse|Cours|Square|Pont|Villa|Cité|Allée) /g,
       (_, __, type) => ` ${type.toLowerCase()} `)
     .replace(/\s+\./g, '.');
+}
+
+// ——— Trafic habituel (voiture) ———
+// Pas de trafic en temps réel (il faudrait suivre les téléphones). À la place : la part des rues
+// parisiennes embouteillées à ce jour et à cette heure, mesurée sur 13 mois par les capteurs de la
+// Ville de Paris (voir scripts/build_traffic.py). Le temps « route fluide » est allongé d'autant.
+// Coefficient provisoire, à caler en comparant une dizaine de trajets avec Google Maps.
+const SLOWDOWN = 2.4;          // 25 % de rues saturées → trajet ≈ 1,6 fois plus long
+const PARIS = { w: 2.224, e: 2.47, s: 48.815, n: 48.902 };
+const JOURS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
+let profile = null;
+
+export async function trafficEstimate(from, to, when = new Date()) {
+  profile ??= fetch(new URL('data/traffic-paris.json', location.href)).then((r) => r.json()).catch(() => null);
+  const p = await profile;
+  const parts = new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', weekday: 'long', hour: 'numeric', hourCycle: 'h23' }).formatToParts(when);
+  const jour = parts.find((x) => x.type === 'weekday').value;
+  const heure = Number(parts.find((x) => x.type === 'hour').value);
+  const share = p?.jours?.[jour]?.[heure];
+  if (share == null) return { factor: 1, label: null };
+  const inParis = (pt) => pt.lon > PARIS.w && pt.lon < PARIS.e && pt.lat > PARIS.s && pt.lat < PARIS.n;
+  const weight = (inParis(from) ? 0.5 : 0) + (inParis(to) ? 0.5 : 0);   // hors de Paris, on n'a pas de mesure
+  const factor = 1 + SLOWDOWN * share * weight;
+  const level = share < 0.06 ? 'fluide' : share < 0.15 ? 'modéré' : share < 0.22 ? 'chargé' : 'très chargé';
+  return { factor, share, label: weight ? `trafic habituel ${level} le ${jour} vers ${heure} h` : null };
 }
 
 /** Transports en commun : plusieurs propositions, triées par heure d'arrivée. */

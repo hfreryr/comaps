@@ -8,7 +8,7 @@
   import { draggable } from '#lib/sheet.js';
   import { wikiInfo } from '#lib/placeinfo.js';
   import { mapStyle, provideImage, osmRef, FAMILIES, DARK_LAND } from '#lib/mapstyle.js';
-  import { streetRoute, transitRoutes, departures, MODE_NAMES, fmtDuration, fmtTime, fmtWait, fmtDistance } from '#lib/routing.js';
+  import { streetRoute, transitRoutes, departures, trafficEstimate, MODE_NAMES, fmtDuration, fmtTime, fmtWait, fmtDistance } from '#lib/routing.js';
 
   const CATEGORIES = [
     { label: 'Restaurants', classes: ['restaurant', 'fast_food'], family: 'food' },
@@ -45,7 +45,8 @@
   const MODES = [
     { id: 'walk', label: 'À pied' },
     { id: 'bike', label: 'Vélo' },
-    { id: 'transit', label: 'Transports' }
+    { id: 'transit', label: 'Transports' },
+    { id: 'car', label: 'Voiture' }
   ];
   const WALK_COLOR = '#2A5BD7';
   const BIKE_COLOR = '#1E8E3E';
@@ -214,7 +215,7 @@
     const feats = [];
     const r = current?.status === 'ok' ? current.data : null;
     if (r && mode !== 'transit') {
-      feats.push(mode === 'walk' ? line(r.coords, 'walk', WALK_COLOR, '#1B3F9E') : line(r.coords, 'bike', BIKE_COLOR, '#13612A'));
+      feats.push(mode === 'bike' ? line(r.coords, 'bike', BIKE_COLOR, '#13612A') : line(r.coords, mode, WALK_COLOR, '#1B3F9E'));
     } else if (r && mode === 'transit' && r[picked]) {
       for (const leg of r[picked].legs) {
         if (leg.coords.length < 2) continue;
@@ -673,7 +674,7 @@
     routeCtrl = new AbortController();
     const signal = routeCtrl.signal;
     picked = 0;
-    routes = { walk: { status: 'loading' }, bike: { status: 'loading' }, transit: { status: 'loading' } };
+    routes = { walk: { status: 'loading' }, bike: { status: 'loading' }, transit: { status: 'loading' }, car: { status: 'loading' } };
     const run = async (id, fn) => {
       try {
         const data = await fn();
@@ -688,6 +689,11 @@
     run('walk', () => streetRoute(from, to, 'walk', signal));
     run('bike', () => streetRoute(from, to, 'bike', signal));
     run('transit', () => transitRoutes(from, to, signal));
+    run('car', async () => {
+      const r = await streetRoute(from, to, 'car', signal);
+      const t = await trafficEstimate(from, to);
+      return { ...r, freeDuration: r.duration, duration: r.duration * t.factor, traffic: t.label };
+    });
   }
 
   function chooseMode(m) {
@@ -717,6 +723,8 @@
 {#snippet modeIcon(id)}
   {#if id === 'walk'}
     <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="13" cy="4.5" r="1.9" class="solid" /><path d="m9.5 21 2.2-7 2.6 2.6V21M7.5 12.5 10 8.4l3.4.4 1.9 3 2.7 1.2M11.7 14l-.9-4.7" /></svg>
+  {:else if id === 'car'}
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 16.5V12l1.8-4.6A2 2 0 0 1 8.7 6h6.6a2 2 0 0 1 1.9 1.4L19 12v4.5" /><path d="M3.5 12.5h17v4.5h-17zM6 17v2.2M18 17v2.2" /><circle cx="7.5" cy="14.7" r=".9" class="solid" /><circle cx="16.5" cy="14.7" r=".9" class="solid" /></svg>
   {:else if id === 'bike'}
     <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5.8" cy="16" r="3.6" /><circle cx="18.2" cy="16" r="3.6" /><path d="m5.8 16 4-7.2h5.8L18.2 16M9.8 8.8l3.6 7.2H5.8M13.6 5.6h2.6" /></svg>
   {:else}
@@ -910,7 +918,7 @@
         <p class="empty">Pas de transport utile sur ce trajet : à pied, c'est {fmtDuration(routes.walk.data.duration)}.</p>
         <button class="retry" onclick={() => chooseMode('walk')}>Voir le trajet à pied</button>
       {:else if current.status === 'none'}
-        <p class="empty">Aucun itinéraire {mode === 'transit' ? 'en transports en commun' : mode === 'bike' ? 'à vélo' : 'à pied'} trouvé entre ces deux points.</p>
+        <p class="empty">Aucun itinéraire {mode === 'transit' ? 'en transports en commun' : mode === 'bike' ? 'à vélo' : mode === 'car' ? 'en voiture' : 'à pied'} trouvé entre ces deux points.</p>
       {:else if current.status === 'error'}
         <p class="empty">Le service d'itinéraire ne répond pas. Réessayez dans un instant.</p>
         <button class="retry" onclick={computeRoutes}>Réessayer</button>
@@ -919,6 +927,9 @@
         <div class="summary">
           <p class="big">{fmtDuration(r.duration)}</p>
           <p class="sub">{fmtDistance(r.distance)} · arrivée vers {arrival(r.duration)}</p>
+          {#if mode === 'car'}
+            <p class="traffic-note">{r.traffic ? `Estimation avec le ${r.traffic}` : 'Estimation sur route fluide'}, d'après les capteurs de la Ville de Paris. Pas de trafic en temps réel : nous ne suivons pas les téléphones.</p>
+          {/if}
         </div>
         <ol class="steps">
           {#each r.steps as s}
@@ -1310,13 +1321,14 @@
   .swap svg { width: 22px; height: 22px; color: var(--ink); }
   .dir-card .results { margin-top: 4px; }
 
-  .modes { display: flex; gap: 8px; }
+  .modes { display: flex; gap: 6px; }
   .mode {
-    flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    flex: 1; min-width: 0; display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 0 6px; white-space: nowrap;
     height: 40px; border: 0; border-radius: 20px; background: var(--card); box-shadow: var(--shadow-float);
     font-size: 14.5px; font-weight: 600; cursor: pointer; color: var(--ink); font-variant-numeric: tabular-nums;
   }
-  .mode svg { width: 20px; height: 20px; }
+  .mode svg { width: 19px; height: 19px; flex: none; }
+  @media (max-width: 400px) { .mode { font-size: 13.5px; } }
   .mode.on { background: var(--accent-btn); color: #fff; }
   .dots { display: inline-block; width: 22px; height: 6px; background: radial-gradient(circle, currentColor 2px, transparent 2.5px) 0 0 / 8px 6px repeat-x; opacity: 0.5; animation: pulse 1s infinite; }
 
@@ -1464,6 +1476,7 @@
   .step-dist { color: var(--muted); font-size: 14px; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .steps .arrive { font-weight: 600; border-bottom: 0; }
 
+  .traffic-note { font-size: 12.5px; color: var(--muted); margin: 6px 0 0; line-height: 1.4; }
   .options { list-style: none; margin: 0 -20px; padding: 0; }
   .options > li + li { border-top: 1px solid var(--line); }
   .option { display: grid; gap: 6px; width: 100%; border: 0; background: none; padding: 12px 20px; text-align: left; cursor: pointer; }

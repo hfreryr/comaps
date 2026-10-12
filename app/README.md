@@ -23,6 +23,7 @@ python app/scripts/build_overlays.py data/paris.osm.pbf
 
 - `landmarks.geojson` : ~7 300 lieux affichés jusqu'au zoom 18 : monuments, musées, parcs et gares, plus les adresses du quotidien (restaurants, cafés, boutiques, hôtels). Chaque lieu a un score de notoriété (traductions du nom, Wikidata, fiche OSM complète ; les enseignes de chaîne ne profitent pas de leurs traductions automatiques) et un **zoom d'apparition** `z`, calculé pour garder un écart régulier à l'écran (plus serré pour les lieux très connus). Au-delà du zoom 17, le fond de carte complète avec tous les lieux.
 - `hours.json` : horaires OSM des restaurants, cafés, bars, boulangeries, commerces alimentaires, pharmacies et musées (~12 500 lieux), indexés par identifiant de tuile, pour afficher « Ouvert / Fermé » dans les listes sans interroger OSM lieu par lieu.
+- `traffic-paris.json` : trafic habituel de Paris, généré par `python app/scripts/build_traffic.py` depuis les comptages routiers permanents de la Ville de Paris (ODbL) : pour chaque jour et chaque heure, la part des tronçons en circulation dense ou saturée. Sert à estimer les temps en voiture (« trafic habituel »), sans trafic en temps réel ni suivi des téléphones. Coefficient de ralentissement provisoire dans `src/lib/routing.js`, à caler sur des comparaisons avec Google Maps.
 - `transit-lines.geojson` : lignes de métro, RER et tram à leurs couleurs officielles (mode « Transports »).
 
 ## Briques utilisées (prototype)
