@@ -24,3 +24,6 @@ build/
 # Système
 .DS_Store
 Thumbs.db
+
+# App
+app/build/
