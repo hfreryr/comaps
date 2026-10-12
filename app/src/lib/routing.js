@@ -119,13 +119,12 @@ function tidy(text) {
 }
 
 // ——— Trafic habituel (voiture) ———
-// Pas de trafic en temps réel (il faudrait suivre les téléphones). À la place : la part des rues
-// parisiennes embouteillées à ce jour et à cette heure, mesurée sur 13 mois par les capteurs de la
-// Ville de Paris (voir scripts/build_traffic.py). Le temps « route fluide » est allongé d'autant.
-// Coefficient provisoire, à caler en comparant une dizaine de trajets avec Google Maps.
-const SLOWDOWN = 2.4;          // 25 % de rues saturées → trajet ≈ 1,6 fois plus long
+// Pas de trafic en temps réel (il faudrait suivre les téléphones). À la place : la vitesse mesurée
+// sur 13 mois par les capteurs de la Ville de Paris, à ce jour et à cette heure, comparée à l'heure
+// la plus rapide de la semaine (voir scripts/build_traffic.py). Ce rapport est appliqué tel quel au
+// temps « route libre » calculé par Valhalla : aucun coefficient choisi à la main.
+// Seule hypothèse restante : que le temps Valhalla corresponde bien à la circulation de nuit.
 const PARIS = { w: 2.224, e: 2.47, s: 48.815, n: 48.902 };
-const JOURS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
 let profile = null;
 
 export async function trafficEstimate(from, to, when = new Date()) {
@@ -134,13 +133,13 @@ export async function trafficEstimate(from, to, when = new Date()) {
   const parts = new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', weekday: 'long', hour: 'numeric', hourCycle: 'h23' }).formatToParts(when);
   const jour = parts.find((x) => x.type === 'weekday').value;
   const heure = Number(parts.find((x) => x.type === 'hour').value);
-  const share = p?.jours?.[jour]?.[heure];
-  if (share == null) return { factor: 1, label: null };
+  const measured = p?.jours?.[jour]?.ralentissement?.[heure];
+  if (measured == null) return { factor: 1, label: null };
   const inParis = (pt) => pt.lon > PARIS.w && pt.lon < PARIS.e && pt.lat > PARIS.s && pt.lat < PARIS.n;
-  const weight = (inParis(from) ? 0.5 : 0) + (inParis(to) ? 0.5 : 0);   // hors de Paris, on n'a pas de mesure
-  const factor = 1 + SLOWDOWN * share * weight;
-  const level = share < 0.06 ? 'fluide' : share < 0.15 ? 'modéré' : share < 0.22 ? 'chargé' : 'très chargé';
-  return { factor, share, label: weight ? `trafic habituel ${level} le ${jour} vers ${heure} h` : null };
+  const weight = (inParis(from) ? 0.5 : 0) + (inParis(to) ? 0.5 : 0);   // hors de Paris, pas de mesure : on n'allonge pas
+  const factor = 1 + (measured - 1) * weight;
+  const level = measured < 1.2 ? 'fluide' : measured < 1.45 ? 'modéré' : measured < 1.7 ? 'chargé' : 'très chargé';
+  return { factor, measured, label: weight ? `trafic habituel ${level} le ${jour} vers ${heure} h` : null };
 }
 
 /** Transports en commun : plusieurs propositions, triées par heure d'arrivée. */

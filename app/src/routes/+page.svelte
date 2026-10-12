@@ -1242,9 +1242,9 @@
   .top {
     position: absolute; z-index: 3; left: 0; right: 0;
     top: env(safe-area-inset-top); padding: 10px 12px 0; pointer-events: none;
-    display: grid; gap: 10px;
+    display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px;   /* minmax(0) : le contenu ne peut pas élargir la colonne */
   }
-  .top > * { pointer-events: auto; }
+  .top > * { pointer-events: auto; min-width: 0; }
   .search {
     max-width: 440px;
     background: var(--card); border-radius: 28px; box-shadow: var(--shadow-float);
@@ -1323,12 +1323,12 @@
 
   .modes { display: flex; gap: 6px; }
   .mode {
-    flex: 1; min-width: 0; display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 0 6px; white-space: nowrap;
+    flex: 1; min-width: 0; display: inline-flex; align-items: center; justify-content: center; gap: 3px; padding: 0 4px; white-space: nowrap; overflow: hidden;
     height: 40px; border: 0; border-radius: 20px; background: var(--card); box-shadow: var(--shadow-float);
     font-size: 14.5px; font-weight: 600; cursor: pointer; color: var(--ink); font-variant-numeric: tabular-nums;
   }
   .mode svg { width: 19px; height: 19px; flex: none; }
-  @media (max-width: 400px) { .mode { font-size: 13.5px; } }
+  @media (max-width: 400px) { .mode { font-size: clamp(12px, 3.4vw, 13.5px); } .mode svg { width: 17px; height: 17px; } }
   .mode.on { background: var(--accent-btn); color: #fff; }
   .dots { display: inline-block; width: 22px; height: 6px; background: radial-gradient(circle, currentColor 2px, transparent 2.5px) 0 0 / 8px 6px repeat-x; opacity: 0.5; animation: pulse 1s infinite; }
 

@@ -4,9 +4,13 @@ Source : « Comptage routier - Données trafic issues des capteurs permanents »
 (plus de 3 000 tronçons, une mesure par heure, 13 mois glissants), licence ODbL.
 https://opendata.paris.fr/explore/dataset/comptages-routiers-permanents/
 
-Pour chaque jour de la semaine et chaque heure, on calcule la part des tronçons dont l'état est
-« pré-saturé », « saturé » ou « bloqué » (les mesures « inconnu » sont ignorées).
-L'app en déduit un facteur de ralentissement à l'heure du départ (voir src/lib/routing.js).
+Deux mesures par jour de la semaine et par heure :
+- « ralentissement » : vitesse mesurée relative. Chaque capteur donne le débit q (véhicules/h) et le
+  taux d'occupation k (% du temps où un véhicule est au-dessus du capteur). q / k est proportionnel à
+  la vitesse moyenne (la longueur des véhicules s'annule dans un rapport). On divise la vitesse de
+  l'heure la plus rapide de la semaine par celle de chaque heure : 1,0 = route libre, 1,9 = trajet
+  1,9 fois plus long. C'est ce facteur que l'app applique (voir src/lib/routing.js).
+- « dense » : part des tronçons en circulation pré-saturée, saturée ou bloquée (sert au libellé).
 
 Usage :  python app/scripts/build_traffic.py
 """
@@ -23,15 +27,41 @@ JOURS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"
 DENSE = {"Pré-saturé", "Saturé", "Bloqué"}
 
 
+def fetch(params):
+    req = urllib.request.Request(f"{API}?{urllib.parse.urlencode(params)}",
+                                 headers={"User-Agent": "UntrackedMaps-build (https://github.com/hfreryr/untracked)"})
+    return json.load(urllib.request.urlopen(req, timeout=300))
+
+
+def col(r, alias, expr):
+    """L'API renvoie les colonnes sous leur alias ou sous leur expression, selon les cas."""
+    return r[alias] if r.get(alias) is not None else r.get(expr)
+
+
+def speeds():
+    rows = fetch({
+        "select": "date_format(t_1h,'EEEE') as jour, hour(t_1h) as heure, sum(q) as sq, sum(k) as sk",
+        "where": "q > 0 and k > 0 and k < 100",
+        "group_by": "date_format(t_1h,'EEEE'), hour(t_1h)",
+        "timezone": "Europe/Paris",
+    })
+    v = {}
+    for r in rows:
+        jour, heure = col(r, "jour", "date_format(t_1h,'EEEE')"), col(r, "heure", "hour(t_1h)")
+        sq, sk = col(r, "sq", "sum(q)"), col(r, "sk", "sum(k)")
+        if jour in JOURS and heure is not None and sq and sk:
+            v[(jour, int(heure))] = sq / sk
+    vmax = max(v.values())
+    return {j: [round(vmax / v[(j, h)], 2) if (j, h) in v else 1 for h in range(24)] for j in JOURS}
+
+
 def main():
     params = {
         "select": "date_format(t_1h,'EEEE') as jour, hour(t_1h) as heure, etat_trafic, count(*) as n",
         "group_by": "date_format(t_1h,'EEEE'), hour(t_1h), etat_trafic",
         "timezone": "Europe/Paris",
     }
-    req = urllib.request.Request(f"{API}?{urllib.parse.urlencode(params)}",
-                                 headers={"User-Agent": "UntrackedMaps-build (https://github.com/hfreryr/untracked)"})
-    rows = json.load(urllib.request.urlopen(req, timeout=300))
+    rows = fetch(params)
     total, dense = defaultdict(int), defaultdict(int)
     for r in rows:
         # l'API renvoie les colonnes sous leur expression (les alias ne sont pas toujours appliqués)
@@ -44,14 +74,16 @@ def main():
         if etat in DENSE:
             dense[(jour, int(heure))] += r["n"]
     profil = {j: [round(dense[(j, h)] / total[(j, h)], 3) if total[(j, h)] else 0 for h in range(24)] for j in JOURS}
+    ralenti = speeds()
     OUT.write_text(json.dumps({
         "source": "Ville de Paris, comptages routiers permanents (ODbL)",
         "genere": date.today().isoformat(),
-        "mesure": "part des tronçons en circulation dense, pré-saturée, saturée ou bloquée",
-        "jours": profil,
+        "ralentissement": "vitesse de l'heure la plus rapide ÷ vitesse mesurée (débit / taux d'occupation)",
+        "dense": "part des tronçons en circulation pré-saturée, saturée ou bloquée",
+        "jours": {j: {"ralentissement": ralenti[j], "dense": profil[j]} for j in JOURS},
     }, ensure_ascii=False, separators=(",", ":")))
     for j in JOURS:
-        print(f"{j:9}", " ".join(f"{100 * v:3.0f}" for v in profil[j]))
+        print(f"{j:9}", " ".join(f"{v:4.2f}" for v in ralenti[j]))
 
 
 if __name__ == "__main__":
