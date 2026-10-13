@@ -74,3 +74,9 @@ Inspirée de Plans, avec une différence assumée : pas de notes (aucune source 
 - `static/data/hours.json` couvre désormais tous les commerces et la plupart des lieux publics (26 931 lieux, ~1,2 Mo, ~300 Ko compressé).
 - La liste d'une catégorie se recharge quand on déplace la carte ; la carte reste sur la zone choisie (fermeture de fiche, bouton Retour, position arrivée tard).
 - Détails d'un lieu lus via Overpass (serveur de secours : overpass.openstreetmap.fr), et non plus via l'API d'édition d'OSM.
+
+## Direction (boussole) (13/10/2026)
+
+- Le point bleu porte un faisceau qui montre la direction où l'on regarde (boussole du téléphone ; à défaut, sens de la marche donné par le GPS). Le point suit vos déplacements tant que l'app est à l'écran.
+- Bouton de localisation comme Plans et Maps : 1er toucher → centré sur vous et suivi ; 2e → la carte tourne avec vous ; 3e → nord en haut. Déplacer la carte à la main arrête le suivi.
+- Sur iPhone, l'accès à la boussole est demandé au premier toucher du bouton. Tout reste sur l'appareil.

@@ -465,7 +465,14 @@
       clearTimeout(reloadTimer);
       reloadTimer = setTimeout(reloadCategoryHere, 350);
     });
-    map.on('dragstart', (e) => { if (nav && e.originalEvent) navFollow = false; });
+    map.on('dragstart', (e) => {
+      if (!e.originalEvent) return;
+      if (nav) navFollow = false;
+      if (followMode !== 'none') followMode = 'none';
+    });
+    // l'app passe en arrière-plan : on arrête de suivre la position (batterie)
+    const onVis = () => { if (document.hidden) stopWatch(); else if (me) startWatch(); };
+    document.addEventListener('visibilitychange', onVis);
     window.addEventListener('popstate', onPopState);
     window.addEventListener('keydown', onKeyDown);
     const offline = () => say('Pas de connexion. La recherche et les itinéraires reprendront dès le retour du réseau.');
@@ -1549,6 +1556,75 @@
     a?.run();
   }
 
+  // Point bleu de votre position, avec un faisceau qui montre la direction où vous regardez (boussole du téléphone).
+  function showMe(lat, lon) {
+    if (!meMarker) {
+      const el = document.createElement('div');
+      el.className = 'me';
+      el.innerHTML = '<span class="me-beam"></span><span class="me-dot"></span>';
+      meMarker = new maplibregl.Marker({ element: el, rotationAlignment: 'map' });
+      if (heading != null) { el.classList.add('has-heading'); meMarker.setRotation(heading); }
+    }
+    meMarker.setLngLat([lon, lat]).addTo(map);
+  }
+
+  // ——— Direction (boussole) ———
+  // Le cap vient de la boussole du téléphone ; à défaut, du sens de la marche (GPS) quand on avance.
+  // Rien n'est envoyé : tout reste sur l'appareil.
+  let heading = null;            // degrés, 0 = nord
+  let compassOn = false;
+  let lastCompass = 0;
+  let followMode = $state('none');   // 'none' | 'follow' (la carte vous suit) | 'heading' (la carte tourne avec vous)
+  let posWatch = null;
+  function setHeading(h, fromCompass) {
+    if (h == null || Number.isNaN(h)) return;
+    if (!fromCompass && Date.now() - lastCompass < 3000) return;   // la boussole prime sur le GPS
+    if (fromCompass) lastCompass = Date.now();
+    // lissage (sans faire le tour par 360 → 0)
+    if (heading == null) heading = h;
+    else { const d = ((h - heading + 540) % 360) - 180; if (Math.abs(d) < 1.5) return; heading = (heading + d * 0.35 + 360) % 360; }
+    if (nav) return;   // pendant le guidage, la flèche suit le trajet
+    const el = meMarker?.getElement();
+    el?.classList.add('has-heading');
+    meMarker?.setRotation(heading);
+    if (followMode === 'heading' && !map.isMoving()) map.easeTo({ bearing: heading, duration: 250, easing: (t) => t });
+  }
+  function onOrientation(e) {
+    let h = null;
+    if (typeof e.webkitCompassHeading === 'number') h = e.webkitCompassHeading;          // iPhone
+    else if (e.absolute && typeof e.alpha === 'number') h = 360 - e.alpha;                  // Android
+    if (h == null) return;
+    h = (h + (screen.orientation?.angle || 0) + 360) % 360;                                // écran en paysage
+    setHeading(h, true);
+  }
+  // iPhone : l'accès à la boussole se demande lors d'un geste (le bouton de localisation)
+  async function startCompass() {
+    if (compassOn) return;
+    try {
+      if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+        if ((await DeviceOrientationEvent.requestPermission()) !== 'granted') return;
+      }
+    } catch { return; }
+    compassOn = true;
+    if ('ondeviceorientationabsolute' in window) window.addEventListener('deviceorientationabsolute', onOrientation);
+    else window.addEventListener('deviceorientation', onOrientation);
+  }
+  // Suivre la position tant que l'app est à l'écran (le point bouge avec vous)
+  function startWatch() {
+    if (posWatch != null || !navigator.geolocation || nav) return;
+    posWatch = navigator.geolocation.watchPosition(({ coords }) => {
+      if (nav) return;
+      me = { label: 'Votre position', lat: coords.latitude, lon: coords.longitude, isMe: true };
+      showMe(me.lat, me.lon);
+      if (coords.speed > 1 && coords.heading != null) setHeading(coords.heading, false);
+      if (followMode !== 'none' && !map.isMoving()) map.easeTo({ center: [me.lon, me.lat], duration: 600 });
+    }, () => {}, { enableHighAccuracy: true, maximumAge: 5000, timeout: 30000 });
+  }
+  function stopWatch() {
+    if (posWatch != null) navigator.geolocation.clearWatch(posWatch);
+    posWatch = null;
+  }
+
   // La position reste sur l'appareil : elle n'est envoyée qu'aux moteurs d'itinéraire, au moment du calcul.
   function getPosition() {
     return new Promise((resolve, reject) => {
@@ -1556,12 +1632,8 @@
       navigator.geolocation.getCurrentPosition(
         ({ coords }) => {
           me = { label: 'Votre position', lat: coords.latitude, lon: coords.longitude, isMe: true };
-          if (!meMarker) {
-            const el = document.createElement('div');
-            el.className = 'me';
-            meMarker = new maplibregl.Marker({ element: el });
-          }
-          meMarker.setLngLat([me.lon, me.lat]).addTo(map);
+          showMe(me.lat, me.lon);
+          startWatch();
           try { localStorage.setItem('position-ok', '1'); } catch { /* rien */ }
           resolve(me);
         },
@@ -1570,8 +1642,8 @@
           if (err.code !== 3) return reject(err);
           navigator.geolocation.getCurrentPosition(({ coords }) => {
             me = { label: 'Votre position', lat: coords.latitude, lon: coords.longitude, isMe: true };
-            if (!meMarker) { const el = document.createElement('div'); el.className = 'me'; meMarker = new maplibregl.Marker({ element: el }); }
-            meMarker.setLngLat([me.lon, me.lat]).addTo(map);
+            showMe(me.lat, me.lon);
+            startWatch();
             resolve(me);
           }, reject, { enableHighAccuracy: false, timeout: 15000, maximumAge: 300000 });
         },
@@ -1600,7 +1672,7 @@
       if (firstTime && perm?.state !== 'granted' && !showPromise) say('Votre position reste sur votre téléphone.');
       const p = await getPosition();
       // (pas si la personne a déjà choisi quoi regarder entre-temps : position arrivée tard)
-      if (!place && !category && !directions && !viewChosen) map.flyTo({ center: [p.lon, p.lat], zoom: 15.5, duration: 900 });
+      if (!place && !category && !directions && !viewChosen) { followMode = 'follow'; map.flyTo({ center: [p.lon, p.lat], zoom: 15.5, duration: 900 }); }
     } catch { /* on reste sur Paris */ }
   }
 
@@ -1620,11 +1692,26 @@
   // Détail technique ajouté au message (pour diagnostiquer à distance une localisation qui ne marche pas)
   const locDetail = (e) => ` [${matchMedia('(display-mode: standalone)').matches || navigator.standalone ? 'app' : 'navigateur'} · ${window.isSecureContext ? 'https' : 'non sécurisé'} · code ${e?.code ?? '?'}${e?.message ? ` · ${e.message}` : ''}]`;
 
+  // Bouton de localisation, comme Plans et Maps : 1er toucher → centré sur vous ; 2e → la carte tourne
+  // dans la direction où vous regardez ; 3e → retour au nord en haut.
   async function locate() {
+    startCompass();   // (doit partir du geste, avant toute attente)
+    if (me && followMode === 'follow') {
+      followMode = 'heading';
+      map.easeTo({ center: [me.lon, me.lat], bearing: heading ?? map.getBearing(), duration: 500 });
+      if (heading == null) say('Direction pas encore disponible : tournez-vous un peu ou marchez quelques pas.');
+      return;
+    }
+    if (me && followMode === 'heading') {
+      followMode = 'follow';
+      map.easeTo({ center: [me.lon, me.lat], bearing: 0, duration: 500 });
+      return;
+    }
     locating = true;
     try {
       const p = await getPosition();
-      map.flyTo({ center: [p.lon, p.lat], zoom: 16, duration: 800 });
+      followMode = 'follow';
+      map.flyTo({ center: [p.lon, p.lat], zoom: Math.max(16, map.getZoom()), duration: 800 });
     } catch (e) {
       say(locError(e) + locDetail(e), { label: 'Réessayer', run: locate });
     } finally {
@@ -1876,6 +1963,8 @@
     speak(kind === 'transit' ? nav.steps[0]?.text : nav.steps[0]?.speak || nav.steps[0]?.text);
     clearInterval(navTick);
     navTick = setInterval(() => { now = Date.now(); if (nav?.kind === 'transit') updateNav(); }, 5000);
+    stopWatch();
+    followMode = 'none';
     if (navigator.geolocation) {
       navWatch = navigator.geolocation.watchPosition(onFix, () => {}, { enableHighAccuracy: true, maximumAge: 2000, timeout: 20000 });
     }
@@ -1888,12 +1977,7 @@
     const { latitude: lat, longitude: lon, heading, speed } = pos.coords;
     me = { label: 'Votre position', lat, lon, isMe: true };
     lastFix = { lat, lon, heading: speed > 1 && heading != null && !Number.isNaN(heading) ? heading : null };
-    if (!meMarker) {
-      const el = document.createElement('div');
-      el.className = 'me';
-      meMarker = new maplibregl.Marker({ element: el, rotationAlignment: 'map' });
-    }
-    meMarker.setLngLat([lon, lat]).addTo(map);
+    showMe(lat, lon);
     updateNav();
   }
 
@@ -1965,9 +2049,9 @@
     if ('speechSynthesis' in window) speechSynthesis.cancel();
     nav = null;
     navList = false;
-    meMarker?.setRotation(0);
-    meMarker?.setRotationAlignment('viewport');
+    meMarker?.setRotation(heading ?? 0);   // retour au faisceau de direction
     meMarker?.getElement().classList.remove('navigating');
+    startWatch();
     map.easeTo({ pitch: 0, bearing: 0, duration: 600 });
     drawRoute();
   }
@@ -2434,8 +2518,13 @@
       </button>
     </div>
   {/if}
-  <button class="locate" class:busy={locating} onclick={locate} aria-label="Me localiser">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 4 4 11l7 2 2 7z" class="solid" /></svg>
+  <button class="locate" class:busy={locating} class:following={followMode !== 'none'} onclick={locate}
+    aria-label={followMode === 'follow' ? 'Orienter la carte dans votre direction' : followMode === 'heading' ? 'Remettre le nord en haut' : 'Me localiser'}>
+    {#if followMode === 'heading'}
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5 17 13H7z" class="solid" /><path d="M7 13h10l-5 8.5z" /><circle cx="12" cy="13" r="1.3" class="solid" /></svg>
+    {:else}
+      <svg viewBox="0 0 24 24" aria-hidden="true" class:hollow={followMode === 'none'}><path d="M20 4 4 11l7 2 2 7z" class="solid" /></svg>
+    {/if}
   </button>
   {#if nav && navBanner}
     <div class="nav-top" class:arrived={navBanner.arrived} role="status" aria-live="polite">
@@ -3224,6 +3313,8 @@
   .thumb.transit { background: linear-gradient(110deg, transparent 40%, #ffbe00 40% 46%, transparent 46%), linear-gradient(20deg, transparent 52%, #0055c8 52% 58%, transparent 58%), linear-gradient(160deg, transparent 62%, #e3051c 62% 68%, transparent 68%), linear-gradient(75deg, transparent 28%, #00643c 28% 34%, transparent 34%), #f1eee8; }
   .map-hint { color: var(--accent); font-size: 14px; padding-top: 10px; padding-bottom: 6px; }
   .locate svg { width: 21px; height: 21px; }
+  .locate svg.hollow .solid { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; }
+  .locate.following { color: var(--accent); }
   .locate.busy svg { animation: pulse 1s ease-in-out infinite; }
   @keyframes pulse { 50% { opacity: 0.35; } }
   .toast {
@@ -3238,10 +3329,19 @@
     background: no-repeat center / contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 40'%3E%3Cpath d='M15 1.5C7.5 1.5 1.5 7.4 1.5 14.7 1.5 25 15 38.5 15 38.5S28.5 25 28.5 14.7C28.5 7.4 22.5 1.5 15 1.5z' fill='%23D93A2F' stroke='%23fff' stroke-width='2'/%3E%3Ccircle cx='15' cy='14.5' r='5' fill='%23fff'/%3E%3C/svg%3E");
     filter: drop-shadow(0 3px 4px rgb(0 0 0 / 0.3));
   }
-  :global(.me) {
-    width: 18px; height: 18px; border-radius: 50%; background: var(--accent);
+  :global(.me) { width: 24px; height: 24px; position: relative; }
+  :global(.me .me-dot) {
+    position: absolute; inset: 0; border-radius: 50%; background: var(--accent); box-sizing: border-box;
     border: 3px solid #fff; box-shadow: 0 0 0 10px rgb(42 91 215 / 0.16), 0 1px 4px rgb(0 0 0 / 0.3);
   }
+  /* Faisceau de direction : un éventail bleu dégradé qui part du point (comme Plans et Maps) */
+  :global(.me .me-beam) {
+    position: absolute; left: 50%; bottom: 50%; width: 76px; height: 64px; margin-left: -38px; display: none;
+    background: radial-gradient(ellipse 50% 100% at 50% 100%, rgb(42 91 215 / 0.55), rgb(42 91 215 / 0) 100%);
+    clip-path: polygon(50% 100%, 6% 0, 94% 0);
+  }
+  :global(.me.has-heading .me-beam) { display: block; }
+  :global(.me.navigating .me-beam), :global(.me.navigating .me-dot) { display: none; }
 
   .results .recents-head { display: flex; padding-right: 16px; justify-content: space-between; align-items: center; font-weight: 600; color: var(--ink) !important; }
   .results .link { width: auto; flex: none; display: inline; padding: 4px 0; }
@@ -3328,7 +3428,7 @@
   .steps li.done { color: var(--faint); }
   .steps li.now { font-weight: 700; color: var(--accent); }
   :global(.me.navigating) {
-    width: 0; height: 0; border-radius: 0; background: none; border: 0; box-shadow: none;
+    width: 0; height: 0; border-radius: 0; background: none; box-shadow: none;
     border-left: 13px solid transparent; border-right: 13px solid transparent; border-bottom: 30px solid var(--accent);
     filter: drop-shadow(0 0 2px #fff) drop-shadow(0 0 1px #fff) drop-shadow(0 2px 4px rgb(0 0 0 / 0.35));
   }
