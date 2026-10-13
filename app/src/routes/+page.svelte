@@ -1388,6 +1388,7 @@
             meMarker = new maplibregl.Marker({ element: el });
           }
           meMarker.setLngLat([me.lon, me.lat]).addTo(map);
+          try { localStorage.setItem('position-ok', '1'); } catch { /* rien */ }
           resolve(me);
         },
         (err) => {
@@ -1411,6 +1412,15 @@
     try {
       const perm = await navigator.permissions?.query({ name: 'geolocation' }).catch(() => null);
       if (perm?.state === 'denied') return;
+      // App installée sur l'écran d'accueil : iOS peut refuser (et mémoriser le refus) une demande faite sans
+      // geste de l'utilisateur. On attend donc qu'il touche le bouton de localisation la première fois.
+      const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+      let ok = false;
+      try { ok = localStorage.getItem('position-ok') === '1'; } catch { /* rien */ }
+      if (standalone && !ok && perm?.state !== 'granted') {
+        if (!showPromise) say('Touchez la flèche pour vous localiser.');
+        return;
+      }
       let firstTime = false;
       try { firstTime = !localStorage.getItem('position-expliquee'); localStorage.setItem('position-expliquee', '1'); } catch { /* rien */ }
       if (firstTime && perm?.state !== 'granted' && !showPromise) say('Votre position reste sur votre téléphone.');
