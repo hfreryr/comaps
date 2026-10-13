@@ -102,7 +102,7 @@ def main():
         grid[(int(p[0] / cell), int(p[1] / cell))].append((pid, p))
     places = []
     for f in glob.glob(f"{args.places}/*/*/*.json"):
-        for pid, lon, lat, tags in json.load(open(f))["t"]:
+        for pid, lon, lat, tags, *_ in json.load(open(f))["t"]:   # (5e élément : devanture déjà présente)
             if bbox[0] < lon < bbox[2] and bbox[1] < lat < bbox[3] and wanted(tags):
                 places.append((pid, lon, lat))
     out = {}
