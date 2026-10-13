@@ -65,3 +65,12 @@ Inspirée de Plans, avec une différence assumée : pas de notes (aucune source 
 - Bandeau : distance, accès fauteuil, entrée gratuite/payante. Sections : Bon à savoir (tags OSM : paiement, terrasse, régimes, chiens…), Horaires, Détails.
 - Barre flottante ♡ (Favoris) · ＋ (autre liste) · ••• (Maison, Travail, copier, partager).
 - Contribution : liens vers OpenStreetMap (modifier / signaler). L'utilisateur modifie lui-même sur le site d'OSM ; l'app n'écrit rien dans OSM.
+
+## Recherche « ouvert ce soir » (13/10/2026)
+
+- Taper « restaurant ce soir 8e », « boulangerie ouverte dimanche », « bar vers 23 h 11e » : la carte se place sur la zone et la liste n'affiche que les lieux ouverts à ce moment (`src/lib/intent.js`, analyse faite sur le téléphone).
+- Dans une liste de catégorie : pastilles « Ouvert maintenant » et « Ouvert à… » (raccourcis Midi / Ce soir / Demain soir, ou jour + heure).
+- **Limite assumée** : à Paris, environ la moitié des commerces ont leurs horaires dans OSM (49 % sur 29 630 lieux de 13 types, extrait du 12/10/2026). Les lieux sans horaires ne sont jamais supprimés : ils sont repliés sous la liste (« Afficher les N lieux aux horaires inconnus »).
+- `static/data/hours.json` couvre désormais tous les commerces et la plupart des lieux publics (26 931 lieux, ~1,2 Mo, ~300 Ko compressé).
+- La liste d'une catégorie se recharge quand on déplace la carte ; la carte reste sur la zone choisie (fermeture de fiche, bouton Retour, position arrivée tard).
+- Détails d'un lieu lus via Overpass (serveur de secours : overpass.openstreetmap.fr), et non plus via l'API d'édition d'OSM.

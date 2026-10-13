@@ -4,7 +4,7 @@
                                      musées, parcs, gares) et adresses (restaurants, cafés, boutiques…),
                                      chacun avec un zoom d'apparition (« z ») qui garde la carte lisible ;
   static/data/transit-lines.geojson  lignes de métro, RER et tram, à leurs couleurs officielles ;
-  static/data/hours.json             horaires des restaurants, cafés, boulangeries, pharmacies… (listes) ;
+  static/data/hours.json             horaires des commerces et lieux publics (listes, filtre « ouvert à… ») ;
   static/data/exits.json             sorties de métro et de RER (numéro, nom, accès), pour la fiche station
                                      et la « sortie conseillée » des trajets.
 
@@ -312,9 +312,14 @@ def assign_zoom(items, lat0=48.86):
 # (identifiant de tuile → horaires OSM) pour afficher « Ouvert / Fermé » dans les listes,
 # sans interroger OpenStreetMap lieu par lieu.
 HOURS_CLASSES = {
-    "amenity": {"restaurant", "fast_food", "cafe", "bar", "pub", "pharmacy"},
-    "shop": {"bakery", "pastry", "supermarket", "convenience", "greengrocer", "deli", "alcohol", "wine"},
-    "tourism": {"museum", "gallery"},
+    # tous les commerces (filtre « ouvert ce soir » sur toutes les catégories)
+    "shop": None,
+    "amenity": {"restaurant", "fast_food", "cafe", "bar", "pub", "ice_cream", "pharmacy", "bank", "post_office", "library",
+                "cinema", "theatre", "nightclub", "doctors", "dentist", "clinic", "veterinary", "townhall", "marketplace",
+                "arts_centre", "community_centre", "coworking_space", "toilets", "fuel", "car_wash", "car_rental", "police"},
+    "tourism": {"museum", "gallery", "attraction", "zoo", "aquarium"},
+    "leisure": {"sports_centre", "fitness_centre", "swimming_pool", "escape_game", "park", "garden", "playground"},
+    "craft": None,
 }
 
 
@@ -325,7 +330,7 @@ class Hours(osmium.SimpleHandler):
 
     def _add(self, oid, kind, tags):
         oh = tags.get("opening_hours")
-        if not oh or not any(tags.get(k) in v for k, v in HOURS_CLASSES.items()):
+        if not oh or not any(tags.get(k) and (v is None or tags.get(k) in v) for k, v in HOURS_CLASSES.items()):
             return
         if oh not in self.index:
             self.index[oh] = len(self.values)

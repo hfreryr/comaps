@@ -80,3 +80,32 @@ export function hoursTable(value, lat, lon, now = new Date()) {
     return null;
   }
 }
+
+/**
+ * Ouvert à un moment donné (filtre « ouvert ce soir »).
+ * @returns {{open: boolean|null, label: string}}  open = null : horaires inconnus ou incertains à ce moment
+ */
+export function statusAt(value, lat, lon, at) {
+  if (!value) return { open: null, label: '' };
+  try {
+    const oh = new opening_hours(value, { lat, lon, address: { country_code: 'fr', state: 'Île-de-France' } });
+    if (oh.getUnknown(at)) return { open: null, label: 'Horaires incertains' };
+    if (!oh.getState(at)) {
+      const next = oh.getNextChange(at);
+      return { open: false, label: next ? `Fermé à ${time(at)} · ouvre ${when(next, at)}` : 'Fermé' };
+    }
+    const next = oh.getNextChange(at);
+    // (le moment est déjà affiché par le filtre : on dit seulement jusqu'à quand)
+    return { open: true, label: next && next - at < 20 * 3600e3 ? `Ferme ${when(next, at)}` : 'Ouvert' };
+  } catch {
+    return { open: null, label: '' };
+  }
+}
+
+/** Libellé court d'un moment : « ce soir 20 h », « demain 12 h 30 », « dimanche 15 h ». */
+export function momentLabel(at, now = new Date()) {
+  const days = Math.round((new Date(at.getFullYear(), at.getMonth(), at.getDate()) - new Date(now.getFullYear(), now.getMonth(), now.getDate())) / 86400000);
+  const day = days === 0 ? (at.getHours() >= 18 ? 'ce soir' : at.getHours() < 12 ? 'ce matin' : "aujourd'hui")
+    : days === 1 ? 'demain' : DAYS[at.getDay()];
+  return `${day} ${time(at)}`;
+}

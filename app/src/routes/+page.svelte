@@ -4,7 +4,8 @@
   import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
   import 'maplibre-gl/dist/maplibre-gl.css';
   import { search, searchCategory, details, reverse, reverseAddress, typeLabel, PARIS } from '#lib/places.js';
-  import { hoursStatus, hoursTable } from '#lib/hours.js';
+  import { hoursStatus, hoursTable, statusAt, momentLabel } from '#lib/hours.js';
+  import { parseIntent, ARR_CENTERS, arrName } from '#lib/intent.js';
   import { draggable } from '#lib/sheet.js';
   import { wikiInfo } from '#lib/placeinfo.js';
   import { mapStyle, provideImage, osmRef, FAMILIES, DARK_LAND, darken, pinFor, pinImageId, GLYPHS } from '#lib/mapstyle.js';
@@ -372,7 +373,25 @@
     try { await navigator.clipboard.writeText([title, address].filter(Boolean).join(', ')); say('Adresse copiée'); } catch { /* refusé */ }
   }
   const activeQuery = $derived(editing ? fieldQuery : query);
-  const catHit = $derived(editing ? null : categoryFor(query));
+  // « restaurant ce soir 8e » : catégorie + moment + zone
+  const intent = $derived(editing ? null : parseIntent(query));
+  const catHit = $derived.by(() => {
+    if (editing) return null;
+    const direct = categoryFor(query);
+    if (direct && !intent?.any) return direct;
+    if (!intent?.any || !intent.words.length) return direct;
+    // une catégorie parmi les mots restants ; les autres mots forment un nom de quartier
+    for (const w of intent.words) {
+      const c = categoryFor(w);
+      if (c) {
+        const rest = intent.words.filter((x) => !CATEGORY_WORDS[c.key].includes(x) && !FILLER.has(x));
+        return { ...c, when: intent.when, area: intent.area || (rest.length ? { text: rest.join(' ') } : null) };
+      }
+    }
+    return direct;
+  });
+  const whenText = (w) => (!w ? '' : w.now ? 'ouverts maintenant' : `ouverts ${momentLabel(w.at)}`);
+  const areaText = (a) => (!a ? '' : a.arr ? arrName(a.arr) : a.text.replace(/^./, (x) => x.toUpperCase()));
   const showList = $derived(editing ? true : focused && (query.trim().length >= 2 || !query.trim()));
   const isAddress = $derived(place?.type === 'Adresse');
   const title = $derived(isAddress ? place.name.split(',')[0] : place?.name);
@@ -404,7 +423,7 @@
       zoom: 13,
       hash: 'carte',
       attributionControl: { compact: true, customAttribution:
-        'Itinéraires <a href="https://valhalla1.openstreetmap.de" target="_blank" rel="noopener">Valhalla / FOSSGIS</a>, <a href="https://transitous.org/sources/" target="_blank" rel="noopener">Transitous</a> · <a href="https://github.com/hfreryr/untracked" target="_blank" rel="noopener">Projet libre</a>' },
+        'Recherche <a href="https://photon.komoot.io" target="_blank" rel="noopener">Photon / komoot</a> · Itinéraires <a href="https://valhalla1.openstreetmap.de" target="_blank" rel="noopener">Valhalla / FOSSGIS</a>, <a href="https://transitous.org/sources/" target="_blank" rel="noopener">Transitous</a> · <a href="https://github.com/hfreryr/untracked" target="_blank" rel="noopener">Projet libre</a>' },
       fadeDuration: 200
     });
     map.setMissingStyleImageResolver((id) => provideImage(map, id));
@@ -1229,7 +1248,7 @@
         .map((f) => ({ f, d: dist(o.lat, o.lon, f.geometry.coordinates[1], f.geometry.coordinates[0]) }))
         .sort((a, b) => a.d - b.d)
         .filter(({ f }) => !seen.has(keyOf(f)) && seen.add(keyOf(f)))
-        .slice(0, c.transit ? 8 : 25);
+        .slice(0, c.transit ? 8 : 80);
       if (stale()) return;
       if (c.transit) {
         nearby = list.map((n) => ({ ...n, deps: { status: 'loading' } }));
@@ -1255,18 +1274,70 @@
           list.push({ f, d: dist(o.lat, o.lon, xy[1], xy[0]) });
         }
         list.sort((a, b) => a.d - b.d);
-        list.splice(25);
+        list.splice(80);
       }
       const hours = await hoursP;
       if (stale()) return;
-      nearby = list.map((n) => {
-        const h = hours.v[hours.k[String(n.f.id)]];
-        return { ...n, st: h ? hoursStatus(h, n.f.geometry.coordinates[1], n.f.geometry.coordinates[0]) : null };
-      });
+      // identifiant des horaires : celui des tuiles (osm × 10 + 1 nœud / 2 chemin), ou « node/123 » pour les lieux de Photon
+      const hKey = (f) => {
+        const m = /^(node|way)\/(\d+)$/.exec(f.properties.osm || '');
+        return m ? String(Number(m[2]) * 10 + (m[1] === 'node' ? 1 : 2)) : String(f.id);
+      };
+      nearbyAll = list.map((n) => ({ ...n, h: hours.v[hours.k[hKey(n.f)]] || null }));
+      applyOpenFilter();
       nearbyDone = true;
       // Les plus proches sont hors de la vue (catégorie rare) : on élargit la carte pour les montrer.
       const first = nearby.slice(0, 4).map((n) => n.f.geometry.coordinates);
       if (fit && first.length && !first.some((xy) => map.getBounds().contains(xy))) fitTo([[o.lon, o.lat], ...first]);
+  }
+
+  // Filtre « ouvert à… » : null (pas de filtre) | { now: true } | { at: Date }
+  let openAt = $state(null);
+  let showUnknown = $state(false);   // afficher aussi les lieux aux horaires inconnus
+  let momentPicker = $state(false);
+  let nearbyAll = [];                 // lieux trouvés avant filtre (avec leurs horaires bruts)
+  let openCounts = $state(null);      // { open, unknown, closed }
+  function applyOpenFilter() {
+    const at = openAt?.at || null;
+    const items = nearbyAll.map((n) => {
+      const [lon, lat] = n.f.geometry.coordinates;
+      return { ...n, st: n.h ? (at ? statusAt(n.h, lat, lon, at) : hoursStatus(n.h, lat, lon)) : null };
+    });
+    if (!openAt) { openCounts = null; nearby = items.slice(0, 25); return; }
+    const open = items.filter((n) => n.st?.open === true);
+    const unknown = items.filter((n) => !n.st || n.st.open == null);
+    openCounts = { open: open.length, unknown: unknown.length, closed: items.length - open.length - unknown.length };
+    nearby = [...open.slice(0, 25), ...(showUnknown ? unknown.slice(0, 20) : [])];
+  }
+  function setOpenAt(v) {
+    openAt = v;
+    showUnknown = false;
+    momentPicker = false;
+    applyOpenFilter();
+  }
+  // Choix du moment : jour et heure
+  const pickerDays = $derived.by(() => {
+    const out = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(); d.setDate(d.getDate() + i);
+      out.push({ i, label: i === 0 ? "Aujourd'hui" : i === 1 ? 'Demain' : d.toLocaleDateString('fr-FR', { weekday: 'long' }).replace(/^./, (x) => x.toUpperCase()) });
+    }
+    return out;
+  });
+  const pickerHours = Array.from({ length: 44 }, (_, k) => { const m = 6 * 60 + k * 30; return [Math.floor(m / 60) % 24, m % 60]; });
+  function momentFrom(dayOffset, h, m) {
+    const at = new Date(); at.setSeconds(0, 0);
+    at.setDate(at.getDate() + dayOffset + (h < 6 ? 1 : 0));   // 0 h – 2 h : la nuit qui suit
+    at.setHours(h, m);
+    return at;
+  }
+  const pickerDay = $derived(openAt?.at ? Math.max(0, Math.round((new Date(openAt.at).setHours(0, 0, 0, 0) - new Date().setHours(0, 0, 0, 0)) / 864e5) - (openAt.at.getHours() < 6 ? 1 : 0)) : 0);
+  const pickerTime = $derived(openAt?.at ? `${openAt.at.getHours()}:${openAt.at.getMinutes()}` : '20:0');
+  function quickMoment(kind) {
+    const now = new Date();
+    if (kind === 'soir') return setOpenAt(now.getHours() >= 20 ? { now: true } : { at: momentFrom(0, 20, 0) });
+    if (kind === 'midi') return setOpenAt({ at: momentFrom(now.getHours() >= 13 ? 1 : 0, 12, 30) });
+    if (kind === 'demain-soir') return setOpenAt({ at: momentFrom(1, 20, 0) });
   }
 
   let userMoved = false;
@@ -1338,6 +1409,10 @@
   function clearCategory() {
     category = null;
     reloadLater = false;
+    openAt = null;
+    openCounts = null;
+    momentPicker = false;
+    nearbyAll = [];
     savedList = null;
     hubPanel = null;
     nearby = [];
@@ -1349,12 +1424,25 @@
     return Math.hypot(x, lat2 - lat1) * 111320;
   }
 
-  function openCategoryFromSearch() {
+  async function openCategoryFromSearch() {
     const c = catHit;          // à lire avant de vider la recherche (catHit en dépend)
     query = '';
     focused = false;
     document.activeElement?.blur();
-    pickCategory(c);
+    if (c.when) { openAt = c.when; showUnknown = false; }
+    let center = null;
+    if (c.area?.arr) center = ARR_CENTERS[c.area.arr];
+    else if (c.area?.text) {
+      const r = (await search(`${c.area.text} Paris`).catch(() => []))[0];
+      if (r) center = [r.lon, r.lat];
+      else say(`« ${c.area.text} » introuvable : recherche autour de la carte`);
+    }
+    const { when, area, ...cat } = c;
+    if (category?.key === cat.key) category = null;   // (sinon pickCategory refermerait la catégorie)
+    if (!center) return pickCategory(cat);
+    viewChosen = true;
+    map.flyTo({ center, zoom: 15, duration: 800 });
+    map.once('moveend', () => (map.areTilesLoaded() ? pickCategory(cat) : map.once('idle', () => pickCategory(cat))));
   }
 
   function onKey(e) {
@@ -2051,8 +2139,13 @@
         <button onmousedown={openCategoryFromSearch}>
           <span class="r-icon cat-icon" style:--fam={famColor(catHit)} aria-hidden="true"></span>
           <span class="r-text">
-            <span class="r-name">{catHit.label} près de vous</span>
-            <span class="r-meta">Les plus proches, avec leurs horaires</span>
+            {#if catHit.when || catHit.area}
+              <span class="r-name">{catHit.label}{catHit.when ? ` ${whenText(catHit.when)}` : ''}</span>
+              <span class="r-meta">{catHit.area ? areaText(catHit.area) : 'Près de vous'}{catHit.when ? ' · selon les horaires connus' : ''}</span>
+            {:else}
+              <span class="r-name">{catHit.label} près de vous</span>
+              <span class="r-meta">Les plus proches, avec leurs horaires</span>
+            {/if}
           </span>
         </button>
       </li>
@@ -2847,7 +2940,39 @@
         </div>
       {:else}
       <h1>{chipList.find((c) => c.key === category.key)?.label || category.label}</h1>
-      <p class="kind">{nearby.length ? (nearbyFromMe ? 'Les plus proches de vous' : 'Autour du centre de la carte') : nearbyDone ? 'Aucun dans cette zone. Déplacez la carte pour chercher ailleurs.' : 'Recherche…'}</p>
+      {#if openAt && openCounts}
+        <p class="kind">{openCounts.open ? `${openCounts.open} ouvert${openCounts.open > 1 ? 's' : ''} ${openAt.now ? 'maintenant' : momentLabel(openAt.at).replace(/ (\d)/, ' à $1')}` : `Aucun ouvert ${openAt.now ? 'maintenant' : momentLabel(openAt.at).replace(/ (\d)/, ' à $1')} dans cette zone`}</p>
+      {:else}
+        <p class="kind">{nearby.length ? (nearbyFromMe ? 'Les plus proches de vous' : 'Autour du centre de la carte') : nearbyDone ? 'Aucun dans cette zone. Déplacez la carte pour chercher ailleurs.' : 'Recherche…'}</p>
+      {/if}
+      {#if !category.transit}
+        <div class="open-pills">
+          <button class="opill" class:on={openAt?.now} aria-pressed={!!openAt?.now} onclick={() => setOpenAt(openAt?.now ? null : { now: true })}>Ouvert maintenant</button>
+          <button class="opill" class:on={!!openAt?.at} aria-expanded={momentPicker} onclick={() => (momentPicker = !momentPicker)}>
+            {openAt?.at ? momentLabel(openAt.at).replace(/^./, (x) => x.toUpperCase()) : 'Ouvert à…'}
+            <svg viewBox="0 0 24 24" aria-hidden="true" class="chev" class:flip={momentPicker}><path d="m7 10 5 5 5-5" /></svg>
+          </button>
+          {#if openAt}<button class="opill-x" onclick={() => setOpenAt(null)} aria-label="Retirer le filtre d'horaires">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" /></svg></button>{/if}
+        </div>
+        {#if momentPicker}
+          <div class="moment">
+            <div class="moment-quick">
+              <button onclick={() => quickMoment('midi')}>Midi</button>
+              <button onclick={() => quickMoment('soir')}>Ce soir</button>
+              <button onclick={() => quickMoment('demain-soir')}>Demain soir</button>
+            </div>
+            <div class="moment-sel">
+              <select aria-label="Jour" value={pickerDay} onchange={(e) => { const [h, m] = pickerTime.split(':').map(Number); setOpenAt({ at: momentFrom(+e.currentTarget.value, h, m) }); momentPicker = true; }}>
+                {#each pickerDays as d}<option value={d.i}>{d.label}</option>{/each}
+              </select>
+              <select aria-label="Heure" value={pickerTime} onchange={(e) => { const [h, m] = e.currentTarget.value.split(':').map(Number); setOpenAt({ at: momentFrom(pickerDay, h, m) }); momentPicker = true; }}>
+                {#each pickerHours as [h, m]}<option value={`${h}:${m}`}>{h} h {m ? '30' : ''}</option>{/each}
+              </select>
+            </div>
+          </div>
+        {/if}
+      {/if}
       {/if}
       <ul class="nearby">
         {#each nearby as { f, d, st, deps: sd, saved: sv } (f.id)}
@@ -2894,6 +3019,12 @@
           </li>
         {/each}
       </ul>
+      {#if openAt && openCounts?.unknown && !category?.saved}
+        <button class="unknown-row" onclick={() => { showUnknown = !showUnknown; applyOpenFilter(); }}>
+          {showUnknown ? 'Masquer' : 'Afficher'} les {openCounts.unknown} lieux aux horaires inconnus
+          <small>Personne ne les a encore indiqués sur OpenStreetMap : certains sont peut-être ouverts.</small>
+        </button>
+      {/if}
     </section>
   {/if}
 </div>
@@ -3327,6 +3458,25 @@
   .status.is-open, .r-meta .is-open { color: var(--open); }
   .status.is-closed, .r-meta .is-closed { color: var(--closed); }
   .muted { color: var(--muted); font-weight: 400; }
+
+  /* ——— Filtre « ouvert à… » ——— */
+  .open-pills { display: flex; gap: 8px; margin: 10px 0 2px; align-items: center; overflow-x: auto; scrollbar-width: none; }
+  .open-pills > * { flex: none; }
+  .opill { display: inline-flex; align-items: center; gap: 4px; height: 34px; padding: 0 12px; border-radius: 17px; border: 1px solid var(--line);
+    background: var(--card); color: var(--ink); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .opill .chev { width: 16px; height: 16px; }
+  .opill.on { background: var(--accent-btn); border-color: var(--accent-btn); color: #fff; }
+  .opill.on .chev { color: #fff; }
+  .opill-x { width: 34px; height: 34px; border-radius: 50%; border: 0; background: var(--fill); color: var(--muted); display: grid; place-items: center; cursor: pointer; }
+  .opill-x svg { width: 15px; height: 15px; stroke-width: 2.4; }
+  .moment { margin: 8px 0 4px; padding: 10px; background: var(--fill); border-radius: 14px; display: grid; gap: 8px; }
+  .moment-quick { display: flex; gap: 6px; flex-wrap: wrap; }
+  .moment-quick button { height: 32px; padding: 0 12px; border-radius: 16px; border: 0; background: var(--card); color: var(--accent); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .moment-sel { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .moment-sel select { font: inherit; font-size: 16px; color: var(--ink); background: var(--card); border: 0; border-radius: 10px; padding: 9px 10px; }
+  .unknown-row { display: block; width: 100%; text-align: left; border: 0; border-top: 1px solid var(--line); background: none; padding: 14px 0 4px;
+    font: inherit; font-size: 15px; font-weight: 600; color: var(--accent); cursor: pointer; }
+  .unknown-row small { display: block; font-weight: 400; font-size: 13px; color: var(--muted); margin-top: 3px; }
 
   /* ——— Fiche lieu, façon Plans ——— */
   .share.left { left: 14px; right: auto; }
