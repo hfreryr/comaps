@@ -1,31 +1,10 @@
-// Recherche de lieux (Photon) et détails d'un lieu (OpenStreetMap).
+// Lieux : détails d'un lieu et lieux d'une catégorie, lus dans les tuiles préparées à l'avance (placestore.js).
+// Aucun service tiers n'est interrogé lieu par lieu. La recherche par texte est dans geocode.js.
 import { kindOf, expectsHours, practical, goodToKnow } from './placeinfo.js';
-// Prototype : serveurs publics, à remplacer par des instances auto-hébergées.
+import { placeById, placesInBounds } from './placestore.js';
+import { city } from './cities/index.js';
 
-const PHOTON = 'https://photon.komoot.io/api/';
-// Lecture des étiquettes d'un lieu : Overpass, le service public fait pour consulter les données OSM
-// (l'API d'OpenStreetMap est réservée aux modifications). Deux serveurs : le second sert de secours.
-const OVERPASS = ['https://overpass-api.de/api/interpreter', 'https://overpass.openstreetmap.fr/api/interpreter'];
-
-async function osmTags(type, id, signal) {
-  const q = `[out:json][timeout:10];${type}(${id});out tags;`;
-  for (const base of OVERPASS) {
-    try {
-      const ctrl = new AbortController();
-      const stop = setTimeout(() => ctrl.abort(), 6000);
-      signal?.addEventListener('abort', () => ctrl.abort());
-      const res = await fetch(`${base}?data=${encodeURIComponent(q)}`, { signal: ctrl.signal });
-      clearTimeout(stop);
-      if (!res.ok) continue;   // serveur saturé (429, 504…) : on essaie le suivant
-      const tags = (await res.json()).elements?.[0]?.tags;
-      if (tags) return tags;
-    } catch (e) {
-      if (signal?.aborted) throw e;
-    }
-  }
-  return null;
-}
-export const PARIS = { lat: 48.8566, lon: 2.3522 };
+export const PARIS = city.center;
 
 const TYPES = {
   restaurant: 'Restaurant', cafe: 'Café', bar: 'Bar', pub: 'Pub', fast_food: 'Restauration rapide',
@@ -68,64 +47,18 @@ function address(p) {
   return [line, where].filter(Boolean).join(', ');
 }
 
-export async function search(query, near = PARIS, signal) {
-  const url = new URL(PHOTON);
-  url.search = new URLSearchParams({
-    q: query, lang: 'fr', limit: '7',
-    lat: String(near.lat), lon: String(near.lon), location_bias_scale: '0.4',
-    bbox: '2.15,48.75,2.55,48.95' // Paris et proche banlieue pour le prototype
-  });
-  const res = await fetch(url, { signal });
-  if (!res.ok) throw new Error(`Photon ${res.status}`);
-  const data = await res.json();
-  // Photon renvoie parfois deux fois le même lieu : on n'en garde qu'un (sinon la liste plante).
-  const seen = new Set();
-  return data.features.filter((f) => {
-    const id = `${f.properties.osm_type}${f.properties.osm_id}`;
-    return !seen.has(id) && seen.add(id);
-  }).map((f) => {
-    const p = f.properties;
-    const [lon, lat] = f.geometry.coordinates;
-    const isAddress = !p.name;
-    return {
-      id: `${p.osm_type}${p.osm_id}`,
-      osmType: { N: 'node', W: 'way', R: 'relation' }[p.osm_type],
-      osmId: p.osm_id,
-      name: p.name || address(p),
-      type: isAddress ? 'Adresse' : typeLabel(p.osm_key, p.osm_value),
-      subclass: isAddress ? null : p.osm_value,
-      address: isAddress ? [p.postcode, p.city].filter(Boolean).join(' ') : address(p),
-      lat, lon
-    };
-  });
-}
-
-/** Adresse la plus proche d'un point (pour un point choisi sur la carte). */
-export async function reverse(lat, lon) {
-  const res = await fetch(`https://photon.komoot.io/reverse?lat=${lat}&lon=${lon}&lang=fr&limit=1`);
-  if (!res.ok) return null;
-  const p = (await res.json()).features?.[0]?.properties;
-  if (!p) return null;
-  return p.name && !p.housenumber ? p.name : address(p) || p.name || null;
-}
-
-/** Adresse postale d'un point touché sur la carte : « 57 Rue de Rennes, 75006 Paris ». */
-export async function reverseAddress(lat, lon) {
-  const res = await fetch(`https://photon.komoot.io/reverse?lat=${lat}&lon=${lon}&lang=fr&limit=1&layer=house&layer=street`);
-  if (!res.ok) return null;
-  const p = (await res.json()).features?.[0]?.properties;
-  if (!p) return null;
-  const line = p.housenumber ? [p.housenumber, p.street].filter(Boolean).join(' ') : p.street || p.name;
-  const where = [p.postcode, p.city].filter(Boolean).join(' ');
-  return line ? [line, where].filter(Boolean).join(', ') : null;
-}
-
-export async function details(place, signal) {
+/** Détails d'un lieu (fiche) : ses étiquettes OSM, lues dans la tuile de sa position. */
+export async function details(place) {
   if (!place.osmType) return {};
-  const t = await osmTags(place.osmType, place.osmId, signal);
-  if (!t) return {};
+  const hit = await placeById(place.osmType, place.osmId, place.lat, place.lon).catch(() => null);
+  if (!hit) return { covered: false };
+  return fromTags(hit.tags);
+}
+
+export function fromTags(t) {
   const street = [t['addr:housenumber'], t['addr:street']].filter(Boolean).join(' ');
   return {
+    covered: true,
     name: t.name,
     address: street ? [street, t['addr:postcode']].filter(Boolean).join(', ') : null,
     cuisine: t.cuisine,
@@ -145,27 +78,24 @@ export async function details(place, signal) {
 }
 
 /**
- * Lieux d'une catégorie autour d'un point (Photon, filtre « include », ex. osm.shop.florist).
- * Complète les lieux lus dans la carte, utile pour les catégories rares (cimetières, piscines…).
- * Rendu sous la forme des lieux de la carte : { id, properties: { name, subclass, osm }, geometry }.
+ * Lieux d'une catégorie dans une zone, lus dans les tuiles préparées (complète ceux lus dans la carte,
+ * utile pour les catégories rares : cimetières, piscines…). `include` : ['osm.shop.florist', …] ; `q` : un mot
+ * à chercher dans le nom (« piscine »). Rendu comme les lieux de la carte : { id, properties, geometry, tags }.
  */
-export async function searchCategory(include, near, signal, q = null) {
-  const url = new URL(PHOTON);
-  const params = new URLSearchParams({
-    lang: 'fr', limit: '20', lat: String(near.lat), lon: String(near.lon), location_bias_scale: '0.1',
-    bbox: '2.15,48.75,2.55,48.95'
-  });
-  // Avec un mot (« piscine ») : recherche texte limitée aux étiquettes OSM ; sinon : par catégorie seule.
-  if (q) { params.set('q', q); for (const c of include) params.append('osm_tag', c.replace(/^osm\./, '').replace('.', ':')); }
-  else params.set('include', include.join(','));
-  url.search = params;
-  const res = await fetch(url, { signal });
-  if (!res.ok) throw new Error(`Photon ${res.status}`);
-  const data = await res.json();
-  return data.features.filter((f) => f.properties.name).map((f) => {
-    const p = f.properties;
-    const type = { N: 'node', W: 'way', R: 'relation' }[p.osm_type];
-    return { id: `ph${p.osm_type}${p.osm_id}`, properties: { name: p.name, subclass: p.osm_value, osm: `${type}/${p.osm_id}` },
-      geometry: { coordinates: f.geometry.coordinates } };
+const fold = (t) => (t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+export async function searchCategory(include, bounds, q = null) {
+  const wanted = include.map((c) => c.replace(/^osm\./, '').split('.'));
+  const word = q ? fold(q) : null;
+  const all = await placesInBounds(bounds).catch(() => []);
+  return all.filter((p) => {
+    const t = p.tags;
+    if (!t.name || !wanted.some(([k, v]) => t[k] === v)) return false;
+    return !word || fold(t.name).includes(word);
+  }).map((p) => {
+    const kind = { 1: 'node', 2: 'way', 3: 'relation' }[p.id % 10];
+    const t = p.tags;
+    const sub = t.shop || t.amenity || t.tourism || t.leisure || t.craft || t.office || t.healthcare;
+    return { id: `pl${p.id}`, properties: { name: t.name, subclass: sub, osm: `${kind}/${Math.floor(p.id / 10)}` },
+      geometry: { coordinates: [p.lon, p.lat] }, tags: t };
   });
 }

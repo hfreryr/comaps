@@ -4,7 +4,6 @@
                                      musées, parcs, gares) et adresses (restaurants, cafés, boutiques…),
                                      chacun avec un zoom d'apparition (« z ») qui garde la carte lisible ;
   static/data/transit-lines.geojson  lignes de métro, RER et tram, à leurs couleurs officielles ;
-  static/data/hours.json             horaires des commerces et lieux publics (listes, filtre « ouvert à… ») ;
   static/data/exits.json             sorties de métro et de RER (numéro, nom, accès), pour la fiche station
                                      et la « sortie conseillée » des trajets.
 
@@ -398,10 +397,7 @@ def main(pbf):
           dict(sorted(Counter(i["z"] for i in items).items())))
     print("premiers commerces :", [i["name"] for i in items if i["kind"] == "place"][:25])
 
-    hs = Hours()
-    hs.apply_file(str(pbf))
-    (OUT / "hours.json").write_text(json.dumps({"v": hs.values, "k": hs.keys}, ensure_ascii=False, separators=(",", ":")))
-    print(f"{len(hs.keys)} horaires ({len(hs.values)} formules différentes)")
+    # (horaires : désormais dans les tuiles de lieux, voir build_places.py)
 
     rt = Routes()
     rt.apply_file(str(pbf))

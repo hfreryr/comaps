@@ -22,24 +22,32 @@ python app/scripts/build_overlays.py data/paris.osm.pbf
 ```
 
 - `landmarks.geojson` : ~7 300 lieux affichés jusqu'au zoom 18 : monuments, musées, parcs et gares, plus les adresses du quotidien (restaurants, cafés, boutiques, hôtels). Chaque lieu a un score de notoriété (traductions du nom, Wikidata, fiche OSM complète ; les enseignes de chaîne ne profitent pas de leurs traductions automatiques) et un **zoom d'apparition** `z`, calculé pour garder un écart régulier à l'écran (plus serré pour les lieux très connus). Au-delà du zoom 17, le fond de carte complète avec tous les lieux.
-- `hours.json` : horaires OSM des restaurants, cafés, bars, boulangeries, commerces alimentaires, pharmacies et musées (~12 500 lieux), indexés par identifiant de tuile, pour afficher « Ouvert / Fermé » dans les listes sans interroger OSM lieu par lieu.
+- `places/14/{x}/{y}.json` : **tous les lieux** (≈ 89 000 : commerces, services, monuments, stations), avec leurs étiquettes utiles (horaires, téléphone, site, accès, paiement, régimes, date de vérification…), découpés par tuile de ≈ 2,4 km. Généré par `python app/scripts/build_places.py data/paris-latest.osm.pbf` (≈ 1 min, 80 tuiles, 16 Mo bruts / ≈ 3,5 Mo compressés, 95 Ko par tuile en médiane). Reconstruit chaque nuit par l'action GitHub `places.yml` dans `data/places/` du site. Non versionné dans Git.
 - `traffic-paris.json` : trafic habituel de Paris, généré par `python app/scripts/build_traffic.py` depuis les comptages routiers permanents de la Ville de Paris (ODbL) : pour chaque jour et chaque heure, la vitesse mesurée (débit ÷ taux d'occupation) rapportée à l'heure la plus rapide de la semaine. Ce ralentissement mesuré (de 1,0 la nuit à 1,96 le jeudi à 18 h) allonge directement le temps « route libre » de Valhalla : aucun coefficient fixé à la main. Seule hypothèse restante : que le temps Valhalla corresponde à la circulation de nuit ; à vérifier par comparaisons manuelles. Ordres de grandeur cohérents avec le TomTom Traffic Index 2025 (Paris, pointe du soir : +73 %).
 - `transit-lines.geojson` : lignes de métro, RER et tram à leurs couleurs officielles (mode « Transports »).
 
-## Briques utilisées (prototype)
+## Briques utilisées, et ce que chacune reçoit (mis à jour le 13/10/2026)
 
-| Brique | Service | Remarque |
-|---|---|---|
-| Fond de carte | Tuiles [OpenFreeMap](https://openfreemap.org), **style maison** (`src/lib/mapstyle.js`) | Gratuit, sans clé, données OSM |
-| Police de la carte | Open Sans, glyphes [OpenMapTiles fonts](https://github.com/openmaptiles/fonts) hébergés avec l'app (`static/fonts/`) | Licence libre |
-| Itinéraire à pied / vélo / voiture | [Valhalla](https://valhalla1.openstreetmap.de) (serveur public FOSSGIS) | Usage léger uniquement |
-| Transports en commun (itinéraires et prochains passages en station) | [Transitous](https://transitous.org) (MOTIS 2) | Réservé aux projets libres non commerciaux ; **prévenir les mainteneurs avant un usage large** |
-| Recherche | [Photon](https://photon.komoot.io) (serveur public komoot) | Usage raisonnable uniquement |
-| Détails d'un lieu | API OpenStreetMap (lecture d'un élément) | À remplacer par une source dédiée avant tout lancement |
-| Horaires | bibliothèque `opening_hours` | Calcul local, dans le navigateur |
-| Police de l'interface | Police système du téléphone | Aucun appel à Google Fonts |
+Aucune donnée personnelle n'est collectée **par nous** ; la position ne quitte l'appareil que pour calculer un itinéraire. Mais chaque service tiers reçoit l'adresse IP et la requête. Politique de chaque fournisseur vérifiée le 13/10/2026.
 
-Aucune donnée personnelle collectée. La position de l'utilisateur ne quitte pas son appareil.
+| Brique | Service | Ce qu'il reçoit | Conditions d'usage (source) |
+|---|---|---|---|
+| Fond de carte | [OpenFreeMap](https://openfreemap.org), style maison (`src/lib/mapstyle.js`) | IP + zone regardée | Sans limite, commercial OK ; journaux anonymisés effacés sous 7 j ([politique](https://openfreemap.org/privacy/)) |
+| Détails d'un lieu, listes de catégories, horaires | **Tuiles de lieux préparées la nuit** (`scripts/build_places.py`, action GitHub `places.yml`), servies avec le site | Rien : fichiers statiques chez nous | Extrait OSM Paris d'openstreetmap.fr, quotidien |
+| Adresses (France) | [Géoplateforme / Base Adresse Nationale](https://www.data.gouv.fr/dataservices/api-geoplateforme-geocodage/discussions) | IP + texte tapé | Service public, 50 req/s par IP |
+| Noms de lieux | [Photon](https://photon.komoot.io) (instance publique komoot) | IP + texte tapé | « Usage raisonnable », sans garantie ; à auto-héberger avant lancement |
+| Itinéraires à pied / vélo / voiture | [Valhalla FOSSGIS](https://routing.openstreetmap.de/about.html) | IP + départ + arrivée | 1 req/s max ; contactés le 13/10 ; à auto-héberger avant lancement |
+| Transports en commun | [Transitous](https://transitous.org/api/) (MOTIS) | IP + départ + arrivée, station consultée | Projets libres, **usage commercial interdit** ; validé par les mainteneurs ; MOTIS à auto-héberger avant lancement |
+| Photos et textes | Wikidata, Wikipédia, Wikimedia Commons | IP + lieu consulté | Identification par en-tête `Api-User-Agent` |
+| Horaires, guidage, Mes lieux, boussole | Sur l'appareil | Rien | — |
+| Police de l'interface | Police système | Rien | Aucun appel à Google Fonts |
+
+Interdits par les règles du projet : Overpass (limites d'usage incompatibles avec une app), l'API d'édition d'OSM en lecture, Maptoolkit (licence limitée aux petits projets).
+
+### Structure pour tenir au-delà de Paris
+- **Données par tuile** (`src/lib/placestore.js`), URL de base configurable (`VITE_DATA_BASE`, `src/lib/config.js`).
+- **Une interface par besoin** : `geocode.js` (adresses et noms, fournisseur selon le pays), `places.js` (détails et catégories, depuis les tuiles), `routing.js`.
+- **Profil de ville** (`src/lib/cities/paris.js`) : boîtes, arrondissements, enrichissements locaux (sorties, rame, trafic). Une donnée absente = fonction désactivée.
 
 ## Retours des premiers tests (12/10/2026)
 - **Métro** : raccourci « Métro » (stations les plus proches, prochains passages directement dans la liste) ; la recherche comprend « métro », « station », « métro le plus proche » ; les stations restent toujours visibles sur la carte dès le zoom 13.
@@ -71,7 +79,7 @@ Inspirée de Plans, avec une différence assumée : pas de notes (aucune source 
 - Taper « restaurant ce soir 8e », « boulangerie ouverte dimanche », « bar vers 23 h 11e » : la carte se place sur la zone et la liste n'affiche que les lieux ouverts à ce moment (`src/lib/intent.js`, analyse faite sur le téléphone).
 - Dans une liste de catégorie : pastilles « Ouvert maintenant » et « Ouvert à… » (raccourcis Midi / Ce soir / Demain soir, ou jour + heure).
 - **Limite assumée** : à Paris, environ la moitié des commerces ont leurs horaires dans OSM (49 % sur 29 630 lieux de 13 types, extrait du 12/10/2026). Les lieux sans horaires ne sont jamais supprimés : ils sont repliés sous la liste (« Afficher les N lieux aux horaires inconnus »).
-- `static/data/hours.json` couvre désormais tous les commerces et la plupart des lieux publics (26 931 lieux, ~1,2 Mo, ~300 Ko compressé).
+- Les horaires viennent des tuiles de lieux (`data/places/`), plus d'index séparé.
 - La liste d'une catégorie se recharge quand on déplace la carte ; la carte reste sur la zone choisie (fermeture de fiche, bouton Retour, position arrivée tard).
 - Détails d'un lieu lus via Overpass (serveur de secours : overpass.openstreetmap.fr), et non plus via l'API d'édition d'OSM.
 

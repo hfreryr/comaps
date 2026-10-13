@@ -115,7 +115,7 @@ export async function wikiInfo({ wikidata, wikipedia }, signal) {
   const m = /^fr:(.+)$/.exec(wikipedia || '');
   if (m) title = m[1];
   if (wikidata && /^Q\d+$/.test(wikidata)) {
-    const r = await fetch(`https://www.wikidata.org/wiki/Special:EntityData/${wikidata}.json`, { signal }).catch(() => null);
+    const r = await fetch(`https://www.wikidata.org/wiki/Special:EntityData/${wikidata}.json`, { signal, ...WM }).catch(() => null);
     const e = r?.ok ? (await r.json()).entities?.[wikidata] : null;
     title ||= e?.sitelinks?.frwiki?.title || null;
     file = e?.claims?.P18?.[0]?.mainsnak?.datavalue?.value || null;   // image choisie par la communauté Wikidata
@@ -144,12 +144,12 @@ export async function wikiInfo({ wikidata, wikipedia }, signal) {
   };
   const API = 'https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*&prop=imageinfo&iiprop=url|extmetadata&iiurlwidth=1200';
   if (file) {
-    const r = await fetch(`${API}&titles=${encodeURIComponent('File:' + file)}`, { signal }).catch(() => null);
+    const r = await fetch(`${API}&titles=${encodeURIComponent('File:' + file)}`, { signal, ...WM }).catch(() => null);
     const ph = toPhoto(r?.ok ? Object.values((await r.json()).query?.pages || {})[0] : null);
     if (ph) photos.push(ph);
   }
   if (category) {
-    const r = await fetch(`${API}&generator=categorymembers&gcmtype=file&gcmlimit=20&gcmtitle=${encodeURIComponent('Category:' + category)}`, { signal }).catch(() => null);
+    const r = await fetch(`${API}&generator=categorymembers&gcmtype=file&gcmlimit=20&gcmtitle=${encodeURIComponent('Category:' + category)}`, { signal, ...WM }).catch(() => null);
     const pages = r?.ok ? Object.values((await r.json()).query?.pages || {}) : [];
     for (const pg of pages) {
       if (photos.length >= 12) break;

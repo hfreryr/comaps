@@ -1,0 +1,28 @@
+# Lieux par tuile, reconstruits chaque nuit depuis l'extrait OSM de Paris (openstreetmap.fr, mis à jour vers 01:30 UTC)
+# et publiés dans data/places/ du site (branche gh-pages), sans toucher au reste.
+name: Lieux par tuile (nuit)
+on:
+  schedule:
+    - cron: '45 2 * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: main }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: pip install osmium
+      - run: curl -sSfL -o paris.osm.pbf https://download.openstreetmap.fr/extracts/europe/france/ile_de_france/paris-latest.osm.pbf
+      - run: python app/scripts/build_places.py paris.osm.pbf --out out/places
+      - name: Publier dans gh-pages/data/places
+        run: |
+          git fetch --depth=1 origin gh-pages
+          git worktree add pages origin/gh-pages
+          rm -rf pages/data/places && mkdir -p pages/data && cp -r out/places pages/data/places
+          cd pages && git add -A data/places
+          git -c user.name=untracked-bot -c user.email=bot@untrackedmaps.app commit -qm "Lieux par tuile : extrait OSM du $(date -u +%F)" || exit 0
+          git push origin HEAD:gh-pages

@@ -3,7 +3,9 @@
   import * as maplibregl from 'maplibre-gl';
   import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
   import 'maplibre-gl/dist/maplibre-gl.css';
-  import { search, searchCategory, details, reverse, reverseAddress, typeLabel, PARIS } from '#lib/places.js';
+  import { searchCategory, details, typeLabel, fromTags, PARIS } from '#lib/places.js';
+  import { search, reverse, reverseAddress } from '#lib/geocode.js';
+  import { dataDate } from '#lib/placestore.js';
   import { hoursStatus, hoursTable, statusAt, momentLabel } from '#lib/hours.js';
   import { parseIntent, ARR_CENTERS, arrName } from '#lib/intent.js';
   import { draggable } from '#lib/sheet.js';
@@ -340,6 +342,8 @@
   const status = $derived(info?.hours ? hoursStatus(info.hours, place.lat, place.lon) : null);
   const week = $derived(info?.hours ? hoursTable(info.hours, place.lat, place.lon) : null);
   let placeMenu = $state(false);     // menu « ••• » de la fiche lieu
+  let osmDate = $state('');
+  dataDate().then((d) => { if (d) osmDate = new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' }); }).catch(() => {});
   // Fraîcheur : date de la dernière vérification sur place notée dans OSM (check_date).
   const freshness = $derived.by(() => {
     const d = info?.checkDate ? new Date(info.checkDate) : null;
@@ -1215,9 +1219,6 @@
     closePlace();
   }
 
-  // Horaires des lieux des listes : petit index chargé à la première liste ouverte.
-  let hoursIndex = null;
-  const loadHours = () => (hoursIndex ??= fetch(new URL('data/hours.json', location.href)).then((r) => r.json()).catch(() => ({ v: [], k: {} })));
 
   const hitFilter = (c) => (c.transit ? ['==', ['get', 'subclass'], '__none__'] : ['match', ['get', c.by || 'subclass'], c.classes, true, false]);
   const catIcon = (c) => c.icon || FAMILIES[c.family]?.icon || 'dot';
@@ -1243,7 +1244,6 @@
   async function collectCategory(c, origin, fit) {
       const req = ++catRequest;
       const stale = () => req !== catRequest || category?.key !== c.key;
-      const hoursP = loadHours();
       const o = origin || { lat: map.getCenter().lat, lon: map.getCenter().lng };
       const seen = new Set();
       const filter = c.transit
@@ -1271,26 +1271,27 @@
         for (let i = 5; i < nearby.length; i++) nearby[i] = { ...nearby[i], deps: null };
         return;
       }
-      // Compléter avec les lieux hors de la vue (catégories rares : cimetières, piscines…).
-      if (list.length < 12 && c.inc) {
-        const extra = await searchCategory(c.inc, o, undefined, c.q).catch(() => []);
-        const near = (a, b) => dist(a[1], a[0], b[1], b[0]) < 80;
-        for (const f of extra) {
-          const xy = f.geometry.coordinates;
-          if (list.some((n) => n.f.properties.name === f.properties.name && near(n.f.geometry.coordinates, xy))) continue;
-          list.push({ f, d: dist(o.lat, o.lon, xy[1], xy[0]) });
-        }
-        list.sort((a, b) => a.d - b.d);
-        list.splice(80);
-      }
-      const hours = await hoursP;
+      // Compléter avec les lieux des tuiles préparées (tout ce qui est dans la zone, y compris hors de la vue
+      // et sans nom dans la carte) : catégories rares, et horaires de chacun.
+      const bb = map.getBounds();
+      const span = Math.max(bb.getEast() - bb.getWest(), 0.02);
+      const zone = { west: o.lon - span, east: o.lon + span, south: o.lat - span * 0.66, north: o.lat + span * 0.66 };
+      const extra = c.inc ? await searchCategory(c.inc, zone, c.q).catch(() => []) : [];
       if (stale()) return;
-      // identifiant des horaires : celui des tuiles (osm × 10 + 1 nœud / 2 chemin), ou « node/123 » pour les lieux de Photon
-      const hKey = (f) => {
-        const m = /^(node|way)\/(\d+)$/.exec(f.properties.osm || '');
-        return m ? String(Number(m[2]) * 10 + (m[1] === 'node' ? 1 : 2)) : String(f.id);
-      };
-      nearbyAll = list.map((n) => ({ ...n, h: hours.v[hours.k[hKey(n.f)]] || null }));
+      const near = (a, b) => dist(a[1], a[0], b[1], b[0]) < 80;
+      const byName = new Map(extra.map((f) => [f.properties.name, f]));
+      for (const f of extra) {
+        const xy = f.geometry.coordinates;
+        if (list.some((n) => n.f.properties.name === f.properties.name && near(n.f.geometry.coordinates, xy))) continue;
+        list.push({ f, d: dist(o.lat, o.lon, xy[1], xy[0]) });
+      }
+      list.sort((a, b) => a.d - b.d);
+      list.splice(80);
+      // horaires : ceux de la tuile (par nom et position, les identifiants des tuiles de carte étant parfois différents)
+      const hoursOf = (f) => f.tags?.opening_hours
+        || [...(byName.get(f.properties.name) ? [byName.get(f.properties.name)] : [])].find((x) => near(x.geometry.coordinates, f.geometry.coordinates))?.tags?.opening_hours
+        || null;
+      nearbyAll = list.map((n) => ({ ...n, h: hoursOf(n.f) }));
       applyOpenFilter();
       nearbyDone = true;
       // Les plus proches sont hors de la vue (catégorie rare) : on élargit la carte pour les montrer.
@@ -2399,8 +2400,11 @@
           </a>
         </div>
       {/if}
+      {#if info?.covered === false}
+        <p class="contrib">Ce lieu est hors de la zone couverte par nos données détaillées (Paris pour l'instant) : seules les infos de la carte sont affichées.</p>
+      {/if}
       <p class="contrib">
-        Une info manque ou est fausse ?
+        {#if osmDate}Données OpenStreetMap du {osmDate}. {/if}Une info manque ou est fausse ?
         {#if osmEditUrl}<a href={osmEditUrl} target="_blank" rel="noopener">Complétez-la sur OpenStreetMap ↗</a>{:else}<a href={osmNoteUrl} target="_blank" rel="noopener">Signalez-la sur OpenStreetMap ↗</a>{/if},
         la carte libre que nous utilisons. Indiquez ce que vous constatez sur place, sans recopier Google Maps : sa licence l'interdit.
       </p>

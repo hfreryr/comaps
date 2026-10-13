@@ -1,3 +1,5 @@
+import { city, inBox } from './cities/index.js';
+import { dataBase } from './config.js';
 // Itinéraires.
 //  - À pied et à vélo : Valhalla (serveur public FOSSGIS, données OpenStreetMap).
 //  - Transports en commun : Transitous (MOTIS 2, données ouvertes des réseaux de transport).
@@ -151,19 +153,18 @@ function tidy(text) {
 // la plus rapide de la semaine (voir scripts/build_traffic.py). Ce rapport est appliqué tel quel au
 // temps « route libre » calculé par Valhalla : aucun coefficient choisi à la main.
 // Seule hypothèse restante : que le temps Valhalla corresponde bien à la circulation de nuit.
-const PARIS = { w: 2.224, e: 2.47, s: 48.815, n: 48.902 };
 let profile = null;
 
 export async function trafficEstimate(from, to, when = new Date()) {
-  profile ??= fetch(new URL('data/traffic-paris.json', location.href)).then((r) => r.json()).catch(() => null);
+  if (!city.packs?.traffic) return { factor: 1, label: null };   // pas de comptages pour cette ville
+  profile ??= fetch(`${dataBase()}${city.packs.traffic}`).then((r) => r.json()).catch(() => null);
   const p = await profile;
   const parts = new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', weekday: 'long', hour: 'numeric', hourCycle: 'h23' }).formatToParts(when);
   const jour = parts.find((x) => x.type === 'weekday').value;
   const heure = Number(parts.find((x) => x.type === 'hour').value);
   const measured = p?.jours?.[jour]?.ralentissement?.[heure];
   if (measured == null) return { factor: 1, label: null };
-  const inParis = (pt) => pt.lon > PARIS.w && pt.lon < PARIS.e && pt.lat > PARIS.s && pt.lat < PARIS.n;
-  const weight = (inParis(from) ? 0.5 : 0) + (inParis(to) ? 0.5 : 0);   // hors de Paris, pas de mesure : on n'allonge pas
+  const weight = (inBox(city.trafficBox, from) ? 0.5 : 0) + (inBox(city.trafficBox, to) ? 0.5 : 0);   // hors de Paris, pas de mesure : on n'allonge pas
   const factor = 1 + (measured - 1) * weight;
   const level = measured < 1.2 ? 'fluide' : measured < 1.45 ? 'modéré' : measured < 1.7 ? 'chargé' : 'très chargé';
   return { factor, measured, label: weight ? `trafic habituel ${level} le ${jour} vers ${heure} h` : null };

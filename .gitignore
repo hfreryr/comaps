@@ -27,3 +27,4 @@ Thumbs.db
 
 # App
 app/build/
+app/static/data/places/
