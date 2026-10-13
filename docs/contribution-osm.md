@@ -21,39 +21,28 @@
 5. **Prudence** : démarrage limité au 6e arrondissement, petit nombre de questions, revue des premières modifications avec la communauté.
 6. **Opt-out** : un contributeur OSM peut demander qu'on ne pose plus de questions sur un lieu ou un type de donnée.
 
-## 3. Brouillon du message pour le forum OSM France
+## 3. Message d'annonce pour le forum OSM France
 
-*À publier dans la catégorie France de community.openstreetmap.org, au moins 2 semaines avant d'ouvrir la contribution dans l'app.*
+*Annonce (pas une demande d'autorisation) : les Organised Editing Guidelines demandent de prévenir au moins 2 semaines avant ; le silence vaut accord. À publier dans la catégorie France de community.openstreetmap.org.*
 
-> **Titre : Untracked Maps — une app de carte grand public qui invite ses utilisateurs à vérifier les lieux sur place (avis bienvenus)**
+> **Titre : Untracked Maps — annonce : questions de vérification sur place à Paris (6e)**
 >
-> Bonjour à toutes et à tous,
+> Bonjour,
 >
-> Je m'appelle Guy, je porte bénévolement **Untracked Maps** (untrackedmaps.app), une carte web grand public pour Paris, construite sur OSM : tuiles OpenFreeMap, recherche Photon, itinéraires Valhalla et Transitous. Le code est sous AGPL-3.0. L'app ne collecte aucune donnée personnelle et n'utilise aucune mesure d'audience.
+> Je porte bénévolement **Untracked Maps** (untrackedmaps.app), une carte web grand public construite sur OSM, sans pistage, code sous AGPL-3.0. Notre public ne connaît pas OSM ; nous voulons qu'il y contribue proprement.
 >
-> Notre public : des gens qui n'ont jamais entendu parler d'OSM et qui veulent quitter Google Maps. Nous aimerions qu'une partie d'entre eux deviennent contributeurs, **sans dégrader la qualité des données ni charger les bénévoles**. Avant d'écrire la moindre ligne de code d'édition, nous voulons votre avis.
+> **Ce qui arrivera, au plus tôt dans deux semaines :** dans la fiche d'un lieu, une question courte sur ce que la personne voit sur place (« Ce commerce existe-t-il toujours ? », « Ouvert le dimanche ? »…). La modification part **avec le compte OSM de la personne**, signée `created_by=Untracked Maps` et `#untrackedmaps`.
 >
-> **Ce que nous envisageons**
-> - Dans la fiche d'un lieu, une question courte sur ce que la personne voit sur place, par exemple : « Ce commerce est-il toujours ouvert ? », « Ouvert le dimanche ? », « Accessible en fauteuil ? ». Réponse en un geste, à la manière de StreetComplete.
-> - La modification part **avec le compte OSM de la personne** (OAuth), jamais avec un compte de l'app. Elle est signée `created_by=Untracked Maps` et porte le hashtag `#untrackedmaps`.
-> - Une réponse « c'est bien ça » met à jour `check_date`. C'est l'info que nous affichons en tête de fiche (« Infos vérifiées en sept. 2026 »).
-> - Les lieux à vérifier en priorité sont repérés en croisant OSM avec Overture Maps (lieux absents ou au score faible). **Ce croisement ne modifie jamais OSM** : il sert seulement à choisir à qui poser quelle question.
+> **Nous reprenons les pratiques existantes** :
+> - [Good practice](https://wiki.openstreetmap.org/wiki/Good_practice) : on cartographie ce qu'on voit sur place, et rien n'est copié d'autres cartes (l'app le rappelle) ;
+> - [les règles des quêtes StreetComplete](https://github.com/streetcomplete/StreetComplete/blob/master/CONTRIBUTING_A_NEW_QUEST.md) : questions courtes, une information à la fois, `check_date` mis à jour quand la réponse confirme l'existant ;
+> - [Organised Editing Guidelines](https://osmfoundation.org/wiki/Organised_Editing_Guidelines) : page wiki publique, bilan mensuel.
 >
-> **Garde-fous prévus**
-> - Pas de modification automatique, pas d'import.
-> - Rappel explicite : on indique ce qu'on constate sur place, on ne recopie pas Google Maps.
-> - Démarrage limité au 6e arrondissement, avec un petit nombre de types de questions.
-> - Page wiki publique (*Organised Editing/Activities*) avec contact, objectifs, questions posées et bilan mensuel.
-> - Revue des premières modifications avec celles et ceux d'entre vous qui le souhaitent, et possibilité de demander l'arrêt d'une question.
+> Aucune modification automatique ni aucun import. Nous démarrons sur le 6e arrondissement uniquement.
 >
-> **Nos questions**
-> 1. Quelles questions vous semblent utiles, et lesquelles risquent de produire des données de mauvaise qualité ?
-> 2. Pour un lieu signalé fermé : faut-il modifier directement (`disused:shop=*`…), ou créer une note pour qu'un contributeur confirmé tranche ?
-> 3. Y a-t-il des personnes à Paris prêtes à relire les premières modifications ?
+> Remarques, critiques et envies de relire les premières modifications sont bienvenues ici ou à [contact].
 >
-> Merci d'avance pour vos retours, même critiques.
->
-> Guy — contact : [à compléter]
+> Guy
 
 ## 4. Page wiki (à créer après le retour du forum)
 
