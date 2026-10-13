@@ -1,44 +1,61 @@
-# Untracked
+# Untracked Maps
 
-Une carte aussi agréable que Google Maps, qui ne vous piste pas. Pour celles et ceux qui ont déjà choisi Signal, Proton ou Brave. Bâtie sur OpenStreetMap et des moteurs libres.
+**Une carte aussi agréable que Google Maps, qui ne vous piste pas.**
+Pour celles et ceux qui ont déjà choisi Signal, Proton ou Brave.
 
-**Ville pilote : Paris** (vérifications terrain d'abord sur un arrondissement).
+👉 **[untrackedmaps.app](https://untrackedmaps.app)** (à ouvrir sur un téléphone)
 
-Rendre les cartes libres basées sur OpenStreetMap (OSM) **aussi fiables et aussi agréables** que Google Maps.
+Untracked Maps est une app web de cartographie grand public, construite sur [OpenStreetMap](https://www.openstreetmap.org) et des moteurs libres. Ce n'est ni un fork ni une extension d'une autre app : c'est notre propre app, qui vise le niveau de finition de Google Maps et de Plans d'Apple. Ville pilote : **Paris**.
+
+- **Aucune donnée personnelle collectée**, pas de mesure d'audience, pas de compte.
+- **Aucune dépendance à Google.**
+- **Code libre** (AGPL-3.0) ; tout ce qui est corrigé sur la carte repart dans OpenStreetMap.
+
+## Ce que fait l'app
+
+- **Recherche** en langage courant : « restaurant ce soir 8e », « boulangerie ouverte dimanche » ; 60 catégories que chacun choisit et réordonne ; filtres « ouvert maintenant » et « ouvert à… ».
+- **Fiche lieu** : ouvert ou fermé, date de dernière vérification sur place, horaires de la semaine, « bon à savoir » (paiement, terrasse, accessibilité…), photos Wikimedia en plein écran.
+- **Transports en commun** : prochains passages en temps réel, sorties de métro, place conseillée dans la rame.
+- **Itinéraires** à pied, à vélo, en transports et en voiture : choix entre plusieurs trajets, arrêt intermédiaire, guidage pas à pas vocal.
+- **Mes lieux** sans compte ni serveur : listes, Maison et Travail, import depuis Google Takeout, transfert vers un autre appareil par lien ou QR code, sauvegarde chiffrée.
+- **Position** : direction façon boussole, carte qui tourne avec vous.
+
+Détails techniques et sources de données : [`app/README.md`](app/README.md).
 
 ## Deux chantiers
 
-### 1. 🔍 Fraîcheur des lieux (`pipeline/`)
-Repérer automatiquement les lieux d'OSM qui ne sont plus à jour — en commençant par les **commerces fermés** — en comparant OSM avec [Overture Maps](https://overturemaps.org).
+### 1. 🗺️ L'app (`app/`)
+SvelteKit + MapLibre, site statique. Fond de carte OpenFreeMap, recherche Photon, détails des lieux via Overpass, itinéraires Valhalla (FOSSGIS) et Transitous. Testée avec de vrais utilisateurs, chronométrés face à Google Maps.
 
-- Aucune modification automatique d'OSM sans accord préalable de la communauté.
-- Toute amélioration repart dans OSM : toutes les apps libres en profitent.
+### 2. 🔍 Fraîcheur des lieux (`pipeline/`)
+Repérer les lieux d'OSM qui ne sont plus à jour, en commençant par les **commerces fermés**, en croisant OSM avec [Overture Maps](https://overturemaps.org). Pilote : Paris 6e.
 
-### 2. 🗺️ L'app (`app/`)
-Concevoir et tester une expérience à la hauteur de Google Maps, d'abord sur le parcours **« faire un itinéraire »**.
+L'objectif : que l'app affiche « vérifié il y a 3 semaines » plutôt que des notes, et invite les gens sur place à confirmer ou corriger, avec leur propre compte OSM.
 
-- Prototypes testés avec de vrais utilisateurs, comparés à Google Maps.
-- Notre propre app web, branchée sur des moteurs libres : https://untrackedmaps.app
+## Contribuer à OpenStreetMap, dans les règles
+
+- **Aucune modification automatique ni aucun import.** Le pipeline repère, une personne confirme.
+- Les futures questions posées sur place partiront **avec le compte OSM de chaque utilisateur**, signées `created_by=Untracked Maps`.
+- Rien ne vient de Google Maps ou d'une autre carte protégée.
+- Annonce à la communauté : [forum OSM France](https://forum.openstreetmap.fr/t/untracked-maps-annonce-questions-de-verification-sur-place-a-paris-6e/47449). Règles détaillées : [`docs/contribution-osm.md`](docs/contribution-osm.md).
 
 ## Feuille de route
 
-| Étape | Objectif | Réussite si… |
+| Étape | Objectif | État |
 |---|---|---|
-| 0. Installation ✅ | Dépôt prêt | Premier script exécuté |
-| 1. Cadrage | Ville : Paris ✅ — 6e arrondissement ✅ | Périmètre écrit ici |
-| 2. Détection ✅ | Lister les lieux OSM peut-être fermés (voir `pipeline/README.md`) | Liste reproductible + carte |
-| 3. Mesure | Vérifier 30 à 50 cas sur le terrain | Taux de fiabilité chiffré |
-| 4. App : carte, recherche, fiche lieu ✅ | Prototype en ligne (`app/`) | Testé sur téléphone |
-| 5. App : itinéraires ✅ | À pied, à vélo, en transports | Testé par 5 personnes face à Google Maps |
-| 6. Communauté OSM | Présenter les résultats du pipeline | Accord ou retour constructif |
-| 7. Bot | Corriger automatiquement les cas très sûrs | Corrections non annulées |
+| App : carte, recherche, fiche lieu, itinéraires, guidage | Prototype en ligne | ✅ |
+| Tests utilisateurs | 5 personnes face à Google Maps | 2 faites, 3 prévues |
+| Comparaison chiffrée | 20 recherches types, Untracked vs Google | À faire |
+| Fraîcheur des lieux | Détection Paris 6e, puis vérification de 50 cas sur le terrain | Détection ✅, vérification à faire |
+| Questions sur place | Vérification par les utilisateurs, avec leur compte OSM | Après l'annonce à la communauté |
+| Autonomie | Nos propres serveurs Île-de-France (recherche, itinéraires, transports) | À chiffrer |
 
 ## Valeurs
 
-- **Communs** : tout repart dans OSM, aucun silo
-- **Frugalité** : coût minimal, auto-hébergeable, pas de dépendance propriétaire
-- **Zéro pistage** : aucune donnée personnelle collectée
-- **Exigence UX** : la frugalité n'excuse pas une mauvaise expérience
+- **Zéro pistage** : aucune donnée personnelle collectée.
+- **Communs** : tout ce qui est corrigé repart dans OSM, aucun silo.
+- **Frugalité** : coût minimal, auto-hébergeable, pas de dépendance propriétaire.
+- **Exigence UX** : la frugalité n'excuse pas une mauvaise expérience.
 
 ## Licences
 
