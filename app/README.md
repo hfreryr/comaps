@@ -101,3 +101,7 @@ En transports, quand on descend du métro ou du RER, le trajet à pied qui suit 
 - **Aucune requête Panoramax à l'usage** : l'app charge seulement l'image choisie (`sd.jpg`, 2048 × 1024, ≈ 230 Ko) et la **recadre à l'affichage** (CSS : secteur de 45° orienté vers le lieu). Plein écran : le panorama entier, ouvert sur le lieu, à faire défiler.
 - Où : en tête de fiche (quand il n'y a pas de photo Wikimedia), vignette dans les listes, pastille-photo sur la carte pour le lieu ouvert et les 6 plus proches d'une liste.
 - **Limites** : ≈ 230 Ko par photo (des vignettes préparées à l'avance demanderaient un serveur : prévu avec P2) ; le cadrage est automatique, donc parfois la boutique voisine (vérifié sur un échantillon : 3 sur 4 justes) ; `container-type` / `cqw` requis (navigateurs depuis 2023).
+
+## Page « Qui voit quoi » (13/10/2026)
+
+`/confidentialite` : ce que l'app envoie, à qui, et ce que chaque service en fait (politiques vérifiées le 13/10/2026), ce qui ne quitte jamais le téléphone, et ce qui changera avant un lancement public. Liée depuis le message d'accueil et les crédits de la carte. À mettre à jour à chaque changement de service.

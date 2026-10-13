@@ -283,7 +283,7 @@
       zoom: 13,
       hash: 'carte',
       attributionControl: { compact: true, customAttribution:
-        'Recherche <a href="https://photon.komoot.io" target="_blank" rel="noopener">Photon / komoot</a> · Itinéraires <a href="https://valhalla1.openstreetmap.de" target="_blank" rel="noopener">Valhalla / FOSSGIS</a>, <a href="https://transitous.org/sources/" target="_blank" rel="noopener">Transitous</a> · <a href="https://github.com/hfreryr/untracked" target="_blank" rel="noopener">Projet libre</a>' },
+        'Recherche <a href="https://photon.komoot.io" target="_blank" rel="noopener">Photon / komoot</a> · Itinéraires <a href="https://valhalla1.openstreetmap.de" target="_blank" rel="noopener">Valhalla / FOSSGIS</a>, <a href="https://transitous.org/sources/" target="_blank" rel="noopener">Transitous</a> · <a href="https://github.com/hfreryr/untracked" target="_blank" rel="noopener">Projet libre</a> · <a href="confidentialite">Qui voit quoi</a>' },
       fadeDuration: 200
     });
     map.setMissingStyleImageResolver((id) => provideImage(map, id));
@@ -2554,7 +2554,7 @@
   {#if showPromise && !place && !category && !directions && !importOpen && !editChips}
     <div class="promise" role="note">
       <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2.5" /><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" /></svg>
-      <p><strong>Une carte qui ne vous piste pas.</strong> Ni compte, ni publicité, rien sur vous n'est collecté. Vos favoris restent sur votre téléphone.</p>
+      <p><strong>Une carte qui ne vous piste pas.</strong> Ni compte, ni publicité, rien sur vous n'est collecté. Vos favoris restent sur votre téléphone. <a href="confidentialite" class="promise-link">Qui voit quoi ?</a></p>
       <button onclick={closePromise}>Compris</button>
     </div>
   {/if}
@@ -3505,6 +3505,7 @@
   .status.is-closed, .r-meta .is-closed { color: var(--closed); }
   .muted { color: var(--muted); font-weight: 400; }
 
+  .promise-link { color: inherit; font-weight: 600; text-decoration: underline; }
   /* ——— Devantures (Panoramax) ——— */
   :global(.facade) { display: block; position: relative; overflow: hidden; container-type: inline-size; aspect-ratio: 4 / 3; background: var(--fill); }
   :global(.facade img) { position: absolute; width: 800cqw; height: 400cqw; max-width: none; left: calc(50cqw - var(--fx) * 800cqw); top: -155cqw; }
