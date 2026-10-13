@@ -63,7 +63,46 @@ export function practical(t) {
   return out;
 }
 
-const stripTags = (html = '') => html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+/**
+ * « Bon à savoir » : ce que les contributeurs d'OpenStreetMap ont noté sur le lieu
+ * (paiement, terrasse, régimes, chiens…). Rien n'est déduit : seules les infos présentes s'affichent.
+ */
+export function goodToKnow(t) {
+  const out = [];
+  const add = (text, ok = true) => out.push({ text, ok });
+  const yes = (k) => ['yes', 'only', 'designated'].includes(t[k]);
+  if (t.heritage || t['heritage:operator'] === 'mhs' || t['ref:mhs']) add('Monument historique');
+  if (yes('payment:contactless')) add('Paiement sans contact');
+  if (yes('payment:credit_cards') || yes('payment:cards') || yes('payment:debit_cards')) add('Cartes bancaires acceptées');
+  else if (t['payment:credit_cards'] === 'no' || t['payment:cards'] === 'no') add('Cartes bancaires refusées', false);
+  if (t['payment:cash'] === 'no') add('Espèces refusées', false);
+  if (t['payment:meal_voucher'] === 'yes' || t['payment:cheque_dejeuner'] === 'yes') add('Titres-restaurant acceptés');
+  if (t.outdoor_seating === 'yes') add('Terrasse');
+  if (t['diet:vegan'] === 'only') add('100 % végétalien');
+  else if (t['diet:vegetarian'] === 'only') add('100 % végétarien');
+  else if (yes('diet:vegan')) add('Options végétaliennes');
+  else if (yes('diet:vegetarian')) add('Options végétariennes');
+  if (yes('diet:gluten_free')) add('Options sans gluten');
+  if (yes('takeaway')) add(t.takeaway === 'only' ? 'Uniquement à emporter' : 'À emporter');
+  if (t.delivery === 'yes') add('Livraison');
+  if (t.reservation === 'required') add('Réservation obligatoire', false);
+  else if (t.reservation === 'recommended') add('Réservation conseillée');
+  else if (t.reservation === 'yes') add('Réservation possible');
+  else if (t.reservation === 'no') add('Sans réservation');
+  if (['wlan', 'yes', 'wifi'].includes(t.internet_access)) add(t['internet_access:fee'] === 'no' ? 'Wi-Fi gratuit' : 'Wi-Fi');
+  if (t.air_conditioning === 'yes') add('Climatisé');
+  if (t.toilets === 'yes') add(t['toilets:wheelchair'] === 'yes' ? 'Toilettes accessibles' : 'Toilettes');
+  if (t.changing_table === 'yes') add('Table à langer');
+  if (t.dog === 'yes' || t.dog === 'leashed') add(t.dog === 'leashed' ? 'Chiens acceptés en laisse' : 'Chiens acceptés');
+  else if (t.dog === 'no') add('Chiens interdits', false);
+  if (t.self_service === 'yes') add('Libre-service');
+  if (t.second_hand === 'only') add("Seconde main");
+  if (t.organic === 'only') add('100 % bio');
+  else if (t.organic === 'yes') add('Produits bio');
+  return out;
+}
+
+const stripTags =(html = '') => html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
 
 /**
  * Extrait Wikipédia (français) et photo Commons d'un lieu.

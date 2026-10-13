@@ -337,7 +337,40 @@
   let lastEdit = { which: null, at: 0 }; // champ quitté juste avant un toucher sur la carte
 
   const status = $derived(info?.hours ? hoursStatus(info.hours, place.lat, place.lon) : null);
-  const week = $derived(showWeek && info?.hours ? hoursTable(info.hours, place.lat, place.lon) : null);
+  const week = $derived(info?.hours ? hoursTable(info.hours, place.lat, place.lon) : null);
+  let placeMenu = $state(false);     // menu « ••• » de la fiche lieu
+  // Fraîcheur : date de la dernière vérification sur place notée dans OSM (check_date).
+  const freshness = $derived.by(() => {
+    const d = info?.checkDate ? new Date(info.checkDate) : null;
+    if (!d || isNaN(d)) return null;
+    const months = (Date.now() - d) / 2.63e9;
+    const when = d.toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' });
+    return months <= 24 ? { ok: true, text: `Infos vérifiées en ${when}` } : { ok: false, text: `Infos non vérifiées depuis ${d.getFullYear()}` };
+  });
+  // Bandeau d'infos (distance, accès, entrée) : seulement ce qui est connu.
+  const infoStrip = $derived.by(() => {
+    const out = [];
+    if (me && place) out.push({ label: 'Distance', value: fmtDistance(dist(me.lat, me.lon, place.lat, place.lon)) });
+    const wc = { yes: 'Oui', limited: 'Partiel', no: 'Non' }[info?.wheelchair];
+    if (wc) out.push({ label: 'Accès fauteuil', value: wc, wc: true });
+    const fee = { no: 'Gratuite', yes: 'Payante' }[info?.fee];
+    if (fee) out.push({ label: 'Entrée', value: fee });
+    return out;
+  });
+  // Liens vers OpenStreetMap : c'est l'utilisateur qui modifie, sur le site d'OSM (nous n'écrivons rien).
+  const osmEditUrl = $derived(place?.osmType ? `https://www.openstreetmap.org/edit?${place.osmType}=${place.osmId}` : null);
+  const osmNoteUrl = $derived(place ? `https://www.openstreetmap.org/note/new#map=19/${(+place.lat).toFixed(6)}/${(+place.lon).toFixed(6)}` : '');
+  const inFav = $derived(!!savedEntry?.lists?.includes('fav'));
+  const isPinned = $derived(!!place && pins.includes(placeKey(place)));
+  function favTap() {
+    const was = inFav;
+    setMembership('fav', !was);
+    if (!was) say(`Ajouté à ${listOf('fav').name}`, { label: 'Autre liste', run: () => (listPicker = true) });
+  }
+  async function copyAddress() {
+    placeMenu = false;
+    try { await navigator.clipboard.writeText([title, address].filter(Boolean).join(', ')); say('Adresse copiée'); } catch { /* refusé */ }
+  }
   const activeQuery = $derived(editing ? fieldQuery : query);
   const catHit = $derived(editing ? null : categoryFor(query));
   const showList = $derived(editing ? true : focused && (query.trim().length >= 2 || !query.trim()));
@@ -1129,6 +1162,7 @@
 
   function closePlace() {
     place = null;
+    placeMenu = false;
     viewer = null;
     info = null;
     deps = null;
@@ -1331,6 +1365,7 @@
   // Fermer « ce qui est au-dessus » : Échap, ou le bouton Retour du téléphone.
   function closeTop() {
     if (viewer != null) viewer = null;
+    else if (placeMenu) placeMenu = false;
     else if (listPicker) listPicker = false;
     else if (hubPanel) hubPanel = null;
     else if (savedList) { savedList = null; refreshSaved(); }
@@ -2067,72 +2102,75 @@
 {/snippet}
 
 {#snippet rowsBlock()}
-      <ul class="rows">
-        {#if address}
-          <li class="row">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z" /><circle cx="12" cy="9.5" r="2.5" /></svg>
-            <span>{address}</span>
-          </li>
-        {/if}
-        {#if status}
-          <li class="row">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></svg>
-            <button class="row-btn" onclick={() => (showWeek = !showWeek)} aria-expanded={showWeek}>
-              <span>{showWeek ? 'Masquer les horaires' : 'Voir les horaires de la semaine'}</span>
-              <svg viewBox="0 0 24 24" aria-hidden="true" class="chev" class:flip={showWeek}><path d="m7 10 5 5 5-5" /></svg>
-            </button>
-          </li>
-          {#if week}
-            <li class="week-row">
-              <table class="week"><tbody>
-                {#each week as d}<tr class:today={d.today}><th>{d.day}</th><td>{d.text}</td></tr>{/each}
-              </tbody></table>
-            </li>
-          {/if}
-        {:else if info?.expectsHours && !isStation}
-          <li class="row muted">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></svg>
-            <span>Horaires non renseignés<small class="why">Personne ne les a encore ajoutés à la carte collaborative que nous utilisons (OpenStreetMap).</small></span>
-          </li>
-        {/if}
-        {#if info?.phone}
-          <li class="row">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.6 3.5 9 3l2 4.6-2.3 1.6a12 12 0 0 0 6.1 6.1l1.6-2.3L21 15l-.5 2.4A3 3 0 0 1 17.6 20C10 20 4 14 4 6.4a3 3 0 0 1 2.6-2.9z" /></svg>
-            <a class="row-link" href={`tel:${info.phone.replace(/\s/g, '')}`}>{info.phone}</a>
-          </li>
-        {/if}
-        {#if info?.website}
-          <li class="row">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M3.5 12h17M12 3.5c2.5 2.6 3.6 5.4 3.6 8.5s-1.1 5.9-3.6 8.5M12 3.5C9.5 6.1 8.4 8.9 8.4 12s1.1 5.9 3.6 8.5" /></svg>
-            <a class="row-link" href={href(info.website)} target="_blank" rel="noopener">{host(info.website)}</a>
-          </li>
-        {/if}
-        {#if !isStation}
-          <li class="row sc-row">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.5 12 5l8 6.5M6.5 10v9.5h11V10" /><path d="M10.2 19.5v-4.8h3.6v4.8" /></svg>
-            {#if placeShortcut}
-              <span>Votre {SHORT_NAMES[placeShortcut].toLowerCase()}</span>
-              <button class="link" onclick={() => { const k = placeShortcut, old = shortcuts[k]; setShortcut(k, null); say(`${SHORT_NAMES[k]} retiré`, { label: 'Annuler', run: () => setShortcut(k, old) }); }}>Retirer</button>
-            {:else}
-              <span>Définir comme</span>
-              <button class="link" onclick={() => { setShortcut('home', place); say('Maison enregistrée · gardée sur cet appareil'); }}>Maison</button>
-              <button class="link" onclick={() => { setShortcut('work', place); say('Travail enregistré · gardé sur cet appareil'); }}>Travail</button>
+      <!-- Bon à savoir : infos notées par les contributeurs OSM, rien de déduit -->
+      {#if info?.good?.length}
+        <section class="psec">
+          <h2>Bon à savoir</h2>
+          <ul class="good">
+            {#each info.good as g}
+              <li class:no={!g.ok}>
+                {#if g.ok}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>
+                {:else}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" /></svg>{/if}
+                <span>{g.text}</span>
+              </li>
+            {/each}
+          </ul>
+        </section>
+      {/if}
+
+      {#if week}
+        <section class="psec">
+          <h2>Horaires</h2>
+          <table class="week"><tbody>
+            {#each week as d}<tr class:today={d.today}><th>{d.day}</th><td>{d.text}</td></tr>{/each}
+          </tbody></table>
+        </section>
+      {:else if info?.expectsHours && !isStation}
+        <section class="psec">
+          <h2>Horaires</h2>
+          <p class="muted small">Personne ne les a encore ajoutés à OpenStreetMap, la carte libre que nous utilisons.</p>
+          {#if osmEditUrl}<a class="link ext" href={osmEditUrl} target="_blank" rel="noopener">Ajouter les horaires ↗</a>{/if}
+        </section>
+      {/if}
+
+      {#if info?.phone || info?.website || address}
+        <section class="psec">
+          <h2>Détails</h2>
+          <dl class="details">
+            {#if info?.phone}
+              <div><dt>Téléphone</dt><dd><a href={`tel:${info.phone.replace(/\s/g, '')}`}>{info.phone}</a></dd></div>
             {/if}
-          </li>
-        {/if}
-        {#each info?.practical || [] as d}
-          <li class="row">
-            {#if d.icon === 'wheelchair'}
-              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="4.5" r="1.8" /><path d="M11 7.5v6h5l2 5M11 10h4M8.5 11.2a5 5 0 1 0 6.3 6.3" /></svg>
-            {:else if d.icon === 'ticket'}
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16v3a2 2 0 0 0 0 4v3H4v-3a2 2 0 0 0 0-4z" /><path d="M14 7v10" stroke-dasharray="2 2" /></svg>
-            {:else}
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 20.5h17M5 20.5v-9M19 20.5v-9M9 20.5v-9M15 20.5v-9M3.5 11.5h17L12 4z" /></svg>
+            {#if info?.website}
+              <div><dt>Site web</dt><dd><a href={href(info.website)} target="_blank" rel="noopener">{host(info.website)}</a></dd></div>
             {/if}
-            <span>{d.text}</span>
-          </li>
-        {/each}
-      </ul>
+            {#if address}
+              <div><dt>Adresse</dt><dd class="selectable">{address}</dd></div>
+            {/if}
+          </dl>
+        </section>
+      {/if}
+
+      {#if placeShortcut}
+        <p class="sc-note">Votre {SHORT_NAMES[placeShortcut].toLowerCase()} · <button class="link" onclick={() => { const k = placeShortcut, old = shortcuts[k]; setShortcut(k, null); say(`${SHORT_NAMES[k]} retiré`, { label: 'Annuler', run: () => setShortcut(k, old) }); }}>Retirer</button></p>
+      {/if}
+
+      {#if !isAddress}
+        <div class="end-btns">
+          <button class="end-btn" class:on={isPinned} onclick={() => { const was = isPinned; togglePin(place); say(was ? 'Désépinglé' : 'Épinglé en haut de Mes lieux'); }}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3.5h6l-1 6 3.5 3.5h-11L10 9.5zM12 13v7.5" /></svg>
+            <span>{isPinned ? 'Épinglé' : 'Épingler'}</span>
+          </button>
+          <a class="end-btn" aria-label="Signaler un problème sur OpenStreetMap" href={osmNoteUrl} target="_blank" rel="noopener">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4 21 19.5H3z" /><path d="M12 10v4.5M12 17v.3" /></svg>
+            <span>Signaler</span>
+          </a>
+        </div>
+      {/if}
+      <p class="contrib">
+        Une info manque ou est fausse ?
+        {#if osmEditUrl}<a href={osmEditUrl} target="_blank" rel="noopener">Complétez-la sur OpenStreetMap ↗</a>{:else}<a href={osmNoteUrl} target="_blank" rel="noopener">Signalez-la sur OpenStreetMap ↗</a>{/if},
+        la carte libre que nous utilisons. Indiquez ce que vous constatez sur place, sans recopier Google Maps : sa licence l'interdit.
+      </p>
 {/snippet}
 
 <div class="app" class:routing={directions} class:navigating={!!nav} style:--top-h={`${directions ? topH : searchH + 16}px`}>
@@ -2576,24 +2614,36 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" /></svg>
       </button>
 
-      <h1>{title}</h1>
-      <p class="kind">{isAddress
-        ? (place.name.split(',').slice(1).join(',').trim() || place.address || 'Adresse')
-        : [stationKind || info?.kind || place.type, info?.cuisine && info.cuisine.split(';')[0].replace(/_/g, ' ')].filter(Boolean).join(' · ') || 'Lieu'}</p>
-      {#if info === null}
-        <p class="status muted">Chargement…</p>
-      {:else if status}
-        <p class="status" class:is-open={status.open === true} class:is-closed={status.open === false}>{status.label}</p>
+      <button class="share left" onclick={sharePlace} aria-label="Partager">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5v11M8 7.5l4-4 4 4M6 11.5H5v8h14v-8h-1" /></svg>
+      </button>
+      <div class="phead">
+        <h1>{title}</h1>
+        <p class="kind">{isAddress
+          ? (place.name.split(',').slice(1).join(',').trim() || place.address || 'Adresse')
+          : [stationKind || info?.kind || place.type, info?.cuisine && info.cuisine.split(';')[0].replace(/_/g, ' ')].filter(Boolean).join(' · ') || 'Lieu'}</p>
+      </div>
+
+      <!-- En un coup d'œil : ouvert ? loin ? encore à jour ? -->
+      <p class="glance">
+        {#if info === null}<span class="muted">Chargement…</span>
+        {:else if status}<span class="st" class:is-open={status.open === true} class:is-closed={status.open === false}>{status.label}</span>{/if}
+      </p>
+      {#if freshness}
+        <p class="fresh" class:old={!freshness.ok}>
+          {#if freshness.ok}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>{/if}{freshness.text}
+        </p>
       {/if}
 
-      <div class="actions">
+      <div class="actions" class:solo={!info?.phone && !info?.website}>
         <button class="action primary" onclick={startDirections}>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8 21.2 12 12 21.2 2.8 12z" class="solid" /><path d="M9.5 14.5v-2.2a1.5 1.5 0 0 1 1.5-1.5h4M13 8.8l2 2-2 2" class="on-solid" /></svg>
-          <span>Itinéraire{#if walkEta}<span class="act-eta" aria-label={walkEta}>&nbsp;· {walkEta.replace(' à pied', '').replace('≈ ', '')}</span>{/if}</span>
-        </button>
-        <button class="action" class:saved={isFav} onclick={saveTap} aria-pressed={isFav} style:--lc={isFav ? listOf(savedEntry.lists[0]).color : null}>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.3l-1.3-1.2C6 14.9 3 12.2 3 8.9 3 6.2 5.1 4 7.8 4c1.5 0 3 .7 4.2 1.9C13.2 4.7 14.7 4 16.2 4 18.9 4 21 6.2 21 8.9c0 3.3-3 6-7.7 10.2z" /></svg>
-          <span>{isFav ? (savedEntry.lists.length > 1 ? `${savedEntry.lists.length} listes` : listOf(savedEntry.lists[0]).name) : 'Enregistrer'}</span>
+          {#if walkEta && /min/.test(walkEta)}
+            {@render modeIcon('walk')}
+            <span>{walkEta.replace(' à pied', '').replace('≈ ', '')}</span>
+          {:else}
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8 21.2 12 12 21.2 2.8 12z" class="solid" /><path d="M9.5 14.5v-2.2a1.5 1.5 0 0 1 1.5-1.5h4M13 8.8l2 2-2 2" class="on-solid" /></svg>
+            <span>Itinéraire</span>
+          {/if}
         </button>
         {#if info?.phone}
           <a class="action" href={`tel:${info.phone.replace(/\s/g, '')}`}>
@@ -2607,11 +2657,13 @@
             <span>Site web</span>
           </a>
         {/if}
-        <button class="action" onclick={sharePlace}>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5v11M8 7.5l4-4 4 4M6 11.5H5v8h14v-8h-1" /></svg>
-          <span>Partager</span>
-        </button>
       </div>
+
+      {#if infoStrip.length}
+        <dl class="strip">
+          {#each infoStrip as it}<div><dt>{it.label}</dt><dd>{it.value}</dd></div>{/each}
+        </dl>
+      {/if}
 
       <!-- Ordre selon ce qui sert le plus : une station → prochains passages et sorties d'abord ;
            un commerce → horaires, téléphone, site avant le texte Wikipédia ; un monument → photo et histoire. -->
@@ -2622,9 +2674,34 @@
       {:else}
         {@render photoBlock()}{@render aboutBlock()}{@render rowsBlock()}
       {/if}
-      {#if info?.checkDate}
-        <p class="fresh">Informations vérifiées le {new Date(info.checkDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-      {/if}
+
+      <!-- Barre flottante : favori, listes, plus -->
+      <div class="fab-bar">
+        {#if placeMenu}
+          <div class="pmenu" role="menu">
+            {#if !isStation}
+              {#each ['home', 'work'] as k}
+                <button role="menuitem" onclick={() => { placeMenu = false; if (placeShortcut === k) { const old = shortcuts[k]; setShortcut(k, null); say(`${SHORT_NAMES[k]} retiré`, { label: 'Annuler', run: () => setShortcut(k, old) }); } else { setShortcut(k, place); say(`${SHORT_NAMES[k]} enregistré · gardé sur cet appareil`); } }}>
+                  {placeShortcut === k ? `Retirer « ${SHORT_NAMES[k]} »` : `Définir comme ${SHORT_NAMES[k]}`}
+                </button>
+              {/each}
+            {/if}
+            <button role="menuitem" onclick={copyAddress}>Copier l'adresse</button>
+            <button role="menuitem" onclick={() => { placeMenu = false; sharePlace(); }}>Partager</button>
+          </div>
+        {/if}
+        <div class="fab">
+          <button class:on={inFav} onclick={favTap} aria-pressed={inFav} aria-label={inFav ? `Retirer de ${listOf('fav').name}` : `Ajouter à ${listOf('fav').name}`}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.3l-1.3-1.2C6 14.9 3 12.2 3 8.9 3 6.2 5.1 4 7.8 4c1.5 0 3 .7 4.2 1.9C13.2 4.7 14.7 4 16.2 4 18.9 4 21 6.2 21 8.9c0 3.3-3 6-7.7 10.2z" /></svg>
+          </button>
+          <button class:on={isFav && savedEntry.lists.some((x) => x !== 'fav')} onclick={() => (listPicker = true)} aria-label="Ajouter à une liste">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+          </button>
+          <button onclick={() => (placeMenu = !placeMenu)} aria-expanded={placeMenu} aria-label="Plus d'options">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="1.4" class="solid" /><circle cx="12" cy="12" r="1.4" class="solid" /><circle cx="18" cy="12" r="1.4" class="solid" /></svg>
+          </button>
+        </div>
+      </div>
     </section>
   {:else if category && !directions}
     <section class="sheet" aria-label={category.label} use:draggable={{ key: category.label, onDismiss: clearCategory }}>
@@ -3151,10 +3228,20 @@
   .viewer-credit a { color: rgb(255 255 255 / 0.85); text-decoration: none; }
   .swipe-row { position: relative; overflow: hidden; }
   .nearby button { box-sizing: border-box; }
-  .swipe-row .n-main { position: relative; z-index: 1; background: var(--card); transition: transform 0.2s ease; }
-  .swipe-row.swiped .n-main { transform: translateX(-76px); }
-  .nearby .swipe-del { position: absolute; padding: 0; right: 0; top: 0; bottom: 0; width: 76px; border: 0; background: var(--closed); color: #fff;
-    display: grid; place-items: center; cursor: pointer; }
+  .swipe-row .n-main { position: relative; z-index: 1; background: var(--card); transition: width 0.2s ease; }
+  /* Poubelle visible : la ligne se rétrécit (le texte reste lisible) au lieu de glisser hors de la fiche */
+  .swipe-row.swiped .n-main { width: calc(100% - 72px); }
+  .nearby .swipe-del { position: absolute; padding: 0; right: 0; top: 0; bottom: 0; width: 72px; border: 0; border-top: 1px solid var(--line);
+    background: var(--closed); color: #fff; display: grid; grid-template-columns: 1fr; place-items: center; cursor: pointer; }
+  .nearby button.swipe-del:hover { background: color-mix(in srgb, var(--closed) 85%, #000); }
+  /* Ordinateur (souris) : au survol d'une ligne, une petite poubelle remplace la distance */
+  @media (hover: hover) and (pointer: fine) {
+    .swipe-row:not(.swiped) .swipe-del { z-index: 2; top: 50%; bottom: auto; right: 14px; width: 38px; height: 38px; margin-top: -19px;
+      border: 0; border-radius: 50%; background: var(--fill); color: var(--closed); opacity: 0; transition: opacity 0.12s; }
+    .swipe-row:not(.swiped):hover .swipe-del, .swipe-row:not(.swiped) .swipe-del:focus-visible { opacity: 1; }
+    .nearby .swipe-row:not(.swiped) button.swipe-del:hover { background: color-mix(in srgb, var(--closed) 16%, var(--card)); }
+    .swipe-row:not(.swiped):hover .n-dist { visibility: hidden; }
+  }
   .swipe-del svg { width: 22px; height: 22px; stroke-width: 2; }
   .chip-heart { width: 15px; height: 15px; fill: var(--fam); stroke: none; }
   .chip.on .chip-heart { fill: #fff; }
@@ -3189,20 +3276,75 @@
   .status.is-closed, .r-meta .is-closed { color: var(--closed); }
   .muted { color: var(--muted); font-weight: 400; }
 
-  /* Boutons d'action en pastilles, comme Google Maps : une rangée qui défile si besoin, icône à gauche du texte */
-  .actions { display: flex; gap: 8px; margin: 14px -20px 0; padding: 0 20px 2px; overflow-x: auto; scrollbar-width: none; }
-  .actions::-webkit-scrollbar { display: none; }
+  /* ——— Fiche lieu, façon Plans ——— */
+  .share.left { left: 14px; right: auto; }
+  .phead { text-align: center; margin: 0 44px; }
+  .phead h1 { margin: 2px 0; }
+  .glance { margin: 8px 0 0; text-align: center; font-size: 15px; display: flex; flex-wrap: wrap; justify-content: center; gap: 0 6px; }
+  .glance .st { font-weight: 600; }
+  .glance .is-open { color: var(--open); }
+  .glance .is-closed { color: var(--closed); }
+  .glance .dot { color: var(--muted); }
+  .fresh { margin: 3px 0 0; text-align: center; font-size: 13px; color: var(--open); display: flex; justify-content: center; align-items: center; gap: 4px; }
+  .fresh svg { width: 14px; height: 14px; stroke-width: 2.6; }
+  .fresh.old { color: var(--muted); }
+  /* Boutons d'action : même largeur, pictogramme au-dessus du texte ; un seul bouton prend toute la largeur */
+  .actions { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 8px; margin: 14px 0 0; }
   .action {
-    flex: none; display: inline-flex; align-items: center; gap: 7px; height: 38px; padding: 0 15px 0 12px; border-radius: 19px;
-    border: 0; cursor: pointer; text-decoration: none; white-space: nowrap; font-size: 14.5px; font-weight: 600; line-height: 1;
-    background: color-mix(in srgb, var(--accent) 11%, transparent); color: var(--accent);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 56px; padding: 6px 4px;
+    border-radius: 14px; border: 0; cursor: pointer; text-decoration: none; font-size: 13.5px; font-weight: 600; line-height: 1.1;
+    background: var(--fill); color: var(--accent); box-sizing: border-box; min-width: 0;
   }
+  .action span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
   .action:active { filter: brightness(0.94); }
-  .action svg { width: 18px; height: 18px; flex: none; }
-  .act-eta { font-weight: 500; opacity: 0.9; }
+  .action svg { width: 21px; height: 21px; flex: none; }
   .action.primary { background: var(--accent-btn); color: #fff; }
-  .action.saved { color: var(--fav); }
-  .action.saved svg path { fill: var(--fav); stroke: var(--fav); }
+  .actions.solo .action { flex-direction: row; min-height: 48px; font-size: 15.5px; gap: 8px; }
+  .action.primary .solid { fill: currentColor; }
+  /* Bandeau : libellé discret au-dessus, valeur en gras, séparés par un trait */
+  .strip { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); margin: 14px 0 0; }
+  .strip div { padding: 0 10px; border-left: 1px solid var(--line); }
+  .strip div:first-child { border-left: 0; padding-left: 0; }
+  .strip dt { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.02em; }
+  .strip dd { margin: 2px 0 0; font-size: 15px; font-weight: 600; }
+  /* Sections du bas */
+  .psec { margin-top: 22px; }
+  .psec h2 { font-size: 17px; font-weight: 700; margin: 0 0 8px; }
+  .psec .small { font-size: 14px; margin: 0 0 4px; }
+  .link.ext { font-weight: 600; text-decoration: none; display: inline-block; padding: 6px 0; }
+  .good { list-style: none; margin: 0; padding: 12px 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; background: var(--fill); border-radius: 14px; font-size: 14.5px; }
+  .good li { display: flex; align-items: center; gap: 7px; }
+  .good svg { width: 16px; height: 16px; flex: none; stroke-width: 2.4; color: var(--open); }
+  .good li.no svg { color: var(--closed); }
+  .details { margin: 0; background: var(--fill); border-radius: 14px; padding: 0 14px; }
+  .details div { padding: 10px 0; border-top: 1px solid var(--line); }
+  .details div:first-child { border-top: 0; }
+  .details dt { font-size: 13px; color: var(--muted); }
+  .details dd { margin: 2px 0 0; font-size: 15.5px; overflow-wrap: anywhere; }
+  .details a { color: var(--accent); text-decoration: none; }
+  .sc-note { margin: 14px 0 0; font-size: 14.5px; color: var(--muted); }
+  .end-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 22px; }
+  .end-btn { display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 46px; border: 0; border-radius: 14px; background: var(--fill);
+    color: var(--accent); font: inherit; font-size: 14.5px; font-weight: 600; text-decoration: none; cursor: pointer; padding: 0 8px; text-align: center; }
+  .end-btn svg { width: 19px; height: 19px; flex: none; }
+  .end-btn.on svg path:first-child { fill: currentColor; }
+  .contrib { margin: 14px 0 52px; font-size: 13px; line-height: 1.45; color: var(--muted); }
+  .contrib a { color: var(--accent); text-decoration: none; font-weight: 600; }
+  /* Barre flottante en bas à droite de la fiche */
+  .fab-bar { position: sticky; bottom: 0; height: 0; display: flex; justify-content: flex-end; z-index: 2; pointer-events: none; }
+  .fab, .pmenu { pointer-events: auto; }
+  .fab { position: absolute; bottom: 4px; right: -6px; display: flex; gap: 2px; padding: 4px; border-radius: 26px; background: var(--card);
+    box-shadow: 0 2px 12px rgb(0 0 0 / 0.18), 0 0 0 0.5px rgb(0 0 0 / 0.08); }
+  .fab button { width: 42px; height: 42px; border-radius: 50%; border: 0; background: var(--fill); color: var(--accent); display: grid; place-items: center; cursor: pointer; }
+  .fab svg { width: 21px; height: 21px; stroke-width: 2; }
+  .fab .solid { fill: currentColor; stroke: none; }
+  .fab button.on { color: var(--fav); }
+  .fab button.on path { fill: currentColor; }
+  .pmenu { position: absolute; bottom: 62px; right: -6px; min-width: 220px; background: var(--card); border-radius: 14px; overflow: hidden;
+    box-shadow: 0 6px 24px rgb(0 0 0 / 0.2), 0 0 0 0.5px rgb(0 0 0 / 0.08); }
+  .pmenu button { display: block; width: 100%; text-align: left; border: 0; background: none; font: inherit; font-size: 15.5px; color: var(--ink);
+    padding: 13px 16px; border-top: 1px solid var(--line); cursor: pointer; }
+  .pmenu button:first-child { border-top: 0; }
   .r-icon.fav-icon { color: var(--fav); background: color-mix(in srgb, var(--fav) 12%, transparent); }
   .r-icon.fav-icon .solid { fill: currentColor; stroke: none; }
   .action.primary .on-solid { stroke: var(--accent-btn); stroke-width: 2; }
@@ -3220,7 +3362,6 @@
   .week th { text-align: left; font-weight: 400; color: var(--muted); padding: 4px 20px 4px 0; text-transform: capitalize; }
   .week td { padding: 4px 0; }
   .week tr.today th, .week tr.today td { color: var(--ink); font-weight: 600; }
-  .fresh { margin: 14px 0 0; font-size: 13px; color: var(--muted); }
 
   .nearby { list-style: none; margin: 12px -20px 0; padding: 0; }
   .nearby button {

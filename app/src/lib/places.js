@@ -1,5 +1,5 @@
 // Recherche de lieux (Photon) et détails d'un lieu (OpenStreetMap).
-import { kindOf, expectsHours, practical } from './placeinfo.js';
+import { kindOf, expectsHours, practical, goodToKnow } from './placeinfo.js';
 // Prototype : serveurs publics, à remplacer par des instances auto-hébergées.
 
 const PHOTON = 'https://photon.komoot.io/api/';
@@ -118,6 +118,8 @@ export async function details(place, signal) {
     kind: kindOf(t),
     expectsHours: expectsHours(t),
     practical: practical(t),
+    good: goodToKnow(t),
+    fee: t.fee,
     wikidata: t.wikidata,
     wikipedia: t.wikipedia
   };

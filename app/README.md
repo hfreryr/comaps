@@ -55,3 +55,13 @@ Aucune donnée personnelle collectée. La position de l'utilisateur ne quitte pa
 - **Choix de l'itinéraire puis guidage** : à pied, à vélo, en voiture, jusqu'à 3 itinéraires (Valhalla `alternates`), chacun avec son bouton **Aller** ; les variantes en gris sur la carte, touchables. En transport, **Aller** sur la proposition dépliée. Le guidage (`src/lib/nav.js`) : bandeau de la prochaine manœuvre et sa distance, carte qui suit et s'oriente, heure d'arrivée et temps restant, voix (synthèse du téléphone, coupable), écran gardé allumé quand le navigateur le permet, nouveau calcul après ~3 positions hors du trajet, arrivée confirmée par deux positions. En transport : marcher, monter (place dans la rame), descendre (sortie), avec avance à l'horaire sous terre. Tout est calculé sur le téléphone.
 - **Mes lieux** (`src/lib/myplaces.js`) : raccourci en tête qui n'affiche que vos lieux et ouvre la fiche de gestion. Lieux épinglés (Maison, Travail, puis vos lieux) en haut de la recherche ; listes « Favoris », « À tester » et listes personnelles ; « Enregistrer » en un geste (dans Favoris, puis « Changer ») ; chaque lieu garde l'icône de sa liste sur la carte (masquable dans le menu du type de carte) ; import Google qui conserve les listes ; partage d'une liste par un lien qui la contient.
 - **Sans serveur** : transfert vers un autre appareil par un lien ou un QR code (données après le « # », jamais envoyées au site) ; sauvegarde dans un fichier à ranger dans son propre cloud, chiffrée par mot de passe si on le souhaite (PBKDF2 + AES-GCM), avec rappel discret au-delà de 30 jours ; restauration par fusion. Bibliothèque QR : `qrcode-generator` (MIT).
+
+## Fiche lieu (13/10/2026)
+
+Inspirée de Plans, avec une différence assumée : pas de notes (aucune source ouverte), mais la **date de vérification** (`check_date` d'OSM) en tête de fiche.
+
+- En tête : statut d'ouverture, « Infos vérifiées en … » (ou « non vérifiées depuis … » au-delà de 2 ans).
+- Boutons de même largeur : temps à pied (bleu), Appeler, Site web ; les boutons sans info disparaissent.
+- Bandeau : distance, accès fauteuil, entrée gratuite/payante. Sections : Bon à savoir (tags OSM : paiement, terrasse, régimes, chiens…), Horaires, Détails.
+- Barre flottante ♡ (Favoris) · ＋ (autre liste) · ••• (Maison, Travail, copier, partager).
+- Contribution : liens vers OpenStreetMap (modifier / signaler). L'utilisateur modifie lui-même sur le site d'OSM ; l'app n'écrit rien dans OSM.
