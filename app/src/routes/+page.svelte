@@ -1682,7 +1682,7 @@
     if (e?.code === 1) {
       const app = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
       return app
-        ? 'Localisation refusée pour cette app. Supprimez-la de l\'écran d\'accueil, réinstallez-la depuis Safari, puis touchez « Autoriser ».'
+        ? 'L\'iPhone refuse la localisation à l\'app installée sur l\'écran d\'accueil (problème connu des versions récentes d\'iOS). En attendant, ouvrez untrackedmaps.app dans Safari : la localisation y fonctionne.'
         : 'Localisation refusée. Autorisez-la dans les réglages du navigateur.';
     }
     if (e?.code === 3) return 'Position pas encore trouvée (délai dépassé). Réessayez, idéalement près d\'une fenêtre.';
@@ -1695,11 +1695,13 @@
   // Bouton de localisation, comme Plans et Maps : 1er toucher → centré sur vous ; 2e → la carte tourne
   // dans la direction où vous regardez ; 3e → retour au nord en haut.
   async function locate() {
-    startCompass();   // (doit partir du geste, avant toute attente)
+    // iPhone (app sur l'écran d'accueil) : une seule demande d'autorisation par toucher. La position passe
+    // en premier ; la boussole n'est demandée qu'au 2e toucher (« la carte tourne avec vous »).
     if (me && followMode === 'follow') {
+      startCompass();   // (doit partir du geste, avant toute attente)
       followMode = 'heading';
       map.easeTo({ center: [me.lon, me.lat], bearing: heading ?? map.getBearing(), duration: 500 });
-      if (heading == null) say('Direction pas encore disponible : tournez-vous un peu ou marchez quelques pas.');
+      if (heading == null && compassOn) say('Direction pas encore disponible : tournez-vous un peu ou marchez quelques pas.');
       return;
     }
     if (me && followMode === 'heading') {
@@ -1711,6 +1713,8 @@
     try {
       const p = await getPosition();
       followMode = 'follow';
+      // là où aucune autorisation n'est demandée (Android, ordinateur), la boussole démarre tout de suite
+      if (typeof DeviceOrientationEvent === 'undefined' || typeof DeviceOrientationEvent.requestPermission !== 'function') startCompass();
       map.flyTo({ center: [p.lon, p.lat], zoom: Math.max(16, map.getZoom()), duration: 800 });
     } catch (e) {
       say(locError(e) + locDetail(e), { label: 'Réessayer', run: locate });
