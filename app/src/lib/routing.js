@@ -47,6 +47,8 @@ function chaikin(coords, iterations = 2) {
   return coords;
 }
 export const smooth = (coords, tol = 7) => chaikin(simplify(coords, tol));
+// Trajets dans les rues : on suit le tracé exact (l'arrondi coupait les angles et faisait traverser des immeubles).
+export const streetLine = (coords) => simplify(coords, 1);
 
 export function decodePolyline(str, precision = 6) {
   const factor = 10 ** precision;
@@ -108,7 +110,7 @@ function parseTrip(trip, mode, via) {
     const shape = decodePolyline(leg.shape, 6);
     const offset = raw.length;
     raw.push(...shape);
-    coords.push(...smooth(shape, mode === 'walk' ? 7 : 4));
+    coords.push(...streetLine(shape));
     steps.push(...simplifySteps(leg.maneuvers, offset));
     if (i < trip.legs.length - 1) steps.push({ text: `Arrêt : ${via.label}`, speak: `Arrêt : ${via.label}`, distance: 0, stop: true, type: 'stop', idx: raw.length - 1 });
   });
@@ -203,7 +205,7 @@ export async function transitRoutes(from, to, signal, when = new Date()) {
         stops: (l.intermediateStops || []).length,
         realTime: l.realTime,
         coords: l.legGeometry
-          ? smooth(decodePolyline(l.legGeometry.points, l.legGeometry.precision || 6), l.mode === 'WALK' ? 7 : 3)
+          ? (l.mode === 'WALK' ? streetLine : (c) => smooth(c, 3))(decodePolyline(l.legGeometry.points, l.legGeometry.precision || 6))
           : []
       }))
     };
