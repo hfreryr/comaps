@@ -17,7 +17,7 @@
   import { DEFAULT_LISTS, LIST_ICONS, LIST_COLORS, migratePlaces, pack, unpack, packList, unpackList, snapshot, restore,
     backupFile, readBackup, mergeInto } from '#lib/myplaces.js';
   import qrcode from 'qrcode-generator';
-  import { placeForExit, placeForTransfer, placeLabel } from '#lib/rame.js';
+  import { exitForQuay, placeForTransfer, placeLabel } from '#lib/rame.js';
   import { ALL_CATEGORIES, CATEGORY_WORDS, FILLER, CHIPS_KEY, loadChipPrefs, categoryFor as catFor } from '#lib/categories.js';
   import { prepare, progress, arrowAngle, isRoundabout, navDistance, spokenDistance } from '#lib/nav.js';
 
@@ -1980,8 +1980,10 @@
       let nextRide = after.find((l) => l.mode !== 'WALK');
       if (nextRide?.mode === 'STOP') nextRide = null;          // on sort pour l'arrêt intermédiaire
       const walkBetween = after.slice(0, after.indexOf(nextRide)).reduce((t, l) => t + (l.duration || 0), 0);
-      if (nextRide && walkBetween <= 600) {
-        // correspondance dans la station (ou tout près) : pas de sortie, mais la bonne voiture
+      const RAIL = ['SUBWAY', 'METRO', 'REGIONAL_RAIL', 'SUBURBAN'];
+      if (nextRide && RAIL.includes(nextRide.mode) && walkBetween <= 600) {
+        // correspondance métro/RER dans la station (ou tout près) : pas de sortie, mais la bonne voiture
+        // (vers un bus ou un tram, on sort : on conseille la sortie la plus proche de l'arrêt)
         placeForTransfer(leg.toStop, nextRide.fromStop)
           .then((pl) => { legExits[k] = pl ? { place: pl, transfer: nextRide } : false; })
           .catch(() => { legExits[k] = false; });
@@ -1989,10 +1991,12 @@
       }
       const nextLeg = after[0];
       const goal = nextLeg?.coords?.length ? { lon: nextLeg.coords.at(-1)[0], lat: nextLeg.coords.at(-1)[1] } : to;
-      bestExit(leg.toPos, goal)
-        .then(async (e) => {
-          const pl = e ? await placeForExit(leg.toStop, e.name).catch(() => null) : null;
-          legExits[k] = e ? { exit: e, place: pl } : false;
+      // Sortie RATP la plus proche de la suite du trajet, avec la voiture où monter ; sinon, sortie OSM sans placement.
+      exitForQuay(leg.toStop, goal).catch(() => null)
+        .then(async (ratp) => ratp || bestExit(leg.toPos, goal).then((e) => (e ? { exit: e, place: null } : null)))
+        .then(async (hit) => {
+          const e = hit?.exit;
+          legExits[k] = hit || false;
           // Le trajet à pied part de cette sortie, pas du centre de la station (un seul calcul, pour le trajet choisi)
           if (e && nextLeg?.mode === 'WALK' && !nextLeg.fromExit && e.lat != null && e.lon != null) {
             const w = await streetRoute({ lat: e.lat, lon: e.lon }, goal, 'walk').catch(() => null);

@@ -73,6 +73,7 @@ const tests = {
     await p.click('.modes .mode >> nth=2'); await p.waitForTimeout(12000);
     assert((await p.locator('.leg').count()) > 2, 'aucun itinéraire en transports');
     // si une sortie est conseillée (métro ou RER), le trajet à pied qui suit a été recalculé depuis cette sortie
+    if (await p.locator('.leg-exit').count()) assert((await p.locator('.leg-tip').count()) >= 1, 'sortie conseillée sans place dans la rame');
     if (await p.locator('.leg-exit').count()) assert(valhalla >= 4, `trajet à pied depuis la sortie non recalculé (${valhalla} appels Valhalla)`);
     await ctx.close();
   },
