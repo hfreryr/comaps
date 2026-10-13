@@ -20,8 +20,11 @@ Ne jamais se présenter comme lié à CoMaps ou à Cartes.app.
 Voir `README.md` pour la feuille de route.
 
 ## Règles non négociables
-- **Ne jamais écrire dans OSM** (ni API d'édition, ni bot) sans accord explicite du porteur du projet **et** de la communauté OSM.
-- **Ne jamais extraire de données de Google Maps** : illégal et contraire au projet. Les comparaisons avec Google se font à la main.
+- **Écrire dans OSM uniquement via le compte de l'utilisateur**, chaque modification confirmée par une personne, et seulement après annonce à la communauté OSM (forum France, au moins 2 semaines avant, Organised Editing Guidelines). Voir `docs/contribution-osm.md`.
+- **Jamais de modification automatique ni d'import** (bot, pipeline) sans le processus officiel (Automated Edits code of conduct, Import guidelines) et l'accord explicite du porteur du projet.
+- **Ne jamais faire entrer dans OSM une info venant de Google Maps** (ni par nous, ni en le suggérant aux utilisateurs) : interdit par le copyright d'OSM.
+- **Ne pas utiliser l'API d'édition d'OSM pour lire** des données (politique d'usage de l'API).
+- **Google Maps** : l'app ne doit jamais en dépendre. On peut s'en servir pour construire et challenger l'app (relevés, comparaisons), mais rien de ce qui en vient ne doit être publié dans l'app ni envoyé dans OSM.
 - **Aucune source seule ne suffit** à déclarer un lieu fermé : toujours garder la trace des signaux utilisés et leur niveau de confiance.
 - **SIRENE** n'est qu'un générateur de candidats : délai pouvant atteindre 18 mois.
 - **Pas de dépendance propriétaire** ni de service centralisé payant. Hébergement statique dès que possible.
