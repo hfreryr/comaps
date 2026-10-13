@@ -2572,9 +2572,6 @@
   {:else if place && !directions}
     <section class="sheet" aria-label={place.name} use:draggable={{ key: place.id, onDismiss: closePlace }}>
       <button class="grip" aria-label="Agrandir la fiche"></button>
-      <button class="share" onclick={sharePlace} aria-label="Partager ce lieu">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5v11M8 7.5l4-4 4 4M6 11.5H5v8h14v-8h-1" /></svg>
-      </button>
       <button class="close" onclick={closePlace} aria-label="Fermer la fiche">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" /></svg>
       </button>
@@ -2592,24 +2589,28 @@
       <div class="actions">
         <button class="action primary" onclick={startDirections}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8 21.2 12 12 21.2 2.8 12z" class="solid" /><path d="M9.5 14.5v-2.2a1.5 1.5 0 0 1 1.5-1.5h4M13 8.8l2 2-2 2" class="on-solid" /></svg>
-          <span class="act-label">Itinéraire{#if walkEta}<small aria-label={walkEta}>{walkEta.replace(' à pied', '')}</small>{/if}</span>
+          <span>Itinéraire{#if walkEta}<span class="act-eta" aria-label={walkEta}>&nbsp;· {walkEta.replace(' à pied', '').replace('≈ ', '')}</span>{/if}</span>
         </button>
         <button class="action" class:saved={isFav} onclick={saveTap} aria-pressed={isFav} style:--lc={isFav ? listOf(savedEntry.lists[0]).color : null}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.3l-1.3-1.2C6 14.9 3 12.2 3 8.9 3 6.2 5.1 4 7.8 4c1.5 0 3 .7 4.2 1.9C13.2 4.7 14.7 4 16.2 4 18.9 4 21 6.2 21 8.9c0 3.3-3 6-7.7 10.2z" /></svg>
-          {isFav ? (savedEntry.lists.length > 1 ? `${savedEntry.lists.length} listes` : listOf(savedEntry.lists[0]).name) : 'Enregistrer'}
+          <span>{isFav ? (savedEntry.lists.length > 1 ? `${savedEntry.lists.length} listes` : listOf(savedEntry.lists[0]).name) : 'Enregistrer'}</span>
         </button>
         {#if info?.phone}
           <a class="action" href={`tel:${info.phone.replace(/\s/g, '')}`}>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.6 3.5 9 3l2 4.6-2.3 1.6a12 12 0 0 0 6.1 6.1l1.6-2.3L21 15l-.5 2.4A3 3 0 0 1 17.6 20C10 20 4 14 4 6.4a3 3 0 0 1 2.6-2.9z" /></svg>
-            Appeler
+            <span>Appeler</span>
           </a>
         {/if}
         {#if info?.website}
           <a class="action" href={href(info.website)} target="_blank" rel="noopener">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M3.5 12h17M12 3.5c2.5 2.6 3.6 5.4 3.6 8.5s-1.1 5.9-3.6 8.5M12 3.5C9.5 6.1 8.4 8.9 8.4 12s1.1 5.9 3.6 8.5" /></svg>
-            Site web
+            <span>Site web</span>
           </a>
         {/if}
+        <button class="action" onclick={sharePlace}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5v11M8 7.5l4-4 4 4M6 11.5H5v8h14v-8h-1" /></svg>
+          <span>Partager</span>
+        </button>
       </div>
 
       <!-- Ordre selon ce qui sert le plus : une station → prochains passages et sorties d'abord ;
@@ -3166,6 +3167,7 @@
   }
   .share svg { width: 17px; height: 17px; stroke-width: 2.1; }
   .share ~ h1 { margin-right: 88px; }
+  .close ~ h1 { margin-right: 44px; }
   .act-label { display: flex; flex-direction: column; align-items: center; line-height: 1.15; }
   .act-label small { font-size: 11.5px; font-weight: 500; opacity: 0.9; margin-top: 1px; }
   .photo { margin: 16px 0 0; }
@@ -3187,14 +3189,17 @@
   .status.is-closed, .r-meta .is-closed { color: var(--closed); }
   .muted { color: var(--muted); font-weight: 400; }
 
-  .actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 10px; margin-top: 16px; }
+  /* Boutons d'action en pastilles, comme Google Maps : une rangée qui défile si besoin, icône à gauche du texte */
+  .actions { display: flex; gap: 8px; margin: 14px -20px 0; padding: 0 20px 2px; overflow-x: auto; scrollbar-width: none; }
+  .actions::-webkit-scrollbar { display: none; }
   .action {
-    display: grid; justify-items: center; align-content: start; gap: 4px; padding: 10px 4px; border-radius: 14px; border: 0; cursor: pointer;
-    background: var(--fill); color: var(--accent); text-decoration: none; font-size: 12.5px; font-weight: 600;
-    min-width: 0; text-align: center; white-space: nowrap; overflow: hidden; line-height: 1.2;
+    flex: none; display: inline-flex; align-items: center; gap: 7px; height: 38px; padding: 0 15px 0 12px; border-radius: 19px;
+    border: 0; cursor: pointer; text-decoration: none; white-space: nowrap; font-size: 14.5px; font-weight: 600; line-height: 1;
+    background: color-mix(in srgb, var(--accent) 11%, transparent); color: var(--accent);
   }
-  .actions:has(> :nth-child(4)) { gap: 8px; }
-  .action svg { width: 22px; height: 22px; }
+  .action:active { filter: brightness(0.94); }
+  .action svg { width: 18px; height: 18px; flex: none; }
+  .act-eta { font-weight: 500; opacity: 0.9; }
   .action.primary { background: var(--accent-btn); color: #fff; }
   .action.saved { color: var(--fav); }
   .action.saved svg path { fill: var(--fav); stroke: var(--fav); }
