@@ -2125,6 +2125,16 @@
         .then(async (e) => {
           const pl = e ? await placeForExit(leg.toStop, e.name).catch(() => null) : null;
           legExits[k] = e ? { exit: e, place: pl } : false;
+          // Le trajet à pied part de cette sortie, pas du centre de la station (un seul calcul, pour le trajet choisi)
+          if (e && nextLeg?.mode === 'WALK' && !nextLeg.fromExit && e.lat != null && e.lon != null) {
+            const w = await streetRoute({ lat: e.lat, lon: e.lon }, goal, 'walk').catch(() => null);
+            const cur = routes.transit?.data?.[picked];
+            if (w?.coords?.length && cur === it) {
+              nextLeg.coords = w.coords;
+              nextLeg.fromExit = true;
+              drawRoute();
+            }
+          }
         })
         .catch(() => { legExits[k] = false; });
     });

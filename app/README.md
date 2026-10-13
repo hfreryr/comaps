@@ -88,3 +88,7 @@ Inspirée de Plans, avec une différence assumée : pas de notes (aucune source 
 - Le point bleu porte un faisceau qui montre la direction où l'on regarde (boussole du téléphone ; à défaut, sens de la marche donné par le GPS). Le point suit vos déplacements tant que l'app est à l'écran.
 - Bouton de localisation comme Plans et Maps : 1er toucher → centré sur vous et suivi ; 2e → la carte tourne avec vous ; 3e → nord en haut. Déplacer la carte à la main arrête le suivi.
 - Sur iPhone, l'accès à la boussole est demandé au premier toucher du bouton. Tout reste sur l'appareil.
+
+## Trajet à pied depuis la sortie conseillée (13/10/2026)
+
+En transports, quand on descend du métro ou du RER, le trajet à pied qui suit part de la **sortie conseillée** (celle d'OSM la plus proche de la destination), plus du centre de la station : un calcul Valhalla supplémentaire pour le trajet choisi. Remarque venue du forum OSM France. Les tracés à pied, à vélo et en voiture suivent désormais exactement les rues (le lissage coupait les angles et faisait traverser des immeubles).
