@@ -3,7 +3,28 @@ import { kindOf, expectsHours, practical, goodToKnow } from './placeinfo.js';
 // Prototype : serveurs publics, à remplacer par des instances auto-hébergées.
 
 const PHOTON = 'https://photon.komoot.io/api/';
-const OSM_API = 'https://api.openstreetmap.org/api/0.6';
+// Lecture des étiquettes d'un lieu : Overpass, le service public fait pour consulter les données OSM
+// (l'API d'OpenStreetMap est réservée aux modifications). Deux serveurs : le second sert de secours.
+const OVERPASS = ['https://overpass-api.de/api/interpreter', 'https://overpass.openstreetmap.fr/api/interpreter'];
+
+async function osmTags(type, id, signal) {
+  const q = `[out:json][timeout:10];${type}(${id});out tags;`;
+  for (const base of OVERPASS) {
+    try {
+      const ctrl = new AbortController();
+      const stop = setTimeout(() => ctrl.abort(), 6000);
+      signal?.addEventListener('abort', () => ctrl.abort());
+      const res = await fetch(`${base}?data=${encodeURIComponent(q)}`, { signal: ctrl.signal });
+      clearTimeout(stop);
+      if (!res.ok) continue;   // serveur saturé (429, 504…) : on essaie le suivant
+      const tags = (await res.json()).elements?.[0]?.tags;
+      if (tags) return tags;
+    } catch (e) {
+      if (signal?.aborted) throw e;
+    }
+  }
+  return null;
+}
 export const PARIS = { lat: 48.8566, lon: 2.3522 };
 
 const TYPES = {
@@ -101,10 +122,8 @@ export async function reverseAddress(lat, lon) {
 
 export async function details(place, signal) {
   if (!place.osmType) return {};
-  const res = await fetch(`${OSM_API}/${place.osmType}/${place.osmId}.json`, { signal });
-  if (!res.ok) return {};
-  const data = await res.json();
-  const t = data.elements?.[0]?.tags || {};
+  const t = await osmTags(place.osmType, place.osmId, signal);
+  if (!t) return {};
   const street = [t['addr:housenumber'], t['addr:street']].filter(Boolean).join(' ');
   return {
     name: t.name,

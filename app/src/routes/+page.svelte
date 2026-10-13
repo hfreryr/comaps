@@ -438,8 +438,9 @@
     });
     map.on('click', onMapClick);
     // Catégorie ouverte : quand on déplace ou zoome la carte à la main, la liste se recharge pour la nouvelle zone.
-    map.on('movestart', (e) => { if (e.originalEvent) userMoved = true; });
+    map.on('movestart', (e) => { if (e.originalEvent) userMoved = viewChosen = true; });
     map.on('moveend', () => {
+      setTimeout(() => (viewHash = location.hash), 500);   // (la carte met à jour l’adresse avec un léger délai)
       if (!userMoved) return;
       userMoved = false;
       clearTimeout(reloadTimer);
@@ -1095,6 +1096,7 @@
   }
 
   async function openPlace(p) {
+    viewChosen = true;
     showModes = false;      // une seule chose ouverte à la fois
     editChips = false;
     importOpen = false;
@@ -1272,6 +1274,13 @@
   let catRequest = 0;
   // Recharger la catégorie ouverte pour la zone affichée (après un déplacement de la carte à la main).
   let reloadLater = false;
+  let viewChosen = false;   // la personne a choisi ce qu'elle regarde (carte déplacée, lieu ou quartier cherché)
+  // Un point est-il près du centre de la vue ? (sinon, on cherche autour du centre de la carte)
+  function nearView(pt, share = 0.15) {
+    const ctr = map.getCenter(), bb = map.getBounds();
+    const span = dist(bb.getSouth(), bb.getWest(), bb.getNorth(), bb.getEast());
+    return dist(pt.lat, pt.lon, ctr.lat, ctr.lng) < span * share;
+  }
   function reloadCategoryHere() {
     const c = category;
     if (!c || c.saved || directions || nav) return;
@@ -1280,9 +1289,7 @@
     // attendre que la carte ait chargé la nouvelle zone
     if (!map.areTilesLoaded()) { map.once('idle', () => { if (category?.key === c.key && !place) reloadCategoryHere(); }); return; }
     // votre position si elle est près du centre de la vue, sinon le centre de la carte
-    const ctr = map.getCenter(), bb = map.getBounds();
-    const span = dist(bb.getSouth(), bb.getWest(), bb.getNorth(), bb.getEast());
-    const origin = me && dist(me.lat, me.lon, ctr.lat, ctr.lng) < span * 0.15 ? me : null;
+    const origin = me && nearView(me) ? me : null;
     nearbyFromMe = !!origin;
     collectCategory(c, origin, false);
   }
@@ -1311,6 +1318,9 @@
       const perm = await navigator.permissions?.query({ name: 'geolocation' }).catch(() => null);
       if (perm?.state === 'granted') origin = await getPosition().catch(() => null);
     }
+    // On regarde un autre quartier (ex. après avoir cherché « 8e arrondissement ») : on cherche là,
+    // sans ramener la carte sur votre position.
+    if (origin && viewChosen && !nearView(origin)) origin = null;
     if (category?.key !== c.key) return; // (l'état est une copie : on compare les clés)
     nearbyFromMe = !!origin;
     const collect = () => collectCategory(c, origin, true);
@@ -1426,7 +1436,11 @@
     if (anyOpen && !history.state?.ui) history.pushState({ ...(history.state || {}), ui: 1 }, '', location.href);
     else if (!anyOpen && history.state?.ui) { skipPop = true; history.back(); }
   });
+  // Revenir en arrière dans l'historique ne doit pas ramener la carte là où elle était à l'ouverture du panneau :
+  // on garde la vue actuelle dans l'adresse (avant que la carte ne relise l'adresse).
+  let viewHash = '';
   function onPopState() {
+    if (viewHash && location.hash !== viewHash) history.replaceState(history.state, '', location.pathname + location.search + viewHash);
     if (skipPop) { skipPop = false; return; }
     closeTop();
     // encore un panneau dessous (une fiche ouverte depuis une liste) : Retour le fermera aussi
@@ -1497,7 +1511,8 @@
       try { firstTime = !localStorage.getItem('position-expliquee'); localStorage.setItem('position-expliquee', '1'); } catch { /* rien */ }
       if (firstTime && perm?.state !== 'granted' && !showPromise) say('Votre position reste sur votre téléphone.');
       const p = await getPosition();
-      if (!place && !category && !directions) map.flyTo({ center: [p.lon, p.lat], zoom: 15.5, duration: 900 });
+      // (pas si la personne a déjà choisi quoi regarder entre-temps : position arrivée tard)
+      if (!place && !category && !directions && !viewChosen) map.flyTo({ center: [p.lon, p.lat], zoom: 15.5, duration: 900 });
     } catch { /* on reste sur Paris */ }
   }
 
