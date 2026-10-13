@@ -437,6 +437,14 @@
       }
     });
     map.on('click', onMapClick);
+    // Catégorie ouverte : quand on déplace ou zoome la carte à la main, la liste se recharge pour la nouvelle zone.
+    map.on('movestart', (e) => { if (e.originalEvent) userMoved = true; });
+    map.on('moveend', () => {
+      if (!userMoved) return;
+      userMoved = false;
+      clearTimeout(reloadTimer);
+      reloadTimer = setTimeout(reloadCategoryHere, 350);
+    });
     map.on('dragstart', (e) => { if (nav && e.originalEvent) navFollow = false; });
     window.addEventListener('popstate', onPopState);
     window.addEventListener('keydown', onKeyDown);
@@ -1170,6 +1178,7 @@
     exits = null;
     marker?.remove();
     clearSelection();
+    if (reloadLater) setTimeout(reloadCategoryHere, 0);
   }
 
   function clearSearch() {
@@ -1201,6 +1210,83 @@
   };
   $effect(() => { nearby; category; applyHit(category); });
 
+  // Lieux d'une catégorie autour d'un point. `fit` : élargir la carte si les plus proches sont hors de la vue
+  // (seulement au premier choix de la catégorie, jamais quand on déplace la carte soi-même).
+  async function collectCategory(c, origin, fit) {
+      const req = ++catRequest;
+      const stale = () => req !== catRequest || category?.key !== c.key;
+      const hoursP = loadHours();
+      const o = origin || { lat: map.getCenter().lat, lon: map.getCenter().lng };
+      const seen = new Set();
+      const filter = c.transit
+        ? ['all', ['has', 'name'], ['==', ['get', 'class'], 'railway'], ['match', ['get', 'subclass'], ['subway', 'station', 'halt'], true, false]]
+        : c.unnamed ? hitFilter(c) : ['all', ['has', 'name'], hitFilter(c)];
+      // Une station a souvent plusieurs points (un par ligne) : on n'en garde qu'un par nom.
+      const keyOf = (f) => (c.transit ? f.properties.name : f.id);
+      const list = map.querySourceFeatures('omt', { sourceLayer: 'poi', filter })
+        .map((f) => ({ f, d: dist(o.lat, o.lon, f.geometry.coordinates[1], f.geometry.coordinates[0]) }))
+        .sort((a, b) => a.d - b.d)
+        .filter(({ f }) => !seen.has(keyOf(f)) && seen.add(keyOf(f)))
+        .slice(0, c.transit ? 8 : 25);
+      if (stale()) return;
+      if (c.transit) {
+        nearby = list.map((n) => ({ ...n, deps: { status: 'loading' } }));
+        nearbyDone = true;
+        // Prochains passages des stations les plus proches, directement dans la liste.
+        list.slice(0, 5).forEach((n, i) => {
+          const [lon, lat] = n.f.geometry.coordinates;
+          departures(n.f.properties.name, lat, lon)
+            .then((d) => d?.lines.length ? { status: 'ok', data: d } : { status: 'none' })
+            .catch(() => ({ status: 'error' }))
+            .then((deps) => { if (!stale() && nearby[i]?.f.id === n.f.id) nearby[i] = { ...nearby[i], deps }; });
+        });
+        for (let i = 5; i < nearby.length; i++) nearby[i] = { ...nearby[i], deps: null };
+        return;
+      }
+      // Compléter avec les lieux hors de la vue (catégories rares : cimetières, piscines…).
+      if (list.length < 12 && c.inc) {
+        const extra = await searchCategory(c.inc, o, undefined, c.q).catch(() => []);
+        const near = (a, b) => dist(a[1], a[0], b[1], b[0]) < 80;
+        for (const f of extra) {
+          const xy = f.geometry.coordinates;
+          if (list.some((n) => n.f.properties.name === f.properties.name && near(n.f.geometry.coordinates, xy))) continue;
+          list.push({ f, d: dist(o.lat, o.lon, xy[1], xy[0]) });
+        }
+        list.sort((a, b) => a.d - b.d);
+        list.splice(25);
+      }
+      const hours = await hoursP;
+      if (stale()) return;
+      nearby = list.map((n) => {
+        const h = hours.v[hours.k[String(n.f.id)]];
+        return { ...n, st: h ? hoursStatus(h, n.f.geometry.coordinates[1], n.f.geometry.coordinates[0]) : null };
+      });
+      nearbyDone = true;
+      // Les plus proches sont hors de la vue (catégorie rare) : on élargit la carte pour les montrer.
+      const first = nearby.slice(0, 4).map((n) => n.f.geometry.coordinates);
+      if (fit && first.length && !first.some((xy) => map.getBounds().contains(xy))) fitTo([[o.lon, o.lat], ...first]);
+  }
+
+  let userMoved = false;
+  let reloadTimer = null;
+  let catRequest = 0;
+  // Recharger la catégorie ouverte pour la zone affichée (après un déplacement de la carte à la main).
+  let reloadLater = false;
+  function reloadCategoryHere() {
+    const c = category;
+    if (!c || c.saved || directions || nav) return;
+    if (place) { reloadLater = true; return; }   // une fiche est ouverte : on recharge à sa fermeture
+    reloadLater = false;
+    // attendre que la carte ait chargé la nouvelle zone
+    if (!map.areTilesLoaded()) { map.once('idle', () => { if (category?.key === c.key && !place) reloadCategoryHere(); }); return; }
+    // votre position si elle est près du centre de la vue, sinon le centre de la carte
+    const ctr = map.getCenter(), bb = map.getBounds();
+    const span = dist(bb.getSouth(), bb.getWest(), bb.getNorth(), bb.getEast());
+    const origin = me && dist(me.lat, me.lon, ctr.lat, ctr.lng) < span * 0.15 ? me : null;
+    nearbyFromMe = !!origin;
+    collectCategory(c, origin, false);
+  }
+
   async function pickCategory(c) {
     editChips = false;
     importOpen = false;
@@ -1227,57 +1313,7 @@
     }
     if (category?.key !== c.key) return; // (l'état est une copie : on compare les clés)
     nearbyFromMe = !!origin;
-    const hoursP = loadHours();
-    const collect = async () => {
-      const o = origin || { lat: map.getCenter().lat, lon: map.getCenter().lng };
-      const seen = new Set();
-      const filter = c.transit
-        ? ['all', ['has', 'name'], ['==', ['get', 'class'], 'railway'], ['match', ['get', 'subclass'], ['subway', 'station', 'halt'], true, false]]
-        : c.unnamed ? hitFilter(c) : ['all', ['has', 'name'], hitFilter(c)];
-      // Une station a souvent plusieurs points (un par ligne) : on n'en garde qu'un par nom.
-      const keyOf = (f) => (c.transit ? f.properties.name : f.id);
-      const list = map.querySourceFeatures('omt', { sourceLayer: 'poi', filter })
-        .map((f) => ({ f, d: dist(o.lat, o.lon, f.geometry.coordinates[1], f.geometry.coordinates[0]) }))
-        .sort((a, b) => a.d - b.d)
-        .filter(({ f }) => !seen.has(keyOf(f)) && seen.add(keyOf(f)))
-        .slice(0, c.transit ? 8 : 25);
-      if (c.transit) {
-        nearby = list.map((n) => ({ ...n, deps: { status: 'loading' } }));
-        nearbyDone = true;
-        // Prochains passages des stations les plus proches, directement dans la liste.
-        list.slice(0, 5).forEach((n, i) => {
-          const [lon, lat] = n.f.geometry.coordinates;
-          departures(n.f.properties.name, lat, lon)
-            .then((d) => d?.lines.length ? { status: 'ok', data: d } : { status: 'none' })
-            .catch(() => ({ status: 'error' }))
-            .then((deps) => { if (category?.key === c.key && nearby[i]?.f.id === n.f.id) nearby[i] = { ...nearby[i], deps }; });
-        });
-        for (let i = 5; i < nearby.length; i++) nearby[i] = { ...nearby[i], deps: null };
-        return;
-      }
-      // Compléter avec les lieux hors de la vue (catégories rares : cimetières, piscines…).
-      if (list.length < 12 && c.inc) {
-        const extra = await searchCategory(c.inc, o, undefined, c.q).catch(() => []);
-        const near = (a, b) => dist(a[1], a[0], b[1], b[0]) < 80;
-        for (const f of extra) {
-          const xy = f.geometry.coordinates;
-          if (list.some((n) => n.f.properties.name === f.properties.name && near(n.f.geometry.coordinates, xy))) continue;
-          list.push({ f, d: dist(o.lat, o.lon, xy[1], xy[0]) });
-        }
-        list.sort((a, b) => a.d - b.d);
-        list.splice(25);
-      }
-      const hours = await hoursP;
-      if (category?.key !== c.key) return;
-      nearby = list.map((n) => {
-        const h = hours.v[hours.k[String(n.f.id)]];
-        return { ...n, st: h ? hoursStatus(h, n.f.geometry.coordinates[1], n.f.geometry.coordinates[0]) : null };
-      });
-      nearbyDone = true;
-      // Les plus proches sont hors de la vue (catégorie rare) : on élargit la carte pour les montrer.
-      const first = nearby.slice(0, 4).map((n) => n.f.geometry.coordinates);
-      if (first.length && !first.some((xy) => map.getBounds().contains(xy))) fitTo([[o.lon, o.lat], ...first]);
-    };
+    const collect = () => collectCategory(c, origin, true);
     const target = origin ? [origin.lon, origin.lat] : null;
     if (target || map.getZoom() < 15) {
       map.flyTo({ center: target || map.getCenter(), zoom: Math.max(c.transit ? 15 : 15.5, map.getZoom()), duration: 700 });
@@ -1291,6 +1327,7 @@
 
   function clearCategory() {
     category = null;
+    reloadLater = false;
     savedList = null;
     hubPanel = null;
     nearby = [];
