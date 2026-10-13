@@ -10,7 +10,7 @@ Entrée : un extrait OSM (ex. https://download.openstreetmap.fr/extracts/europe/
 Sortie : static/data/places/14/{x}/{y}.json  (zoom 14 ≈ 2,4 km de côté à Paris)
          static/data/places/index.json      (tuiles disponibles, date de l'extrait)
 
-Format d'une tuile : {"v":1,"t":[[id, lon, lat, {tags}], …]}
+Format d'une tuile : {"v":1,"t":[[id, lon, lat, {tags}, devanture?], …]}  devanture = [idPhoto, hôte, azimut, cap, distance, licence, auteur, date]
   id = identifiant OSM × 10 + (1 nœud, 2 chemin, 3 relation), le même codage que dans les tuiles de la carte.
 
 Usage :  python app/scripts/build_places.py data/paris-latest.osm.pbf [--out app/static/data/places] [--zoom 14]
@@ -96,7 +96,14 @@ def main():
     ap.add_argument("pbf")
     ap.add_argument("--out", default="app/static/data/places")
     ap.add_argument("--zoom", type=int, default=14)
+    ap.add_argument("--facades", help="facades.json (build_facades.py) : photo de devanture ajoutée en 5e position de chaque lieu")
     args = ap.parse_args()
+    facades = {}
+    if args.facades:
+        try:
+            facades = json.load(open(args.facades))
+        except Exception as e:
+            print("devantures ignorées :", e, file=sys.stderr)
     t0 = time.time()
     h = Places(args.zoom)
     h.apply_file(args.pbf, locations=True)
@@ -106,8 +113,14 @@ def main():
         for p in sorted(out.rglob("*"), reverse=True):
             p.unlink() if p.is_file() else p.rmdir()
     sizes = []
+    nf = 0
     for (x, y), items in h.tiles.items():
         items.sort(key=lambda it: it[0])
+        for it in items:
+            f = facades.get(str(it[0]))
+            if f:
+                it.append(f)
+                nf += 1
         d = out / str(args.zoom) / str(x)
         d.mkdir(parents=True, exist_ok=True)
         s = json.dumps({"v": 1, "t": items}, ensure_ascii=False, separators=(",", ":"))
@@ -118,7 +131,7 @@ def main():
         "source": os.path.basename(args.pbf), "tiles": sorted(f"{x}/{y}" for x, y in h.tiles),
     }
     (out / "index.json").write_text(json.dumps(index, separators=(",", ":")))
-    print(f"{h.count} lieux dans {len(h.tiles)} tuiles (zoom {args.zoom}), {sum(sizes)/1e6:.1f} Mo bruts, "
+    print(f"{nf} devantures ; " + f"{h.count} lieux dans {len(h.tiles)} tuiles (zoom {args.zoom}), {sum(sizes)/1e6:.1f} Mo bruts, "
           f"tuile médiane {sorted(sizes)[len(sizes)//2]/1e3:.0f} Ko, en {time.time()-t0:.0f} s")
 
 

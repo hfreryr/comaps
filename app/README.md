@@ -92,3 +92,12 @@ Inspirée de Plans, avec une différence assumée : pas de notes (aucune source 
 ## Trajet à pied depuis la sortie conseillée (13/10/2026)
 
 En transports, quand on descend du métro ou du RER, le trajet à pied qui suit part de la **sortie conseillée** (celle d'OSM la plus proche de la destination), plus du centre de la station : un calcul Valhalla supplémentaire pour le trajet choisi. Remarque venue du forum OSM France. Les tracés à pied, à vélo et en voiture suivent désormais exactement les rues (le lissage coupait les angles et faisait traverser des immeubles).
+
+## Devantures : une photo de chaque commerce (13/10/2026)
+
+**Source** : [Panoramax](https://panoramax.fr), l'équivalent libre de Street View. À Paris, la campagne de la **Ville de Paris** (photos 360°, 2024-2025, instance IGN, **Licence Ouverte 2.0**) couvre l'essentiel ; les photos d'autres contributeurs (CC-BY-SA 4.0) servent en second choix, avec leur crédit. Il n'existe aucune autre source ouverte de photos de commerces : Wikimedia n'en couvre que 307 sur 46 000 à Paris.
+
+- `scripts/build_facades.py` (action `facades.yml`, chaque dimanche) : pour chaque lieu, la photo 360° prise à 4–18 m, Licence Ouverte d'abord, puis la plus proche de 9 m et la plus récente ; on note l'identifiant de la photo et le **cap vers le lieu**. Mesuré sur le 6e : 31 000 photos, **75 % des lieux** (82 % des commerces) ont une devanture. Résultat dans `data/facades.json` du site, intégré aux tuiles de lieux chaque nuit (5e élément de chaque lieu).
+- **Aucune requête Panoramax à l'usage** : l'app charge seulement l'image choisie (`sd.jpg`, 2048 × 1024, ≈ 230 Ko) et la **recadre à l'affichage** (CSS : secteur de 45° orienté vers le lieu). Plein écran : le panorama entier, ouvert sur le lieu, à faire défiler.
+- Où : en tête de fiche (quand il n'y a pas de photo Wikimedia), vignette dans les listes, pastille-photo sur la carte pour le lieu ouvert et les 6 plus proches d'une liste.
+- **Limites** : ≈ 230 Ko par photo (des vignettes préparées à l'avance demanderaient un serveur : prévu avec P2) ; le cadrage est automatique, donc parfois la boutique voisine (vérifié sur un échantillon : 3 sur 4 justes) ; `container-type` / `cqw` requis (navigateurs depuis 2023).

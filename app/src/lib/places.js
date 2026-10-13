@@ -52,7 +52,7 @@ export async function details(place) {
   if (!place.osmType) return {};
   const hit = await placeById(place.osmType, place.osmId, place.lat, place.lon).catch(() => null);
   if (!hit) return { covered: false };
-  return fromTags(hit.tags);
+  return { ...fromTags(hit.tags), facade: hit.facade || null };
 }
 
 export function fromTags(t) {
@@ -96,6 +96,6 @@ export async function searchCategory(include, bounds, q = null) {
     const t = p.tags;
     const sub = t.shop || t.amenity || t.tourism || t.leisure || t.craft || t.office || t.healthcare;
     return { id: `pl${p.id}`, properties: { name: t.name, subclass: sub, osm: `${kind}/${Math.floor(p.id / 10)}` },
-      geometry: { coordinates: [p.lon, p.lat] }, tags: t };
+      geometry: { coordinates: [p.lon, p.lat] }, tags: t, facade: p.facade || null };
   });
 }

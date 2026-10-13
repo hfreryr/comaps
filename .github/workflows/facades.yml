@@ -1,0 +1,30 @@
+# Devantures (Panoramax) : une photo par lieu, choisie chaque semaine ; publiée dans data/facades.json du site.
+# La construction nocturne des lieux (places.yml) la lit depuis le site et l'intègre aux tuiles.
+name: Devantures Panoramax (hebdo)
+on:
+  schedule:
+    - cron: '20 3 * * 0'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: main }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: pip install osmium
+      - run: curl -sSfL -o paris.osm.pbf https://download.openstreetmap.fr/extracts/europe/france/ile_de_france/paris-latest.osm.pbf
+      - run: python app/scripts/build_places.py paris.osm.pbf --out out/places
+      - run: python app/scripts/build_facades.py --places out/places --bbox 2.224,48.815,2.47,48.902 --out out/facades.json
+      - name: Publier dans gh-pages/data/facades.json
+        run: |
+          git fetch --depth=1 origin gh-pages
+          git worktree add pages origin/gh-pages
+          mkdir -p pages/data && cp out/facades.json pages/data/facades.json
+          cd pages && git add -A data/facades.json
+          git -c user.name=untracked-bot -c user.email=bot@untrackedmaps.app commit -qm "Devantures Panoramax du $(date -u +%F)" || exit 0
+          git push origin HEAD:gh-pages

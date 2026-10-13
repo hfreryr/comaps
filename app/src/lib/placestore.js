@@ -34,7 +34,7 @@ function loadTile(x, y) {
       if (!idx.tiles.has(key)) return [];
       const r = await fetch(`${dataBase()}places/${idx.zoom}/${x}/${y}.json`).catch(() => null);
       const j = r?.ok ? await r.json() : null;
-      return (j?.t || []).map(([id, lon, lat, tags]) => ({ id, lon, lat, tags }));
+      return (j?.t || []).map(([id, lon, lat, tags, f]) => ({ id, lon, lat, tags, facade: f ? facadeOf(f) : null }));
     })());
   }
   return tiles.get(key);
@@ -75,4 +75,18 @@ export async function covers(lat, lon) {
 /** Date de l'extrait OSM dont viennent les lieux (affichée dans l'app). */
 export async function dataDate() {
   return (await loadIndex()).built;
+}
+
+/**
+ * Photo de devanture (Panoramax, 360°) : de quoi la charger et la recadrer vers le lieu.
+ * [idPhoto, hôte, azimut de la photo, cap vers le lieu, distance, licence, auteur, date]
+ */
+function facadeOf([id, host, az, bearing, d, lic, by, date]) {
+  // l'image complète (2048 × 1024, équirectangulaire) ; le recadrage se fait à l'affichage
+  const src = `https://${host}/api/pictures/${id}/sd.jpg`;
+  // tuiles haute définition (16 × 8 de 768 px) pour le plein écran
+  const tile = (col, row) => `https://${host}/api/pictures/${id}/tiled/${col}_${row}.jpg`;
+  const rel = ((bearing - az + 540) % 360) - 180;     // où regarder, en degrés depuis le centre de la photo
+  const credit = lic.startsWith('etalab') ? 'Ville de Paris / IGN, Panoramax' : `${by || 'contributeur'}, Panoramax (${lic})`;
+  return { id, src, tile, rel, d, credit, lic, date, page: `https://api.panoramax.xyz/#focus=pic&pic=${id}` };
 }

@@ -316,6 +316,13 @@
     try { localStorage.setItem('promesse-vue', '1'); } catch { /* rien */ }
   }
 
+  // Panorama plein écran : on l'ouvre centré sur le lieu (rel : degrés depuis le centre de la photo)
+  function panoScroll(node, rel) {
+    const img = node.querySelector('img');
+    const center = () => { node.scrollLeft = (rel / 360 + 0.5) * img.clientWidth - node.clientWidth / 2; };
+    if (img.complete) center(); else img.addEventListener('load', center, { once: true });
+  }
+
   // ——— Itinéraire ———
   let directions = $state(false);
   let from = $state(null);           // { label, lat, lon, isMe? }
@@ -762,7 +769,43 @@
   }
   // Sélection d'un lieu : sa propre pastille, agrandie, à la place de la petite (repère rouge pour une adresse).
   let selStates = [];
+  // ——— Pastilles-photo : la devanture sur la carte, pour le lieu ouvert et les premiers lieux d'une liste ———
+  let photoPins = [];        // marqueurs HTML posés sur la carte
+  let selPhotoPin = null;
+  function photoPinEl(f, size, onTap) {
+    const el = document.createElement('button');
+    el.className = `pin-photo s${size}`;
+    el.style.setProperty('--fx', f.rel / 360 + 0.5);
+    el.setAttribute('aria-label', 'Devanture');
+    el.innerHTML = `<span class="facade"><img src="${f.src}" alt="" loading="lazy" decoding="async"></span>`;
+    el.addEventListener('click', (e) => { e.stopPropagation(); onTap(); });
+    return el;
+  }
+  function clearPhotoPins() { photoPins.forEach((m) => m.remove()); photoPins = []; }
+  function clearSelPhoto() { selPhotoPin?.remove(); selPhotoPin = null; }
+  // le lieu ouvert : sa devanture au-dessus de sa pastille
+  $effect(() => {
+    const f = info?.facade, p = place;
+    clearSelPhoto();
+    if (!f || !p || !map || directions) return;
+    selPhotoPin = new maplibregl.Marker({ element: photoPinEl(f, 64, () => (viewer = 'facade')), anchor: 'bottom', offset: [0, -22] })
+      .setLngLat([p.lon, p.lat]).addTo(map);
+  });
+  // une liste de catégorie : les 6 lieux les plus proches qui ont une devanture
+  $effect(() => {
+    const list = nearby, c = category;
+    clearPhotoPins();
+    if (!c || c.saved || c.transit || !map || directions) return;
+    for (const n of list.filter((n) => n.f.facade).slice(0, 6)) {
+      const [lon, lat] = n.f.geometry.coordinates;
+      const m = new maplibregl.Marker({ element: photoPinEl(n.f.facade, 40, () => openFeature(n.f)), anchor: 'bottom', offset: [0, -14] })
+        .setLngLat([lon, lat]).addTo(map);
+      photoPins.push(m);
+    }
+  });
+
   function clearSelection() {
+    clearSelPhoto();
     for (const t of selStates) { try { map.setFeatureState(t, { sel: false }); } catch { /* tuile déchargée */ } }
     selStates = [];
     map?.getSource('selected')?.setData(empty());
@@ -1291,7 +1334,10 @@
       const hoursOf = (f) => f.tags?.opening_hours
         || [...(byName.get(f.properties.name) ? [byName.get(f.properties.name)] : [])].find((x) => near(x.geometry.coordinates, f.geometry.coordinates))?.tags?.opening_hours
         || null;
-      nearbyAll = list.map((n) => ({ ...n, h: hoursOf(n.f) }));
+      // (les lieux de la carte sont des objets MapLibre : on recopie leurs champs, un « ... » perdrait la géométrie)
+      const withFacade = (f, facade) => ({ id: f.id, properties: f.properties, geometry: f.geometry, source: f.source, sourceLayer: f.sourceLayer, layer: f.layer, tags: f.tags, facade });
+      const twin = (f) => f.tags ? f : (byName.get(f.properties.name) && near(byName.get(f.properties.name).geometry.coordinates, f.geometry.coordinates) ? byName.get(f.properties.name) : null);
+      nearbyAll = list.map((n) => ({ ...n, h: hoursOf(n.f), f: n.f.facade || !twin(n.f)?.facade ? n.f : withFacade(n.f, twin(n.f).facade) }));
       applyOpenFilter();
       nearbyDone = true;
       // Les plus proches sont hors de la vue (catégorie rare) : on élargit la carte pour les montrer.
@@ -1415,6 +1461,7 @@
   }
 
   function clearCategory() {
+    clearPhotoPins();
     category = null;
     reloadLater = false;
     openAt = null;
@@ -2277,7 +2324,21 @@
   </ul>
 {/snippet}
 
+{#snippet facade(f, alt = '')}
+  <!-- devanture : photo 360° Panoramax recadrée vers le lieu (secteur de 45°), sans serveur -->
+  <span class="facade" style:--fx={f.rel / 360 + 0.5}>
+    <img src={f.src} {alt} loading="lazy" decoding="async" />
+  </span>
+{/snippet}
+
 {#snippet photoBlock()}
+      {#if info?.facade && !wiki?.photos?.length}
+        <button class="facade-card" onclick={() => (viewer = 'facade')} aria-label="Voir la devanture en plein écran">
+          {@render facade(info.facade, `Devanture : ${title}`)}
+          <span class="ph-tag">Devanture</span>
+        </button>
+        <p class="ph-credit"><a href={info.facade.page} target="_blank" rel="noopener">Photo : {info.facade.credit}{info.facade.date ? ` · ${info.facade.date.slice(0, 4)}` : ''}</a></p>
+      {/if}
       {#if wiki?.photos?.length}
         <div class="photos" class:single={wiki.photos.length === 1}>
           {#each wiki.photos as ph, i (ph.src)}
@@ -2597,7 +2658,21 @@
       <button class="nav-end" onclick={endNav}>Fin</button>
     </div>
   {/if}
-  {#if viewer != null && wiki?.photos?.length}
+  {#if viewer === 'facade' && info?.facade}
+    <!-- Devanture en plein écran : la photo 360° entière, qu'on fait défiler ; ouverte sur le lieu -->
+    <div class="viewer" role="dialog" aria-modal="true" aria-label="Devanture de {title}">
+      <div class="pano" use:panoScroll={info.facade.rel}>
+        <img src={info.facade.src} alt={`Vue à 360° devant ${title}`} draggable="false" />
+      </div>
+      <div class="viewer-top">
+        <span>Devanture · faites défiler pour regarder autour</span>
+        <button class="viewer-close" onclick={() => (viewer = null)} aria-label="Fermer">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" /></svg>
+        </button>
+      </div>
+      <p class="viewer-credit"><a href={info.facade.page} target="_blank" rel="noopener">Photo : {info.facade.credit}{info.facade.date ? ` · ${info.facade.date.slice(0, 4)}` : ''} · ouvrir dans Panoramax</a></p>
+    </div>
+  {:else if viewer != null && wiki?.photos?.length}
     {@const ph = wiki.photos[viewerIdx] || wiki.photos[0]}
     <div class="viewer" role="dialog" aria-modal="true" aria-label="Photos de {title}">
       <div class="viewer-strip" class:zoomed={zoom.s > 1} bind:this={viewerEl} style:transform={dragY ? `translateY(${dragY}px)` : null}
@@ -3097,7 +3172,11 @@
             {/if}
             {#if !(category.saved && (hubPanel || (!savedList && !category.shared)))}
             <button class="n-main" onclick={() => { if (swiped) { swiped = null; return; } nearby.find((n) => n.f === f)?.saved ? openPlace({ ...nearby.find((n) => n.f === f).saved }) : openFeature(f); }}>
+              {#if f.facade}
+                <span class="n-thumb">{@render facade(f.facade)}</span>
+              {:else}
               <span class="n-dot" style:--fam={category.saved ? (category.shared ? category.color : listOf(nearby.find((n) => n.f === f)?.saved?.lists?.[0]).color) : famColor(category)} aria-hidden="true"></span>
+              {/if}
               <span class="r-text">
                 <span class="r-name">{displayName(f, category)}</span>
                 {#if category.transit}
@@ -3576,6 +3655,26 @@
   .status.is-open, .r-meta .is-open { color: var(--open); }
   .status.is-closed, .r-meta .is-closed { color: var(--closed); }
   .muted { color: var(--muted); font-weight: 400; }
+
+  /* ——— Devantures (Panoramax) ——— */
+  :global(.facade) { display: block; position: relative; overflow: hidden; container-type: inline-size; aspect-ratio: 4 / 3; background: var(--fill); }
+  :global(.facade img) { position: absolute; width: 800cqw; height: 400cqw; max-width: none; left: calc(50cqw - var(--fx) * 800cqw); top: -155cqw; }
+  .facade-card { display: block; width: 100%; padding: 0; border: 0; margin: 16px 0 0; border-radius: 14px; overflow: hidden; cursor: zoom-in; position: relative; background: none; }
+  .facade-card :global(.facade) { aspect-ratio: 16 / 10; }
+  .ph-tag { position: absolute; left: 10px; top: 10px; background: rgb(0 0 0 / 0.55); color: #fff; font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 8px; }
+  .n-thumb { display: block; width: 44px; height: 44px; border-radius: 10px; overflow: hidden; }
+  .n-thumb :global(.facade) { aspect-ratio: 1; height: 100%; }
+  .n-thumb :global(.facade img) { top: -170cqw; }
+  .nearby li:has(.n-thumb) button.n-main { grid-template-columns: 44px 1fr auto; }
+  :global(.pin-photo) { display: block; padding: 0; border: 3px solid #fff; border-radius: 50%; overflow: hidden; background: var(--fill); cursor: pointer;
+    box-shadow: 0 2px 8px rgb(0 0 0 / 0.3); }
+  :global(.pin-photo.s64) { width: 64px; height: 64px; }
+  :global(.pin-photo.s40) { width: 40px; height: 40px; }
+  :global(.pin-photo .facade) { width: 100%; height: 100%; aspect-ratio: 1; }
+  :global(.pin-photo .facade img) { top: -170cqw; }
+  .pano { position: absolute; inset: 0; overflow-x: auto; overflow-y: hidden; display: flex; align-items: center; scrollbar-width: none; }
+  .pano img { height: min(100vh, 50vw * 1); max-width: none; display: block; }
+  @media (max-aspect-ratio: 1/1) { .pano img { height: 60vh; } }
 
   /* ——— Filtre « ouvert à… » ——— */
   .open-pills { display: flex; gap: 8px; margin: 10px 0 2px; align-items: center; overflow-x: auto; scrollbar-width: none; }
