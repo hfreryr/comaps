@@ -70,7 +70,7 @@ const tests = {
     let valhalla = 0; p.on('request', (r) => { if (r.url().includes('valhalla')) valhalla++; });
     await p.fill('#search', 'Panthéon'); await p.waitForTimeout(3500); await pick(p); await p.waitForTimeout(2500);
     await p.click('.action.primary'); await p.waitForTimeout(2000);
-    await p.click('.modes .mode >> nth=2'); await p.waitForTimeout(12000);
+    await p.click('.mode-tabs .mode-tab >> nth=2'); await p.waitForTimeout(12000);
     assert((await p.locator('.leg').count()) > 2, 'aucun itinéraire en transports');
     // si une sortie est conseillée (métro ou RER), le trajet à pied qui suit a été recalculé depuis cette sortie
     if (await p.locator('.leg-exit').count()) assert((await p.locator('.leg-tip').count()) >= 1, 'sortie conseillée sans place dans la rame');

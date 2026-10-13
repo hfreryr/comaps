@@ -33,9 +33,11 @@ export function draggable(node, params = {}) {
     const vh = window.innerHeight;
     const full = Math.min(n, vh - TOP_GAP);
     const half = Math.min(n, Math.round(vh * 0.46));
-    // L'aperçu s'arrête juste au-dessus des boutons d'action quand il y en a (titre, type, statut).
+    // L'aperçu s'arrête sous l'élément marqué data-peek-end (résumé d'itinéraire), sinon juste au-dessus
+    // des boutons d'action quand il y en a (titre, type, statut).
+    const end = node.querySelector('[data-peek-end]');
     const actions = node.querySelector('.actions');
-    const peek = actions ? actions.offsetTop - 6 : PEEK;
+    const peek = end ? end.offsetTop + end.offsetHeight + 10 : actions ? actions.offsetTop - 6 : PEEK;
     return { peek: Math.min(peek, half), half, full };
   }
   function apply(animate = true) {

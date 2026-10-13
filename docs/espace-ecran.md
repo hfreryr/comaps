@@ -51,5 +51,20 @@ Sur la capture iPhone, Untracked occupe :
 3. **Densité générale** : textes secondaires, marges et boutons ramenés vers les tailles de Google Maps. Une seule échelle de tailles pour toute l'app, pas des retouches au cas par cas.
 4. **Fiche lieu** : l'ouvrir plus bas (nom, état, boutons), pas à mi-hauteur. *À confirmer avec une capture d'une fiche lieu dans Google Maps ou Plans.*
 
+## Résultat (14/10/2026, mêmes mesures dans Chromium 390 × 844)
+
+| Étape | Avant | Après |
+|---|---|---|
+| Itinéraire (à pied, en transport) | 31 % | **65 %** |
+| Fiche lieu | 40 % | **47 %** (raccourcis masqués) |
+| Liste d'une catégorie | 68 % | 69 % |
+| Accueil | 86 % | 87 % |
+
+Propositions 1, 2 et 3 appliquées.
+
+Proposition 4 (ouvrir la fiche lieu plus bas) : **en attente**. Les captures reçues de Google Maps et de Plans montrent la fiche dépliée en entier, pas sa hauteur d'ouverture. Ce qu'elles confirment :
+- l'ordre en tête de fiche, le même que le nôtre : nom, type, état, boutons ;
+- une galerie de photos juste après les boutons.
+
 ## Hors de notre main
 La barre de Safari prend environ 10 % de l'écran. L'app installée sur l'écran d'accueil la supprime, mais la localisation y est bloquée par un bug d'iOS 26/27.
