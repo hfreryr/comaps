@@ -11,7 +11,10 @@ cd app
 npm install
 npm run dev      # développement
 npm run build    # site statique dans app/build/
+npm run e2e      # tests de bout en bout sur le site construit
 ```
+
+**Publier** (depuis la racine du dépôt) : `bash app/scripts/publish.sh "message"`. Le script remplace le site sur la branche `gh-pages` **sans toucher** aux données déposées par les actions automatiques (`data/places/`, `data/facades.json`). Ne pas publier à la main : le 13/10, une publication manuelle a effacé les devantures de tout Paris (rétablies).
 
 ## Couches maison (`static/data/`)
 
