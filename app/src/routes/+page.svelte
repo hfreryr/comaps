@@ -1964,6 +1964,11 @@
   const host = (url) => { try { return new URL(href(url)).hostname.replace(/^www\./, ''); } catch { return url; } };
   const href = (url) => (/^https?:\/\//.test(url) ? url : `https://${url}`);
   const famColor = (c) => c.color || FAMILIES[c.family].color;
+  // « prenez la sortie 2 · Rue de Rennes » ; sans numéro : « prenez la sortie rue de Rennes » ; nom générique (« Entrée / Sortie ») : « prenez la sortie »
+  const exitPhrase = (e) => {
+    if (e.ref) return `prenez la ${exitLabel(e).replace(/^Sortie/, 'sortie')}`;
+    return e.name && !/^(entr[ée]e|sortie|acc[èe]s)\b/i.test(e.name) ? `prenez la sortie ${e.name}` : '';
+  };
 
   // À la descente du métro ou du RER : sortie conseillée (la plus proche de l'étape suivante, d'après OSM)
   // et place dans la rame (données RATP / IDFM). Pour une correspondance : place pour changer au plus vite.
@@ -2742,8 +2747,8 @@
                           {#if tip?.place}
                             <span class="leg-tip"><span class="car-ic" aria-hidden="true"></span>Montez {placeLabel(tip.place)}{tip.transfer ? ` pour la correspondance${tip.transfer.line ? ` avec la ligne ${tip.transfer.line}` : ''}` : ''}</span>
                           {/if}
-                          {#if tip?.exit}
-                            <span class="leg-exit"><span class="exit-sq" aria-hidden="true"></span>À {leg.to}, prenez la {exitLabel(tip.exit).replace(/^Sortie/, 'sortie')}{tip.exit.ref ? '' : ' (sortie)'}</span>
+                          {#if tip?.exit && exitPhrase(tip.exit)}
+                            <span class="leg-exit"><span class="exit-sq" aria-hidden="true"></span>À {leg.to}, {exitPhrase(tip.exit)}</span>
                           {/if}
                           {/each}
                         </span>
