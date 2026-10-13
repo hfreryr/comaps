@@ -99,8 +99,12 @@ En transports, quand on descend du métro ou du RER, le trajet à pied qui suit 
 
 - `scripts/build_facades.py` (action `facades.yml`, chaque dimanche) : pour chaque lieu, la photo 360° prise à 4–18 m, Licence Ouverte d'abord, puis la plus proche de 9 m et la plus récente ; on note l'identifiant de la photo et le **cap vers le lieu**. Mesuré sur le 6e : 31 000 photos, **75 % des lieux** (82 % des commerces) ont une devanture. Résultat dans `data/facades.json` du site, intégré aux tuiles de lieux chaque nuit (5e élément de chaque lieu).
 - **Aucune requête Panoramax à l'usage** : l'app charge seulement l'image choisie (`sd.jpg`, 2048 × 1024, ≈ 230 Ko) et la **recadre à l'affichage** (CSS : secteur de 45° orienté vers le lieu). Plein écran : le panorama entier, ouvert sur le lieu, à faire défiler.
-- Où : en tête de fiche (quand il n'y a pas de photo Wikimedia), vignette dans les listes, pastille-photo sur la carte pour le lieu ouvert et les 6 plus proches d'une liste.
+- Où : **section « Vue de la rue » de la fiche** uniquement (après « Bon à savoir »), pour reconnaître l'entrée. Retirées des listes et des pastilles de carte le 13/10 au soir : testées, elles sont jugées moches et ne disent rien de l'ambiance du lieu. Une image d'ambiance demande une autre source (voir README du dépôt, prochaines étapes).
 - **Limites** : ≈ 230 Ko par photo (des vignettes préparées à l'avance demanderaient un serveur : prévu avec P2) ; le cadrage est automatique, donc parfois la boutique voisine (vérifié sur un échantillon : 3 sur 4 justes) ; `container-type` / `cqw` requis (navigateurs depuis 2023).
+
+## Listes de catégories : comportement (13/10/2026, soir)
+
+Aligné sur Google Maps et Plans : toucher « Restaurants » met les résultats **sur la carte** et ouvre la liste **en aperçu** (une bande en bas), pas en grand. Glisser la liste vers le bas la réduit à cet aperçu **sans désélectionner la catégorie** ; seules la croix et un nouveau toucher du raccourci la ferment. Pendant un itinéraire, les pastilles de la liste **disparaissent** de la carte et reviennent quand on quitte l'itinéraire (`dimPlaces`, couche `cat-hit`). « Mes lieux » garde l'ancien comportement (glisser ferme).
 
 ## Page « Qui voit quoi » (13/10/2026)
 

@@ -8,12 +8,14 @@ const TOP_GAP = 64;        // marge laissée en haut en plein écran, pour voir 
 /**
  * Action Svelte : use:draggable={{ key, onDismiss }}
  *  - key : change quand la fiche affiche autre chose (elle revient alors à mi-hauteur) ;
- *  - onDismiss : appelée quand on fait glisser la fiche hors de l'écran (facultatif).
+ *  - onDismiss : appelée quand on fait glisser la fiche hors de l'écran (facultatif ; sans elle, la fiche
+ *    s'arrête à l'aperçu et reste ouverte, comme la liste d'une catégorie dans les apps de référence) ;
+ *  - start : hauteur d'ouverture, 'peek' | 'half' (défaut).
  */
 export function draggable(node, params = {}) {
   const mobile = matchMedia('(max-width: 767px)');
-  let { key, onDismiss } = params;
-  let snap = 'half';
+  let { key, onDismiss, start } = params;
+  let snap = start || 'half';
   let drag = null;
 
   // Hauteur naturelle du contenu (sans contrainte), pour ne jamais ouvrir plus grand que nécessaire.
@@ -128,7 +130,7 @@ export function draggable(node, params = {}) {
   return {
     update(p = {}) {
       onDismiss = p.onDismiss;
-      if (p.key !== key) { key = p.key; snap = 'half'; apply(); }
+      if (p.key !== key) { key = p.key; snap = p.start || 'half'; apply(); }
     },
     destroy() {
       watch.disconnect();

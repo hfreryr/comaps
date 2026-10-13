@@ -479,9 +479,11 @@
     dimmed = on;
     const v = on ? 0.35 : 1;
     const op = ['case', ['boolean', ['feature-state', 'sel'], false], 0, v];
-    for (const id of ['poi', 'poi-other', 'landmark', 'metro', 'cat-hit', 'fav']) {
+    // les résultats de la liste (restaurants…) disparaissent pendant l'itinéraire et reviennent après
+    if (map.getLayer('cat-hit')) map.setLayoutProperty('cat-hit', 'visibility', on ? 'none' : 'visible');
+    for (const id of ['poi', 'poi-other', 'landmark', 'metro', 'fav']) {
       if (!map.getLayer(id)) continue;
-      const keep = id === 'cat-hit' || id === 'fav';   // nos propres repères ne s'estompent pas pendant un trajet
+      const keep = id === 'fav';   // nos propres repères ne s'estompent pas pendant un trajet
       map.setPaintProperty(id, 'icon-opacity', keep ? ['case', ['boolean', ['feature-state', 'sel'], false], 0, 1] : op);
       map.setPaintProperty(id, 'text-opacity', keep ? ['case', ['boolean', ['feature-state', 'sel'], false], 0, 1] : op);
     }
@@ -618,40 +620,10 @@
   }
   // Sélection d'un lieu : sa propre pastille, agrandie, à la place de la petite (repère rouge pour une adresse).
   let selStates = [];
-  // ——— Pastilles-photo : la devanture sur la carte, pour le lieu ouvert et les premiers lieux d'une liste ———
-  let photoPins = [];        // marqueurs HTML posés sur la carte
-  let selPhotoPin = null;
-  function photoPinEl(f, size, onTap) {
-    const el = document.createElement('button');
-    el.className = `pin-photo s${size}`;
-    el.style.setProperty('--fx', f.rel / 360 + 0.5);
-    el.setAttribute('aria-label', 'Devanture');
-    el.innerHTML = `<span class="facade"><img src="${f.src}" alt="" loading="lazy" decoding="async"></span>`;
-    el.addEventListener('click', (e) => { e.stopPropagation(); onTap(); });
-    return el;
-  }
-  function clearPhotoPins() { photoPins.forEach((m) => m.remove()); photoPins = []; }
-  function clearSelPhoto() { selPhotoPin?.remove(); selPhotoPin = null; }
-  // le lieu ouvert : sa devanture au-dessus de sa pastille
-  $effect(() => {
-    const f = info?.facade, p = place;
-    clearSelPhoto();
-    if (!f || !p || !map || directions) return;
-    selPhotoPin = new maplibregl.Marker({ element: photoPinEl(f, 64, () => (viewer = 'facade')), anchor: 'bottom', offset: [0, -22] })
-      .setLngLat([p.lon, p.lat]).addTo(map);
-  });
-  // une liste de catégorie : les 6 lieux les plus proches qui ont une devanture
-  $effect(() => {
-    const list = nearby, c = category;
-    clearPhotoPins();
-    if (!c || c.saved || c.transit || !map || directions) return;
-    for (const n of list.filter((n) => n.f.facade).slice(0, 6)) {
-      const [lon, lat] = n.f.geometry.coordinates;
-      const m = new maplibregl.Marker({ element: photoPinEl(n.f.facade, 40, () => openFeature(n.f)), anchor: 'bottom', offset: [0, -14] })
-        .setLngLat([lon, lat]).addTo(map);
-      photoPins.push(m);
-    }
-  });
+  // (Les pastilles-photo sur la carte et les vignettes des listes ont été retirées le 13/10 : les vues de rue
+  //  ne rendent pas l'ambiance d'un lieu. La vue de la rue reste dans la fiche, pour reconnaître l'entrée.)
+  const clearSelPhoto = () => {};
+  const clearPhotoPins = () => {};
 
   function clearSelection() {
     clearSelPhoto();
@@ -2181,13 +2153,7 @@
 {/snippet}
 
 {#snippet photoBlock()}
-      {#if info?.facade && !wiki?.photos?.length}
-        <button class="facade-card" onclick={() => (viewer = 'facade')} aria-label="Voir la devanture en plein écran">
-          {@render facade(info.facade, `Devanture : ${title}`)}
-          <span class="ph-tag">Devanture</span>
-        </button>
-        <p class="ph-credit"><a href={info.facade.page} target="_blank" rel="noopener">Photo : {info.facade.credit}{info.facade.date ? ` · ${info.facade.date.slice(0, 4)}` : ''}</a></p>
-      {/if}
+
       {#if wiki?.photos?.length}
         <div class="photos" class:single={wiki.photos.length === 1}>
           {#each wiki.photos as ph, i (ph.src)}
@@ -2269,6 +2235,16 @@
               </li>
             {/each}
           </ul>
+        </section>
+      {/if}
+
+      {#if info?.facade}
+        <section class="psec">
+          <h2>Vue de la rue</h2>
+          <button class="facade-card" onclick={() => (viewer = 'facade')} aria-label="Voir la vue de la rue en plein écran">
+            {@render facade(info.facade, `Vue de la rue : ${title}`)}
+          </button>
+          <p class="ph-credit"><a href={info.facade.page} target="_blank" rel="noopener">Photo : {info.facade.credit}{info.facade.date ? ` · ${info.facade.date.slice(0, 4)}` : ''} · pour reconnaître l'entrée</a></p>
         </section>
       {/if}
 
@@ -2880,7 +2856,9 @@
       </div>
     </section>
   {:else if category && !directions}
-    <section class="sheet" aria-label={category.label} use:draggable={{ key: category.label, onDismiss: clearCategory }}>
+    <!-- Liste d'une catégorie : ouverte en aperçu (la carte reste visible), on l'agrandit si on veut la liste ;
+         la faire glisser vers le bas la réduit sans fermer la catégorie (seule la croix ou le raccourci la ferment). -->
+    <section class="sheet" aria-label={category.label} use:draggable={category.saved ? { key: category.label, onDismiss: clearCategory } : { key: category.label, start: 'peek' }}>
       <button class="grip" aria-label="Agrandir la fiche"></button>
       <button class="close" onclick={clearCategory} aria-label="Fermer la liste">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" /></svg>
@@ -3021,11 +2999,7 @@
             {/if}
             {#if !(category.saved && (hubPanel || (!savedList && !category.shared)))}
             <button class="n-main" onclick={() => { if (swiped) { swiped = null; return; } nearby.find((n) => n.f === f)?.saved ? openPlace({ ...nearby.find((n) => n.f === f).saved }) : openFeature(f); }}>
-              {#if f.facade}
-                <span class="n-thumb">{@render facade(f.facade)}</span>
-              {:else}
               <span class="n-dot" style:--fam={category.saved ? (category.shared ? category.color : listOf(nearby.find((n) => n.f === f)?.saved?.lists?.[0]).color) : famColor(category)} aria-hidden="true"></span>
-              {/if}
               <span class="r-text">
                 <span class="r-name">{displayName(f, category)}</span>
                 {#if category.transit}
@@ -3509,7 +3483,7 @@
   /* ——— Devantures (Panoramax) ——— */
   :global(.facade) { display: block; position: relative; overflow: hidden; container-type: inline-size; aspect-ratio: 4 / 3; background: var(--fill); }
   :global(.facade img) { position: absolute; width: 800cqw; height: 400cqw; max-width: none; left: calc(50cqw - var(--fx) * 800cqw); top: -155cqw; }
-  .facade-card { display: block; width: 100%; padding: 0; border: 0; margin: 16px 0 0; border-radius: 14px; overflow: hidden; cursor: zoom-in; position: relative; background: none; }
+  .facade-card { display: block; width: 100%; padding: 0; border: 0; margin: 0; border-radius: 14px; overflow: hidden; cursor: zoom-in; position: relative; background: none; }
   .facade-card :global(.facade) { aspect-ratio: 16 / 10; }
   .ph-tag { position: absolute; left: 10px; top: 10px; background: rgb(0 0 0 / 0.55); color: #fff; font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 8px; }
   .n-thumb { display: block; width: 44px; height: 44px; border-radius: 10px; overflow: hidden; }

@@ -11,7 +11,7 @@ for (let i = 0; i < 60; i++) {
   try { if ((await fetch(`http://localhost:${PORT}/`)).ok) break; } catch { /* pas encore prêt */ }
   await new Promise((r) => setTimeout(r, 500));
 }
-const proxy = process.env.HTTPS_PROXY ? { proxy: { server: process.env.HTTPS_PROXY, bypass: 'localhost,127.0.0.1' } } : {};
+const proxy = process.env.HTTPS_PROXY ? { proxy: { server: process.env.HTTPS_PROXY, bypass: '<-loopback>,localhost,127.0.0.1' } } : {};
 const browser = await chromium.launch({ ...proxy, args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] });
 let failed = 0;
 const assert = (cond, msg) => { if (!cond) throw new Error(msg); };
@@ -57,11 +57,12 @@ const tests = {
     assert((await p.locator('.nearby li').count()) > 3, 'liste vide');
     await ctx.close();
   },
-  async 'devantures dans la liste et sur la carte'() {
+  async 'catégorie : liste en aperçu, glisser ne la ferme pas'() {
     const { p, ctx } = await page();
     await p.click('.chip:has-text("Restaurants")'); await p.waitForTimeout(6000);
-    assert((await p.locator('.nearby .n-thumb').count()) >= 3, 'moins de 3 vignettes');
-    assert((await p.locator('.pin-photo').count()) >= 3, 'moins de 3 pastilles-photo');
+    const h = await p.$eval('.sheet', (e) => e.getBoundingClientRect().height);
+    assert(h < 300, `la liste s'ouvre trop grande (${h}px) : attendu un aperçu`);
+    assert((await p.locator('.chip.on').count()) === 1, 'catégorie non marquée active');
     await ctx.close();
   },
   async 'transports : sortie conseillée et trajet à pied recalculé'() {
