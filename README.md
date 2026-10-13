@@ -49,6 +49,14 @@ L'objectif : que l'app affiche « vérifié il y a 3 semaines » plutôt que des
 | Fraîcheur des lieux | Détection Paris 6e, puis vérification de 50 cas sur le terrain | Détection ✅, vérification à faire |
 | Questions sur place | Vérification par les utilisateurs, avec leur compte OSM | Après l'annonce à la communauté |
 | Autonomie | Nos propres serveurs Île-de-France (recherche, itinéraires, transports) | À chiffrer |
+| Photos d'ambiance des lieux | Ce que Google et Apple ont et qu'aucune source ouverte n'a | Mesuré le 13/10 (voir ci-dessous), choix à faire |
+
+### Photos d'ambiance : ce qui a été mesuré (13/10/2026)
+
+Aucune source ouverte ne couvre les commerces (Wikimedia : 307 sur 46 466 à Paris ; Panoramax donne la rue, pas l'ambiance : retiré des listes après test).
+Piste testée : l'image que le **site web du lieu** propose pour les partages (`og:image`), script `app/scripts/test_ogimage.py`, zone Paris 6e :
+1 296 restaurants / cafés / bars, **496 ont un site web (38 %)** ; 105 sites injoignables, 174 sans `og:image`, 93 logos ou trop petites, **112 images retenues** dont ≈ 80 % sont de vraies photos à l'œil
+→ **≈ 90 lieux, soit 7 % de la zone**. Qualité bonne quand elle existe, couverture trop faible pour en faire la source principale ; question juridique (réutilisation hors aperçu de lien) non tranchée.
 
 ## Valeurs
 
