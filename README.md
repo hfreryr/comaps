@@ -57,6 +57,7 @@ Aucune source ouverte ne couvre les commerces (Wikimedia : 307 sur 46 466 à Par
 Piste testée : l'image que le **site web du lieu** propose pour les partages (`og:image`), script `app/scripts/test_ogimage.py`, zone Paris 6e :
 1 296 restaurants / cafés / bars, **496 ont un site web (38 %)** ; 105 sites injoignables, 174 sans `og:image`, 93 logos ou trop petites, **112 images retenues** dont ≈ 80 % sont de vraies photos à l'œil
 → **≈ 90 lieux, soit 7 % de la zone**. Qualité bonne quand elle existe, couverture trop faible pour en faire la source principale ; question juridique (réutilisation hors aperçu de lien) non tranchée.
+Même test avec les sites connus d'**Overture** (6e) : 882 restaurants / cafés / bars, **713 ont un site (81 %)** contre 38 % dans OSM ; sur 698 sites testés : 136 images retenues (**15 %** des lieux), 253 sites injoignables depuis notre environnement de test (filtrage réseau probable, plafond réel estimé ≈ 25 %).
 
 ## Valeurs
 
