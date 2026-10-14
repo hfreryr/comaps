@@ -104,6 +104,13 @@
         </div>
       {:else}
       <h1>{app.chipList.find((c) => c.key === app.category.key)?.label || app.category.label}</h1>
+      {@const pref = app.chipPrefs.findIndex((x) => x.key === app.category.key)}
+      {#if pref >= 0 && app.chipPrefs[pref].hidden}
+        <!-- catégorie trouvée par la recherche mais absente des raccourcis : on propose de l'y ajouter (tests P3 et P4) -->
+        <button class="link add-chip" onclick={() => { app.toggleChip(pref); app.say(tx('liste.raccourci_ajoute', { nom: app.category.label })); }}>
+          {tx('liste.ajouter_aux_raccourcis', { nom: app.category.label })}
+        </button>
+      {/if}
       {#if app.openAt && app.openCounts}
         <p class="kind">{app.openCounts.open ? tx('liste.n_ouverts', { n: app.openCounts.open, quand: app.openAt.now ? tx('horaires.maintenant') : momentLabel(app.openAt.at).replace(/ (\d)/, ' à $1') }) : tx('liste.aucun_ouvert_dans_cette_zone', { quand: app.openAt.now ? tx('horaires.maintenant') : momentLabel(app.openAt.at).replace(/ (\d)/, ' à $1') })}</p>
       {:else}
@@ -311,4 +318,5 @@
 
     .chev { animation: none; transition: none; }
   }
+  .add-chip { display: block; margin: 2px 0 4px; }
 </style>
