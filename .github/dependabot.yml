@@ -1,0 +1,13 @@
+# Mises à jour de sécurité proposées automatiquement (une proposition de changement par mise à jour, à valider).
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /app
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 5
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: monthly }
+  - package-ecosystem: pip
+    directory: /
+    schedule: { interval: monthly }

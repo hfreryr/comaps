@@ -63,3 +63,30 @@ test('fusion : ajoute ce qui manque, réunit les listes, garde les noms de liste
 test('anciens favoris sans liste : rangés dans Favoris', () => {
   assert.deepEqual(migratePlaces([{ name: 'a' }])[0].lists, ['fav']);
 });
+
+test('lien de liste piégé : champs nettoyés, lieux invalides écartés', async () => {
+  const evil = await pack({ v: 1, l: { n: 'x'.repeat(5000), i: '"><img onerror=alert(1)>', c: 'red;background:url(//evil)' },
+    p: [['Bon lieu', 48.85, 2.34, 'n12', ['fav'], '', ''], ['Hors limites', 999, 2.34, '', [], '', ''], 'pas un lieu', ['<b>x</b>', 48.8, 2.3, 'javascript:1', ['../../etc'], {}, []]] });
+  const { list, places } = await unpackList(evil);
+  assert.equal(list.name.length, 60);
+  assert.equal(list.icon, 'star');
+  assert.equal(list.color, '#2A5BD7');
+  assert.equal(places.length, 2);
+  assert.equal(places[1].name, '<b>x</b>');           // texte brut (affiché comme du texte, jamais interprété)
+  assert.equal(places[1].osmType, undefined);          // identifiant OSM invalide ignoré
+  assert.deepEqual(places[1].lists, []);
+});
+test('lien trop long ou avec des caractères interdits : refusé', async () => {
+  await assert.rejects(() => unpack('a'.repeat(500_000)));
+  await assert.rejects(() => unpack('abc<script>'));
+});
+test('restauration : seuls Maison et Travail, listes et raccourcis vérifiés', () => {
+  const r = restore({ lists: [{ id: 'fav', name: 'Favoris', icon: 'heart', color: '#D63A7A' }, { id: '../x', name: 'Mauvais' }],
+    p: [['A', 48.8, 2.3, '', ['fav'], '', '']], s: { home: ['Maison', 48.8, 2.3, '', [], '', ''], __proto__: ['x', 1, 1] , autre: ['Z', 1, 1] },
+    pins: ['ok', 3], chips: [{ key: 'resto', label: 'R'.repeat(50) }, { key: '<x>' }] });
+  assert.equal(r.lists.length, 1);
+  assert.deepEqual(Object.keys(r.shortcuts), ['home']);
+  assert.deepEqual(r.pins, ['ok']);
+  assert.equal(r.chips.length, 1);
+  assert.equal(r.chips[0].label.length, 20);
+});

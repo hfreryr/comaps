@@ -47,19 +47,20 @@ Aujourd'hui : 6 tests de bout en bout (fiche lieu, adresse, « restaurant ce soi
 
 ## Étape 2 : sécurité (2 à 4 h)
 Surface d'attaque réduite (site statique, ni serveur, ni comptes, données sur le téléphone), mais :
-- [ ] **Politique de sécurité du contenu (CSP)** dans la page : n'autoriser que nos fournisseurs documentés (OpenFreeMap, Photon, Géoplateforme, Valhalla, Transitous, Wikimedia, Panoramax). Vérifier ensuite que tous les parcours marchent.
-- [ ] **Liens entrants** (`#liste=`, `#transfert=`, `#lieu=`) et **fichiers importés** (sauvegarde, export Google) : limiter la taille, vérifier la forme, refuser ce qui est inattendu. Tester avec des données piégées.
-- [ ] **Liens sortants** venus d'OSM (site web, téléphone) : n'accepter que `https:`, `http:` et `tel:`.
-- [ ] **Actions GitHub** :
+- [x] **Politique de sécurité du contenu (CSP)** dans la page : n'autoriser que nos fournisseurs documentés (OpenFreeMap, Photon, Géoplateforme, Valhalla, Transitous, Wikimedia, Panoramax). Vérifier ensuite que tous les parcours marchent.
+- [x] **Liens entrants** (`#liste=`, `#transfert=`, `#lieu=`) et **fichiers importés** (sauvegarde, export Google) : limiter la taille, vérifier la forme, refuser ce qui est inattendu. Tester avec des données piégées.
+- [x] **Liens sortants** venus d'OSM (site web, téléphone) : n'accepter que `https:`, `http:` et `tel:`.
+- [x] **Actions GitHub** :
   - désigner `actions/checkout` et `actions/setup-python` par leur empreinte, plus par `@v4` / `@v5` ;
   - réduire les permissions au strict nécessaire ;
   - vérifier ce qui est téléchargé (extrait OSM, Panoramax).
-- [ ] **Dépendances** : `npm audit` (0 faille le 14/10), versions figées, contrôle régulier.
+- [x] **Dépendances** : `npm audit` (0 faille le 14/10), versions figées, contrôle régulier.
 - [ ] **Côté porteur du projet** (je ne peux pas le faire) :
   - [ ] double authentification sur le compte GitHub ;
   - [ ] double authentification et verrou de transfert chez le registraire de `untrackedmaps.app` ;
-  - [ ] protection de la branche `main` (pas de suppression, pas de réécriture d'historique).
-- [ ] Page « Qui voit quoi » : y ajouter une ligne « Sécurité » (ce qui est protégé, comment signaler une faille).
+  - [ ] protection de la branche `main` (pas de suppression, pas de réécriture d'historique) ;
+  - [ ] activer le signalement privé de failles (Settings → Security → Private vulnerability reporting), annoncé dans `SECURITY.md`.
+- [x] Page « Qui voit quoi » : y ajouter une ligne « Sécurité » (ce qui est protégé, comment signaler une faille).
 
 ## Étape 3 : rangement du code (4 à 6 h)
 Déjà fait le 14/10 :
@@ -88,6 +89,6 @@ Le fichier principal est passé de 3 770 à 3 340 lignes.
 |---|---|---|
 | 0. Règles | fait (proposition de changement) | 14/10 |
 | 1. Tests | fait : 39 tests unitaires, 12 de bout en bout, 5 pipeline ; un bug trouvé et corrigé | 14/10 |
-| 2. Sécurité | à faire | |
+| 2. Sécurité | fait (sauf la partie du porteur du projet) | 14/10 |
 | 3. Rangement | commencé (3 parties sorties) | 14/10 |
 | 4. Textes | à faire | |

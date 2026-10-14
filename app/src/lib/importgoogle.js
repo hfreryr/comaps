@@ -107,6 +107,8 @@ const WORK = /^(work|travail|bureau)$/i;
  * @returns {Promise<{ places: Array<{name,address,lat?,lon?}>, home?: object, work?: object }>}
  */
 export async function readGoogleExport(file) {
+  // garde-fou : une archive Takeout « Maps » fait quelques Mo ; au-delà, ce n'est pas le bon fichier
+  if (file.size > 300e6) throw new Error('taille');
   const buf = await file.arrayBuffer();
   const u8 = new Uint8Array(buf, 0, 4);
   const files = u8[0] === 0x50 && u8[1] === 0x4b
@@ -130,6 +132,8 @@ export async function readGoogleExport(file) {
   const seen = new Set();
   for (const p of all) {
     if (!p.name && !p.address) continue;
+    p.name = String(p.name).slice(0, 300); p.address = String(p.address || '').slice(0, 300);
+    if (!(Math.abs(p.lat) <= 90 && Math.abs(p.lon) <= 180)) { delete p.lat; delete p.lon; }
     if (HOME.test(p.label)) { out.home = { ...p, name: p.address || p.name }; continue; }
     if (WORK.test(p.label)) { out.work = { ...p, name: p.address || p.name }; continue; }
     const k = `${p.name}|${p.lat?.toFixed?.(4)}|${p.listName}`;

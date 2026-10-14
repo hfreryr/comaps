@@ -19,6 +19,7 @@ jobs:
         with: { node-version: '22' }
       - run: npm ci
         env: { PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1' }
+      - run: npm audit --audit-level=high      # échoue si une dépendance a une faille grave connue
       - run: npm test
       - run: npm run build
   pipeline:

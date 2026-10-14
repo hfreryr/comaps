@@ -141,6 +141,17 @@ Le mode sombre garde ses couleurs : chaque nouvelle couleur claire a sa traducti
 
 Aligné sur Google Maps et Plans : toucher « Restaurants » met les résultats **sur la carte** et ouvre la liste **en aperçu** (une bande en bas), pas en grand. Glisser la liste vers le bas la réduit à cet aperçu **sans désélectionner la catégorie** ; seules la croix et un nouveau toucher du raccourci la ferment. Pendant un itinéraire, les pastilles de la liste **disparaissent** de la carte et reviennent quand on quitte l'itinéraire (`dimPlaces`, couche `cat-hit`). « Mes lieux » garde l'ancien comportement (glisser ferme).
 
+## Sécurité (14/10/2026)
+
+Voir [`SECURITY.md`](../SECURITY.md) :
+- politique de sécurité du contenu (`vite.config.js`) ;
+- vérification des liens et fichiers reçus (`myplaces.js`, `importgoogle.js`) ;
+- liens sortants neutralisés (`links.js`) ;
+- actions GitHub verrouillées ;
+- audit des dépendances et mises à jour proposées automatiquement (Dependabot).
+
+Les tests de bout en bout échouent si la politique bloque un fournisseur.
+
 ## Page « Qui voit quoi » (13/10/2026)
 
 `/confidentialite` : ce que l'app envoie, à qui, et ce que chaque service en fait (politiques vérifiées le 13/10/2026), ce qui ne quitte jamais le téléphone, et ce qui changera avant un lancement public. Liée depuis le message d'accueil et les crédits de la carte. À mettre à jour à chaque changement de service.

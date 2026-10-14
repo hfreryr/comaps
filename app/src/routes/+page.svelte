@@ -6,6 +6,7 @@
   import '#lib/ui/base.css';
   import ModeIcon from '#lib/ui/ModeIcon.svelte';
   import { badge, streetOpts } from '#lib/routeview.js';
+  import { href, host } from '#lib/links.js';
   import { empty, addRouteLayers, addPlaceLayers, routeTags as tagsFor } from '#lib/maplayers.js';
   import RouteSheet from '#lib/ui/RouteSheet.svelte';
   import NavView from '#lib/ui/NavView.svelte';
@@ -1872,8 +1873,6 @@
   });
 
 
-  const host = (url) => { try { return new URL(href(url)).hostname.replace(/^www\./, ''); } catch { return url; } };
-  const href = (url) => (/^https?:\/\//.test(url) ? url : `https://${url}`);
   const famColor = (c) => c.color || FAMILIES[c.family].color;
 
   // À la descente du métro ou du RER : sortie conseillée (la plus proche de l'étape suivante, d'après OSM)
