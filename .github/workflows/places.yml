@@ -23,7 +23,7 @@ jobs:
           curl -sSfL $B/paris.osm.pbf.md5 | awk '{print $1"  paris.osm.pbf"}' | md5sum -c -
       - run: curl -sSfL -o facades.json https://untrackedmaps.app/data/facades.json || echo '{}' > facades.json
       - run: python app/scripts/build_places.py paris.osm.pbf --out out/places --facades facades.json
-      - name: Garde-fou (extrait tronqué ou vide : on ne publie pas)
+      - name: "Garde-fou : si l'extrait paraît tronqué ou vide, on ne publie pas"
         run: python -c "import json,sys; i=json.load(open('out/places/index.json')); n=len(i['tiles']); print(n,'tuiles'); sys.exit(0 if n >= 50 else 1)"
       - name: Publier dans gh-pages/data/places
         run: |
