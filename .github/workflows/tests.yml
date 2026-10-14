@@ -1,0 +1,32 @@
+# Tests automatiques à chaque proposition de changement et à chaque envoi sur main :
+# tests unitaires de l'app (sans réseau), construction du site, tests du pipeline.
+# (Les tests de bout en bout appellent les vrais services : ils se lancent à la main, npm run e2e.)
+name: Tests
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  app:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: app } }
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4.4.0
+        with: { persist-credentials: false }
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
+        with: { node-version: '22' }
+      - run: npm ci
+        env: { PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1' }
+      - run: npm test
+      - run: npm run build
+  pipeline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4.4.0
+        with: { persist-credentials: false }
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
+        with: { python-version: '3.12' }
+      - run: pip install rapidfuzz pytest
+      - run: python -m pytest -q pipeline/tests
