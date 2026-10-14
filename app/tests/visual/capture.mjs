@@ -40,5 +40,18 @@ for (const dark of [false, true]) {
   await shot(p, `${t}-fiche-resto`);
   await c.close();
 }
+// Grand écran : fiche lieu puis itinéraire
+{
+  const c = await b.newContext({ viewport: { width: 1280, height: 800 }, locale: 'fr-FR', timezoneId: 'Europe/Paris', geolocation: { latitude: 48.8867, longitude: 2.3431 }, permissions: ['geolocation'] });
+  await c.addInitScript(() => { localStorage.setItem('promesse-vue', '1'); });
+  const p = await c.newPage();
+  await p.goto('http://localhost:4183/', { waitUntil: 'networkidle' }); await p.waitForTimeout(3000);
+  await p.fill('#search', 'Panthéon'); await p.waitForSelector('.results li[role=option] button', { timeout: 40000 });
+  await p.dispatchEvent('.results li[role=option] button >> nth=0', 'mousedown'); await p.waitForTimeout(3500);
+  await p.screenshot({ path: `${out}/ordi-fiche.png` });
+  await p.click('.action.primary'); await p.waitForTimeout(10000);
+  await p.screenshot({ path: `${out}/ordi-itineraire.png` });
+  await c.close();
+}
 await b.close(); try { process.kill(-srv.pid); } catch {}
 console.log('ok');
