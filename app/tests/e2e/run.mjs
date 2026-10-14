@@ -171,6 +171,13 @@ const tests = {
     assert(!errors.length, errors.join(' | '));
     await ctx.close();
   },
+  async 'page « Qui voit quoi » : on peut la faire défiler'() {
+    const { p, ctx } = await page();
+    await p.evaluate(() => { const a = document.createElement('a'); a.href = 'confidentialite'; a.id = 'qvq'; document.body.appendChild(a); a.click(); });
+    await p.waitForSelector('.scroller'); await p.mouse.move(200, 400); await p.mouse.wheel(0, 1200); await p.waitForTimeout(600);
+    assert((await p.$eval('.scroller', (e) => e.scrollTop)) > 300, 'la page ne défile pas');
+    await ctx.close();
+  },
   async 'transports : sortie conseillée et trajet à pied recalculé'() {
     const { p, ctx } = await page({ geolocation: { latitude: 48.8867, longitude: 2.3431 } });
     let valhalla = 0; p.on('request', (r) => { if (r.url().includes('valhalla')) valhalla++; });
