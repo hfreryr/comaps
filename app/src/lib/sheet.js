@@ -11,11 +11,13 @@ const TOP_GAP = 64;        // marge laissée en haut en plein écran, pour voir 
  *  - key : change quand la fiche affiche autre chose (elle revient alors à mi-hauteur) ;
  *  - onDismiss : appelée quand on fait glisser la fiche hors de l'écran (facultatif ; sans elle, la fiche
  *    s'arrête à l'aperçu et reste ouverte, comme la liste d'une catégorie dans les apps de référence) ;
- *  - start : hauteur d'ouverture, 'peek' | 'half' (défaut).
+ *  - start : hauteur d'ouverture, 'peek' | 'half' (défaut) ;
+ *  - min : la fiche peut aussi se réduire à une fine bande (jusqu'à l'élément marqué data-min-end), pour voir
+ *    presque toute la carte (aperçu d'un itinéraire, comme dans Plans et Maps).
  */
 export function draggable(node, params = {}) {
   const mobile = matchMedia('(max-width: 767px)');
-  let { key, onDismiss, start } = params;
+  let { key, onDismiss, start, min } = params;
   let snap = start || 'half';
   let drag = null;
 
@@ -39,7 +41,9 @@ export function draggable(node, params = {}) {
     const end = node.querySelector('[data-peek-end]');
     const actions = node.querySelector('.actions');
     const peek = end ? end.offsetTop + end.offsetHeight + 10 : actions ? actions.offsetTop - 6 : PEEK;
-    return { peek: Math.min(peek, half), half, full };
+    const minEnd = min && node.querySelector('[data-min-end]');
+    const low = minEnd ? minEnd.offsetTop + minEnd.offsetHeight + 4 : null;
+    return { min: low, peek: Math.min(peek, half), half, full };
   }
   // Hauteur de la fiche annoncée à la page (événement « sheetmove ») : ce qui est posé sur la carte juste au-dessus
   // (vignette de vue de la rue) suit la fiche.
@@ -101,7 +105,8 @@ export function draggable(node, params = {}) {
       setTimeout(onDismiss, 180);
       return;
     }
-    const order = ['peek', 'half', 'full'].filter((s, i, a) => i === 0 || limits[s] > limits[a[i - 1]]);
+    const order = ['min', 'peek', 'half', 'full'].filter((s) => limits[s] != null)
+      .filter((s, i, a) => i === 0 || limits[s] > limits[a[i - 1]]);
     let i = order.reduce((best, s, k) => (Math.abs(limits[s] - h) < Math.abs(limits[order[best]] - h) ? k : best), 0);
     if (v < -0.45) i = Math.min(order.length - 1, order.indexOf(snap) + 1);   // geste vif vers le haut
     if (v > 0.45) i = Math.max(0, order.indexOf(snap) - 1);                   // geste vif vers le bas
@@ -110,7 +115,7 @@ export function draggable(node, params = {}) {
   }
   function onGrip(e) {
     if (!e.target.closest('.grip') || !mobile.matches) return;
-    snap = snap === 'full' ? 'half' : 'full';
+    snap = snap === 'full' ? 'half' : snap === 'min' ? 'peek' : 'full';
     apply();
   }
   function onWheel(e) {             // petite fenêtre d'ordinateur : la molette agrandit la fiche

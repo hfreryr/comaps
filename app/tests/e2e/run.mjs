@@ -123,6 +123,30 @@ const tests = {
     assert((await p.locator('.chip.on').count()) === 1, 'catégorie non marquée active');
     await ctx.close();
   },
+  async 'aperçu d\'itinéraire : la fiche se réduit à une fine bande, puis remonte'() {
+    const { p, ctx, errors } = await page();
+    await p.click('.chip:has-text("Restaurants")'); await p.waitForTimeout(6000);
+    await p.click('.nearby li button >> nth=0'); await p.waitForTimeout(3000);
+    await p.click('.action.primary'); await p.waitForSelector('.route-sheet .mode-tabs', { timeout: 15000 }); await p.waitForTimeout(6000);
+    // glisser du doigt (événements tactiles réels) depuis la poignée
+    const cdp = await ctx.newCDPSession(p);
+    const swipe = async (y0, y1) => {
+      const pt = (y) => [{ x: 195, y }];
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: pt(y0) });
+      for (let k = 1; k <= 8; k++) { await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: pt(y0 + (y1 - y0) * k / 8) }); await p.waitForTimeout(40); }
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); await p.waitForTimeout(700);
+    };
+    const box = async () => p.$eval('.route-sheet', (e) => e.getBoundingClientRect());
+    const top = (await box()).top;
+    await swipe(top + 8, 840);
+    const low = await box();
+    assert(low.height < 120 && low.height > 40, `fiche pas réduite à une bande : ${Math.round(low.height)} px`);
+    assert(await p.$eval('.route-sheet .mode-tabs', (e) => e.getBoundingClientRect().bottom <= 844), 'durées des modes cachées');
+    await swipe(low.top + 8, low.top - 250);
+    assert((await box()).height > low.height + 60, 'la fiche ne remonte pas');
+    assert(!errors.length, errors.join(' | '));
+    await ctx.close();
+  },
   async 'Mes lieux : favori, nouvelle liste, renommer, supprimer'() {
     const { p, ctx, errors } = await page();
     await p.fill('#search', "Ed's rue Muller"); await p.waitForSelector('.results li.opt button', { timeout: 20000 }); await pick(p); await p.waitForTimeout(3000);
