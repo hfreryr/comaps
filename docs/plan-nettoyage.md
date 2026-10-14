@@ -15,11 +15,11 @@ Durées : estimations de temps de travail, pas des mesures.
 ---
 
 ## Étape 0 : règles permanentes (15 min)
-- [ ] Ajouter à `CLAUDE.md` :
+- [x] Ajouter à `CLAUDE.md` :
   - toute nouvelle fonction de l'app va dans son propre fichier (`src/lib/ui/` pour l'écran, `src/lib/` pour la logique), jamais dans `+page.svelte` ;
   - toute nouvelle fonction arrive avec son test ;
   - tout nouveau texte affiché va dans le fichier de textes (dès l'étape 4).
-- [ ] Ranger le script de captures avant/après dans le dépôt (`app/tests/visual/`). Il vit aujourd'hui dans un dossier temporaire.
+- [x] Ranger le script de captures avant/après dans le dépôt (`app/tests/visual/`). Il vivait jusqu'ici dans un dossier temporaire.
 
 ## Étape 1 : tests (2 à 3 h)
 Aujourd'hui : 6 tests de bout en bout (fiche lieu, adresse, « restaurant ce soir 8e », liste de catégorie, transports, rechargement de liste). **Aucun test unitaire.** Le pipeline Python n'a **aucun test**, alors que `CLAUDE.md` en exige pour la logique de comparaison.
@@ -84,7 +84,7 @@ Le fichier principal est passé de 3 770 à 3 340 lignes.
 ## Suivi
 | Étape | État | Date |
 |---|---|---|
-| 0. Règles | à faire | |
+| 0. Règles | fait (proposition de changement) | 14/10 |
 | 1. Tests | à faire | |
 | 2. Sécurité | à faire | |
 | 3. Rangement | commencé (3 parties sorties) | 14/10 |
