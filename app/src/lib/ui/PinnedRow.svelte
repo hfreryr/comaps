@@ -9,9 +9,9 @@
 </script>
 
 
-  <div class="pinned" role="list">
+  <div class="pinned">
     {#each ['home', 'work'] as k}
-      <button role="listitem" class="pin-btn" class:unset={!app.shortcuts[k]}
+      <button class="pin-btn" class:unset={!app.shortcuts[k]}
         onmousedown={inSearch ? (e) => { e.preventDefault(); app.useShortcut(k); } : undefined}
         onclick={inSearch ? undefined : () => app.useShortcut(k)}>
         <span class="pin-circle home">{#if k === 'home'}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.5 12 5l8 6.5M6.5 10v9.5h11V10" /><path d="M10.2 19.5v-4.8h3.6v4.8" /></svg>{:else}<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="7.5" width="17" height="12" rx="2.5" /><path d="M9 7.5V6a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 6v1.5M3.5 12.5h17" /></svg>{/if}</span>
@@ -20,7 +20,7 @@
       </button>
     {/each}
     {#each app.pinnedPlaces as f (app.placeKey(f))}
-      <button role="listitem" class="pin-btn"
+      <button class="pin-btn"
         onmousedown={inSearch ? (e) => { e.preventDefault(); app.pickResult({ ...f }); } : undefined}
         onclick={inSearch ? undefined : () => app.openPlace({ ...f, pin: { glyph: app.listOf(f.lists[0]).icon, color: app.listOf(f.lists[0]).color } })}>
         <ListDot l={app.listOf(f.lists[0])} size={44} />

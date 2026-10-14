@@ -672,7 +672,7 @@
 
 <svelte:window bind:innerHeight={innerH} />
 <div class="app" class:routing={directions} class:navigating={!!nav} style:--top-h={`${directions ? topH : searchH + 16}px`}>
-  <div class="map" bind:this={mapEl} aria-label={tx('ecran.carte')}></div>
+  <div class="map" role="region" bind:this={mapEl} aria-label={tx('ecran.carte')}></div>
 
   <TopBar />
 

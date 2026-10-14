@@ -49,5 +49,6 @@ Voir `README.md` pour la feuille de route.
 ## Design
 - Références visuelles : Google Maps et Plans d'Apple (sobriété, carte calme, lieux colorés par famille). S'en inspirer, ne jamais copier leurs icônes, logos ou éléments propres.
 - Police système du téléphone pour l'interface ; sur la carte, Inter (libre, la plus proche des polices système), servie avec l'app. Aucune ressource chargée chez Google (pas de Google Fonts).
+- **Accessibilité : WCAG 2.1 niveau AA** (texte contrasté à 4,5:1 au moins, chaque bouton nommé). Le test e2e « accessibilité » (axe-core) bloque les régressions ; il ne remplace pas un essai au clavier et avec VoiceOver.
 - Test du couloir : quelqu'un qui n'a jamais entendu parler d'OSM doit comprendre en 5 secondes.
 - La frugalité n'excuse jamais une expérience médiocre.

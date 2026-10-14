@@ -50,7 +50,7 @@
 
 <style>
   :global(body) { margin: 0; background: #fff; color: #1c1d1f; font: 16px/1.5 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
-  @media (prefers-color-scheme: dark) { :global(body) { background: #1c1f24; color: #e8e9ec; } table { border-color: #3a3f47; } th, td { border-color: #3a3f47; } .back, a { color: #7ea2ff; } }
+  @media (prefers-color-scheme: dark) { :global(body) { background: #1c1f24; color: #e8e9ec; } table { border-color: #3a3f47; } th, td { border-color: #3a3f47; } }
   /* La carte bloque le défilement de la page entière (html, body { overflow: hidden }) et ce style reste chargé
      quand on arrive ici depuis la carte : la page défile donc dans son propre conteneur. */
   .scroller { position: fixed; inset: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
@@ -59,6 +59,7 @@
   h2 { font-size: 19px; margin: 28px 0 8px; }
   .lead { font-size: 18px; }
   .back, a { color: #2a5bd7; text-decoration: none; }
+  @media (prefers-color-scheme: dark) { .back, a { color: #7ea2ff; } }   /* après la règle claire, sinon elle l'écrase */
   table { border-collapse: collapse; width: 100%; font-size: 14.5px; margin-top: 12px; }
   th, td { text-align: left; vertical-align: top; padding: 8px 8px 8px 0; border-bottom: 1px solid #e3e5e8; }
   th { font-weight: 600; }

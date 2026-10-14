@@ -7,16 +7,15 @@
 
   // État et actions de la page (voir le bloc « app » de +page.svelte)
   const app = getContext('app');
-  let {  } = $props();
 </script>
 
 
-  <ul class="results" role="listbox">
+  <ul class="results" aria-label={tx('resultats.liste_aria')}>
     {#if app.editing}
       <li class="note map-hint">{tx('resultats.ou_touchez_la_carte_pour_choisir_un')}</li>
     {/if}
     {#if app.editing === 'from'}
-      <li role="option" aria-selected="false">
+      <li class="opt">
         <button onmousedown={app.useMyPosition}>
           <span class="r-icon me-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M20 4 4 11l7 2 2 7z" class="solid" /></svg></span>
           <span class="r-text"><span class="r-name">{tx('resultats.votre_position')}</span><span class="r-meta">{tx('resultats.utiliser_la_localisation_du')}</span></span>
@@ -34,7 +33,7 @@
       <li class="note recents-head"><span>{tx('resultats.mes_lieux')}</span>
         {#if !app.editing}<button class="link" onmousedown={(e) => { e.preventDefault(); app.focused = false; document.activeElement?.blur(); app.pickCategory(ALL_CATEGORIES[0]); }}>{tx('resultats.tout_voir')}</button>{/if}</li>
       {#each app.favorites.slice(0, 5) as r (r.id + r.lat)}
-        <li role="option" aria-selected="false">
+        <li class="opt">
           <button onmousedown={() => app.pickResult(r)}>
             <ListDot l={app.listOf(r.lists?.[0])} size={32} />
             <span class="r-text">
@@ -49,7 +48,7 @@
       <li class="note recents-head"><span>{tx('resultats.recents')}</span>
         <button class="link" onmousedown={(e) => { e.preventDefault(); app.forgetRecents(); }}>{tx('resultats.effacer')}</button></li>
       {#each app.recents as r (r.id)}
-        <li role="option" aria-selected="false">
+        <li class="opt">
           <button onmousedown={() => app.pickResult(r)}>
             <span class="r-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></svg>
@@ -63,7 +62,7 @@
       {/each}
     {/if}
     {#if app.catHit}
-      <li role="option" aria-selected="false">
+      <li class="opt">
         <button onmousedown={app.openCategoryFromSearch}>
           <span class="r-icon cat-icon" style:--fam={app.famColor(app.catHit)} aria-hidden="true"></span>
           <span class="r-text">
@@ -79,7 +78,7 @@
       </li>
     {/if}
     {#each app.results as r, i (r.id)}
-      <li role="option" aria-selected={i === app.active}>
+      <li class="opt">
         <button class:active={i === app.active} onmousedown={() => app.pickResult(r)}>
           <span class="r-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z" /><circle cx="12" cy="9.5" r="2.5" /></svg>

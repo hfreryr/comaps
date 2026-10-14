@@ -25,6 +25,7 @@ export default {
   'recherche.depart': 'Départ',
   'recherche.arrivee': 'Arrivée',
   // ——— Résultats de recherche ———
+  'resultats.liste_aria': 'Résultats de la recherche',
   'resultats.ou_touchez_la_carte_pour_choisir_un': 'Ou touchez la carte pour choisir un point.',
   'resultats.votre_position': 'Votre position',
   'resultats.utiliser_la_localisation_du': 'Utiliser la localisation du téléphone',
