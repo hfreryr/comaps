@@ -53,7 +53,10 @@
   let showWeek = $state(false);
   let wiki = $state(null);           // extrait Wikipédia et photo Commons
   let moreText = $state(false);
-  let viewer = $state(null);         // photo affichée en plein écran (indice), null : fermé
+  let viewer = $state(null);
+  let placeSheetH = $state(null);    // hauteur de la fiche lieu (téléphone), pour poser la vignette de vue de la rue au-dessus
+  let innerH = $state(typeof window === 'undefined' ? 800 : window.innerHeight);
+  $effect(() => { if (!place) placeSheetH = null; });         // photo affichée en plein écran (indice), null : fermé
   let viewerEl = $state();
   let viewerIdx = $state(0);
   // Zoom dans la visionneuse : pincer, double-toucher, déplacer ; glisser vers le bas (sans zoom) ferme.
@@ -2142,15 +2145,6 @@
         </section>
       {/if}
 
-      {#if info?.facade}
-        <section class="psec">
-          <h2>Vue de la rue</h2>
-          <button class="facade-card" onclick={() => (viewer = 'facade')} aria-label="Voir la vue de la rue en plein écran">
-            {@render facade(info.facade, `Vue de la rue : ${title}`)}
-          </button>
-          <p class="ph-credit"><a href={info.facade.page} target="_blank" rel="noopener">Photo : {info.facade.credit}{info.facade.date ? ` · ${info.facade.date.slice(0, 4)}` : ''} · pour reconnaître l'entrée</a></p>
-        </section>
-      {/if}
 
       {#if week}
         <section class="psec">
@@ -2210,6 +2204,7 @@
       </p>
 {/snippet}
 
+<svelte:window bind:innerHeight={innerH} />
 <div class="app" class:routing={directions} class:navigating={!!nav} style:--top-h={`${directions ? topH : searchH + 16}px`}>
   <div class="map" bind:this={mapEl} aria-label="Carte"></div>
 
@@ -2317,6 +2312,15 @@
     <NavView {nav} {navBanner} {navRemaining} {to} {navFollow} bind:navList bind:voice {endNav}
       recenter={() => { navFollow = true; updateNav(); }} />
   {/if}
+  {#if place && !directions && !nav && info?.facade && viewer == null && (placeSheetH == null || placeSheetH < innerH * 0.6)}
+    <!-- Vue de la rue posée sur la carte, juste au-dessus de la fiche (comme Plans et Google Maps) ; plein écran au toucher -->
+    <button class="street-thumb" style:bottom={placeSheetH != null ? `${placeSheetH + 12}px` : null} onclick={() => (viewer = 'facade')}
+      aria-label="Voir la vue de la rue">
+      {@render facade(info.facade, `Vue de la rue : ${title}`)}
+      <span class="st-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4.5 12a7.5 3.5 0 1 0 15 0M17 9.5l2.5 2.5 2.5-2.5" /><circle cx="12" cy="12" r="1.6" class="solid" /></svg></span>
+      <span class="st-src">Panoramax</span>
+    </button>
+  {/if}
   {#if viewer === 'facade' && info?.facade}
     <!-- Devanture en plein écran : la photo 360° entière, qu'on fait défiler ; ouverte sur le lieu -->
     <div class="viewer" role="dialog" aria-modal="true" aria-label="Devanture de {title}">
@@ -2324,7 +2328,7 @@
         <img src={info.facade.src} alt={`Vue à 360° devant ${title}`} draggable="false" />
       </div>
       <div class="viewer-top">
-        <span>Devanture · faites défiler pour regarder autour</span>
+        <span>Vue de la rue · faites défiler pour regarder autour</span>
         <button class="viewer-close" onclick={() => (viewer = null)} aria-label="Fermer">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" /></svg>
         </button>
@@ -2461,7 +2465,7 @@
     <RouteSheet {from} {to} {mode} {routes} {picked} {pickedStreet} {showVia} {legExits}
       {chooseMode} {pickStreet} {pickTransit} {startNav} {addStop} {computeRoutes} />
   {:else if place && !directions}
-    <section class="sheet" aria-label={place.name} use:draggable={{ key: place.id, onDismiss: closePlace }}>
+    <section class="sheet" aria-label={place.name} use:draggable={{ key: place.id, onDismiss: closePlace }} onsheetmove={(e) => (placeSheetH = e.detail.height)}>
       <button class="grip" aria-label="Agrandir la fiche"></button>
       <button class="close" onclick={closePlace} aria-label="Fermer la fiche">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" /></svg>
@@ -3108,6 +3112,15 @@
   /* ——— Devantures (Panoramax) ——— */
   :global(.facade) { display: block; position: relative; overflow: hidden; container-type: inline-size; aspect-ratio: 4 / 3; background: var(--fill); }
   :global(.facade img) { position: absolute; width: 800cqw; height: 400cqw; max-width: none; left: calc(50cqw - var(--fx) * 800cqw); top: -155cqw; }
+  .street-thumb { position: absolute; z-index: 2; left: 12px; bottom: 50%; width: 112px; height: 76px; padding: 0; border: 2.5px solid #fff;
+    border-radius: 14px; overflow: hidden; box-shadow: var(--shadow-float); background: var(--fill); cursor: zoom-in; animation: appear-thumb 200ms ease-out; }
+  .street-thumb :global(.facade) { aspect-ratio: auto; width: 100%; height: 100%; }
+  .street-thumb :global(.facade img) { top: -170cqw; }
+  .st-icon { position: absolute; left: 5px; bottom: 5px; width: 22px; height: 22px; border-radius: 50%; background: rgb(0 0 0 / 0.55); display: grid; place-items: center; color: #fff; }
+  .st-icon svg { width: 16px; height: 16px; stroke-width: 2; }
+  .st-src { position: absolute; right: 4px; top: 4px; font-size: 9.5px; font-weight: 600; color: #fff; background: rgb(0 0 0 / 0.45); padding: 1px 5px; border-radius: 6px; }
+  @keyframes appear-thumb { from { opacity: 0; transform: scale(0.92); } }
+  @media (min-width: 768px) { .street-thumb { left: 432px; bottom: 24px !important; width: 160px; height: 104px; } }
   .facade-card { display: block; width: 100%; padding: 0; border: 0; margin: 0; border-radius: 14px; overflow: hidden; cursor: zoom-in; position: relative; background: none; }
   .facade-card :global(.facade) { aspect-ratio: 16 / 10; }
   .ph-tag { position: absolute; left: 10px; top: 10px; background: rgb(0 0 0 / 0.55); color: #fff; font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 8px; }

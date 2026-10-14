@@ -40,9 +40,13 @@ export function draggable(node, params = {}) {
     const peek = end ? end.offsetTop + end.offsetHeight + 10 : actions ? actions.offsetTop - 6 : PEEK;
     return { peek: Math.min(peek, half), half, full };
   }
+  // Hauteur de la fiche annoncée à la page (événement « sheetmove ») : ce qui est posé sur la carte juste au-dessus
+  // (vignette de vue de la rue) suit la fiche.
+  const emit = (height) => node.dispatchEvent(new CustomEvent('sheetmove', { detail: { height } }));
   function apply(animate = true) {
     if (!mobile.matches) {
       for (const p of ['height', 'maxHeight', 'overflowY', 'transition']) node.style[p] = '';
+      emit(null);
       return;
     }
     const h = heights();
@@ -53,6 +57,7 @@ export function draggable(node, params = {}) {
     node.style.overflowY = snap === 'full' ? 'auto' : 'hidden';
     if (snap !== 'full') node.scrollTop = 0;
     node.dataset.snap = snap;
+    emit(h[snap]);
     const grip = node.querySelector('.grip');
     if (grip) {
       grip.setAttribute('aria-label', snap === 'full' ? 'Réduire la fiche' : 'Agrandir la fiche');
@@ -80,6 +85,7 @@ export function draggable(node, params = {}) {
     drag.dy = dy;
     const h = Math.max(40, Math.min(drag.limits.full + 24, drag.h0 - dy));
     node.style.height = `${h}px`;
+    emit(h);
   }
   function onEnd() {
     if (!drag?.active) { drag = null; return; }
@@ -90,6 +96,7 @@ export function draggable(node, params = {}) {
     if (onDismiss && (h < limits.peek * 0.7 || (snap === 'peek' && v > 0.5))) {
       node.style.transition = 'height 200ms ease-in';
       node.style.height = '0px';
+      emit(0);
       setTimeout(onDismiss, 180);
       return;
     }

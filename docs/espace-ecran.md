@@ -72,7 +72,7 @@ Proposition 4 (ouvrir la fiche lieu plus bas) : **abandonnée après mesure.** C
 
 Notre hauteur d'ouverture est donc la même que celle des références. Ce que montrent leurs fiches à l'ouverture : nom, type, état, boutons, puis une bande d'infos (Plans) ou « Bon à savoir » (Google), puis des photos.
 
-Constat utile, vu sur les deux captures : **une vignette de vue de la rue posée sur la carte**, en bas à gauche, juste au-dessus de la fiche (jumelles « Look Around » chez Apple, Street View chez Google). C'est l'emplacement naturel de nos photos de devanture Panoramax, au lieu d'une section dans la fiche. → proposition 5.
+Constat utile, vu sur les deux captures : **une vignette de vue de la rue posée sur la carte**, en bas à gauche, juste au-dessus de la fiche (jumelles « Look Around » chez Apple, Street View chez Google). C'est l'emplacement naturel de nos photos de devanture Panoramax, au lieu d'une section dans la fiche. → proposition 5, **appliquée le 14/10** : vignette de 112 × 76 points, posée 12 points au-dessus de la fiche, avec la mention « Panoramax ».
 
 ## Hors de notre main
 La barre de Safari prend environ 10 % de l'écran. L'app installée sur l'écran d'accueil la supprime, mais la localisation y est bloquée par un bug d'iOS 26/27.
