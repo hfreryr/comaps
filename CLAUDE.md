@@ -37,6 +37,7 @@ Voir `README.md` pour la feuille de route.
 - Scripts reproductibles : une seule commande documentée pour tout relancer.
 - Ajouter des tests pour la logique de comparaison.
 - **App : toute nouvelle fonction va dans son propre fichier** (`app/src/lib/ui/` pour l'écran, `app/src/lib/` pour la logique), jamais dans `app/src/routes/+page.svelte`, qui ne doit plus grossir.
+- **État de l'écran** : les composants et modules le lisent par `getContext('app')` ; un nom ajouté doit figurer dans le bloc `// <app>` de `+page.svelte` (avec un `set` s'il est modifié). `npm run check` le vérifie.
 - **Toute nouvelle fonction arrive avec son test** (unitaire `node --test` ou de bout en bout `npm run e2e`).
 - **Tout nouveau texte affiché passe par le fichier de textes** dès qu'il existe (plan de nettoyage, étape 4).
 - Avant de publier un changement visible, comparer les captures avant/après (`app/tests/visual/`), puis publier avec `bash app/scripts/publish.sh` uniquement (jamais à la main : il préserve les données des actions automatiques).

@@ -53,15 +53,13 @@ Interdits par les règles du projet : Overpass (limites d'usage incompatibles av
 - **Données par tuile** (`src/lib/placestore.js`), URL de base configurable (`VITE_DATA_BASE`, `src/lib/config.js`).
 - **Une interface par besoin** : `geocode.js` (adresses et noms, fournisseur selon le pays), `places.js` (détails et catégories, depuis les tuiles), `routing.js`.
 - **Profil de ville** (`src/lib/cities/paris.js`) : boîtes, arrondissements, enrichissements locaux (sorties, rame, trafic). Une donnée absente = fonction désactivée.
-- **Découpage de l'écran** (en cours, commencé le 14/10) : `src/routes/+page.svelte` (3 770 → 3 340 lignes) garde l'état et la carte. Déjà sortis :
-  - `src/lib/ui/RouteSheet.svelte` : fiche itinéraire ;
-  - `NavView.svelte` : guidage ;
-  - `ModeIcon.svelte` et `LegChain.svelte` : petits éléments communs ;
-  - `src/lib/ui/base.css` : styles partagés ;
-  - `src/lib/routeview.js` : mise en forme des itinéraires ;
-  - `src/lib/maplayers.js` : couches maison de la carte.
+- **Découpage de l'écran** (fait le 14/10) : `src/routes/+page.svelte` (3 770 → environ 730 lignes) ne garde que l'état, la carte et l'assemblage.
+  - **Comment les morceaux se parlent** : la page déclare l'état (lieu ouvert, catégorie, itinéraire, Mes lieux…) et le partage par un objet `app` (bloc généré entre `// <app>` et `// </app>`, transmis par `setContext('app', app)`). Un composant écrit `const app = getContext('app')` puis lit ou modifie `app.place`, `app.directions`… `npm run check` vérifie que chaque `app.nom` utilisé existe bien dans ce bloc.
+  - **Écran** (`src/lib/ui/`) : `TopBar` (barres du haut), `ResultList` et `PinnedRow` (résultats de recherche), `CategorySheet` (liste d'une catégorie), `PlaceSheet` (fiche lieu et station), `RouteSheet` (itinéraire), `NavView` (guidage), `MapControls` (boussole, type de carte, position), `PhotoViewer` et `StreetThumb` (photos, vue de la rue), `ListPicker`, `TransferSheet`, `ImportSheet`, `ChipsEditor`, `PromiseBanner`, petits éléments (`ModeIcon`, `LegChain`, `ListDot`, `Facade`), styles communs `base.css`.
+  - **Logique** (`src/lib/`), une fonction `createX(app)` par sujet : `mapsetup.svelte.js` (mise en place de la carte), `mapdraw.js` (dessin et cadrage), `searchflow.js` (recherche et catégories), `placeflow.js` (fiche lieu), `directionsflow.js` (itinéraire), `navflow.js` (guidage), `location.js` (position, boussole), `myplacesflow.js`, `shortcutsflow.js`, `chipsflow.js`, `importflow.js` (Mes lieux), `screen.js` (messages, retour arrière), `zoom.js` (visionneuse). Plus les modules sans état déjà existants (`routing.js`, `hours.js`, `myplaces.js`, `routeview.js`, `maplayers.js`…).
+  - **Écart avec le plan initial** : l'état n'a pas été déplacé dans un `state.svelte.js` ; il reste déclaré dans la page et passe par l'objet `app`. Même effet pour les composants (ils lisent l'état au lieu de tout recevoir), sans réécrire les ~160 déclarations d'état. On pourra le faire plus tard si besoin.
 
-  Chaque étape est vérifiée par comparaison de captures avant/après et par les tests e2e. Restent la fiche lieu, Mes lieux, la recherche et la visionneuse : elles partagent beaucoup d'état avec la page, il faudra d'abord un module d'état commun.
+  Chaque étape a été vérifiée par comparaison de captures avant/après et par les tests e2e.
 
 ## Retours des premiers tests (12/10/2026)
 - **Métro** : raccourci « Métro » (stations les plus proches, prochains passages directement dans la liste) ; la recherche comprend « métro », « station », « métro le plus proche » ; les stations restent toujours visibles sur la carte dès le zoom 13.
@@ -121,7 +119,7 @@ En transports, quand on descend du métro ou du RER, le trajet à pied qui suit 
 Enquête et mesures : [`docs/espace-ecran.md`](../docs/espace-ecran.md). Appliqué :
 - écran itinéraire compact (ci-dessus) ;
 - raccourcis de catégories masqués quand une fiche lieu est ouverte ;
-- une échelle de tailles unique (`--fs-body`, `--fs-meta`, `--fs-small`, `--gutter` dans le style de `+page.svelte`), avec une densité proche de Google Maps : barre de recherche, raccourcis, champs et marges des fiches plus compacts. Les champs de saisie restent à 16 px, sinon Safari zoome au moment de taper ;
+- une échelle de tailles unique (`--fs-body`, `--fs-meta`, `--fs-small`, `--gutter` dans `src/lib/ui/base.css`), avec une densité proche de Google Maps : barre de recherche, raccourcis, champs et marges des fiches plus compacts. Les champs de saisie restent à 16 px, sinon Safari zoome au moment de taper ;
 - le cadrage de la carte tient compte de la hauteur réelle du haut d'écran et de la fiche, mesurée au lieu de valeurs fixes.
 
 ## Fond de carte clair et polices (14/10/2026)

@@ -69,13 +69,14 @@ Déjà fait le 14/10 :
 - couches de carte (`maplayers.js`) ;
 - styles partagés (`ui/base.css`).
 
-Le fichier principal est passé de 3 770 à 3 340 lignes.
-- [ ] **État commun** : regrouper les données de l'app (lieu ouvert, catégorie, itinéraire, Mes lieux…) dans `src/lib/state.svelte.js`. Chaque partie de l'écran le lit au lieu de tout recevoir de la page.
-- [ ] Sortir la **fiche lieu** (`ui/PlaceSheet.svelte`, avec la fiche station).
-- [ ] Sortir **Mes lieux** (accueil, listes, sauvegarde, transfert, import).
-- [ ] Sortir la **recherche** (barre, résultats, raccourcis).
-- [ ] Sortir la **visionneuse** de photos et de vue de la rue.
-- [ ] Objectif : `+page.svelte` sous 800 lignes, réduit à la carte et à l'assemblage.
+Le fichier principal est passé de 3 770 à 3 340 lignes, puis à environ 730 lignes (fin de l'étape, 14/10).
+- [x] **État commun** : les parties de l'écran lisent l'état par l'objet `app` partagé par la page (`getContext('app')`) au lieu de tout recevoir. *Écart* : l'état reste déclaré dans la page (pas de `state.svelte.js`), ce qui évite de réécrire ~160 déclarations ; `npm run check` vérifie que chaque `app.nom` utilisé existe.
+- [x] Sortir la **fiche lieu** (`ui/PlaceSheet.svelte`, avec la fiche station ; logique dans `placeflow.js`).
+- [x] Sortir **Mes lieux** (`ListPicker`, `TransferSheet`, `ImportSheet` ; logique dans `myplacesflow.js`, `shortcutsflow.js`, `importflow.js`).
+- [x] Sortir la **recherche** (`TopBar`, `ResultList`, `PinnedRow`, `CategorySheet`, `ChipsEditor` ; logique dans `searchflow.js`, `chipsflow.js`).
+- [x] Sortir la **visionneuse** de photos et de vue de la rue (`PhotoViewer`, `StreetThumb`, `zoom.js`).
+- [x] Objectif : `+page.svelte` sous 800 lignes, réduit à la carte et à l'assemblage (environ 730).
+- Bug trouvé en route : l'action de défilement du panorama n'était plus transmise à la visionneuse (corrigé, et désormais détecté par `npm run check`).
 
 ## Étape 4 : textes à part (3 à 4 h)
 - [ ] Un fichier de textes français (`src/lib/i18n/fr.js`) et une fonction d'accès. Tous les textes affichés y passent, accords (pluriels) compris.
@@ -88,7 +89,7 @@ Le fichier principal est passé de 3 770 à 3 340 lignes.
 | Étape | État | Date |
 |---|---|---|
 | 0. Règles | fait (proposition de changement) | 14/10 |
-| 1. Tests | fait : 39 tests unitaires, 12 de bout en bout, 5 pipeline ; un bug trouvé et corrigé | 14/10 |
+| 1. Tests | fait : 47 tests unitaires, 14 de bout en bout, 5 pipeline ; un bug trouvé et corrigé | 14/10 |
 | 2. Sécurité | fait (sauf la partie du porteur du projet) | 14/10 |
-| 3. Rangement | commencé (3 parties sorties) | 14/10 |
+| 3. Rangement | fait : 20 composants d'écran, 13 modules de logique, page à ~730 lignes | 14/10 |
 | 4. Textes | à faire | |

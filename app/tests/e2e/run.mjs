@@ -46,6 +46,17 @@ const tests = {
     assert(!errors.length, errors.join(' | '));
     await ctx.close();
   },
+  async 'vue de la rue : vignette puis visionneuse plein écran'() {
+    // lieu des tuiles locales avec une photo de devanture (Panoramax)
+    const { p, ctx, errors } = await page();
+    await p.fill('#search', 'Etam rue de Rennes'); await p.waitForSelector('.results li[role=option] button', { timeout: 20000 }); await pick(p);
+    await p.waitForSelector('.street-thumb', { timeout: 20000 });
+    await p.click('.street-thumb'); await p.waitForSelector('.viewer .pano', { timeout: 10000 });
+    await p.click('.viewer-close'); await p.waitForTimeout(500);
+    assert(!(await p.$('.viewer')), 'la visionneuse ne se ferme pas');
+    assert(!errors.length, errors.join(' | '));
+    await ctx.close();
+  },
   async 'adresse via Géoplateforme'() {
     const { p, ctx } = await page();
     await p.fill('#search', '57 rue de rennes'); await p.waitForSelector('.results li[role=option]', { timeout: 30000 });
