@@ -2,6 +2,7 @@
 // Données « Positionnement dans la rame », RATP / Île-de-France Mobilités, Licence Ouverte 2.0
 // Sorties situées par le « Référentiel des arrêts : Accès » IDFM (Licence Ouverte 2.0).
 // (scripts/build_rame.py → static/data/rame.json, ~215 Ko, chargé au premier trajet en transport).
+import { tx } from '#lib/i18n/index.js';
 
 let index = null;
 const load = () => (index ??= fetch(new URL('data/rame.json', location.href))
@@ -42,6 +43,6 @@ export async function placeForTransfer(stopId, nextStopId) {
 
 /** « à l'avant du train (voiture 1 sur 6) » */
 export function placeLabel(p) {
-  const where = { Avant: "à l'avant", Milieu: 'au milieu', Arrière: "à l'arrière" }[p.where] || '';
-  return `${where} du train (voiture ${p.pos} sur ${p.of})`;
+  const where = { Avant: tx('itin.a_avant'), Milieu: tx('itin.au_milieu'), Arrière: tx('itin.a_arriere') }[p.where] || '';
+  return tx('itin.du_train_voiture_sur', { where, pos: p.pos, of: p.of });
 }

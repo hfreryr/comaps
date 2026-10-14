@@ -1,5 +1,6 @@
 // Fiche lieu : ouverture, partage, prochains passages, lieux récents.
 // Code sorti de +page.svelte : il lit et modifie l'état de l'écran par l'objet « app » (bloc « app » de la page).
+import { tx } from '#lib/i18n/index.js';
 import { departures } from '#lib/routing.js';
 import { details } from '#lib/places.js';
 import { sortExits, stationExits } from '#lib/exits.js';
@@ -17,7 +18,7 @@ export function createPlace(app) {
     const before = app.recents;
     app.recents = [];
     try { localStorage.removeItem(app.RECENTS_KEY); } catch { /* rien à effacer */ }
-    app.say('Lieux récents effacés', { label: 'Annuler', run: () => {
+    app.say(tx('fiche.lieux_recents_effaces'), { label: tx('resultats.annuler'), run: () => {
       app.recents = before;
       try { localStorage.setItem(app.RECENTS_KEY, JSON.stringify(app.recents)); } catch { /* rien */ }
     } });
@@ -64,7 +65,7 @@ export function createPlace(app) {
     const data = { title: app.place.name, text: app.place.name, url: u.toString() };
     try {
       if (navigator.share) await navigator.share(data);
-      else { await navigator.clipboard.writeText(data.url); app.say('Lien copié'); }
+      else { await navigator.clipboard.writeText(data.url); app.say(tx('meslieux.lien_copie')); }
     } catch { /* partage annulé */ }
   }
   // Prochains passages d'une station, rafraîchis toutes les 30 s tant que la fiche est ouverte.

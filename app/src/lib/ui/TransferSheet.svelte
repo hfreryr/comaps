@@ -1,4 +1,5 @@
 <script>
+  import { tx } from '#lib/i18n/index.js';
   import { getContext } from 'svelte';
   import { DEFAULT_LISTS } from '#lib/myplaces.js';
   import ListDot from '#lib/ui/ListDot.svelte';
@@ -8,18 +9,18 @@
 </script>
 
 
-    <section class="sheet" aria-label="Récupérer vos lieux">
-      <h1>Récupérer vos lieux</h1>
-      <p class="kind">Depuis un autre appareil</p>
+    <section class="sheet" aria-label={tx('transfert.recuperer_vos_lieux')}>
+      <h1>{tx('transfert.recuperer_vos_lieux')}</h1>
+      <p class="kind">{tx('transfert.depuis_un_autre_appareil')}</p>
       <ul class="rows">
-        <li class="row"><ListDot l={DEFAULT_LISTS[0]} size={24} /><span>{app.incoming.data.places.length} lieu{app.incoming.data.places.length > 1 ? 'x' : ''} dans {app.incoming.data.lists.length} liste{app.incoming.data.lists.length > 1 ? 's' : ''}</span></li>
+        <li class="row"><ListDot l={DEFAULT_LISTS[0]} size={24} /><span>{tx('transfert.lieu_dans_liste', { lieux: app.incoming.data.places.length, listes: app.incoming.data.lists.length })}</span></li>
         {#if app.incoming.data.shortcuts.home || app.incoming.data.shortcuts.work}
-          <li class="row"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.5 12 5l8 6.5M6.5 10v9.5h11V10" /><path d="M10.2 19.5v-4.8h3.6v4.8" /></svg><span>{[app.incoming.data.shortcuts.home && 'Maison', app.incoming.data.shortcuts.work && 'Travail'].filter(Boolean).join(' et ')}</span></li>
+          <li class="row"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.5 12 5l8 6.5M6.5 10v9.5h11V10" /><path d="M10.2 19.5v-4.8h3.6v4.8" /></svg><span>{[app.incoming.data.shortcuts.home && tx('transfert.maison'), app.incoming.data.shortcuts.work && tx('transfert.travail')].filter(Boolean).join(' et ')}</span></li>
         {/if}
       </ul>
-      <p class="credit">Ils s'ajoutent à ceux de cet appareil (rien n'est effacé).</p>
-      <button class="go wide done" onclick={() => { const n = app.applyIncoming(app.incoming.raw); app.incoming = null; app.say(`${n} lieu${n > 1 ? 'x' : ''} ajouté${n > 1 ? 's' : ''} à Mes lieux`); }}>Ajouter à cet appareil</button>
-      <button class="link more" onclick={() => (app.incoming = null)}>Ignorer</button>
+      <p class="credit">{tx('transfert.ils_ajoutent_a_ceux_de_cet_appareil')}</p>
+      <button class="go wide done" onclick={() => { const n = app.applyIncoming(app.incoming.raw); app.incoming = null; app.say(tx('transfert.lieu_ajoute_a_mes_lieux', { n })); }}>{tx('transfert.ajouter_a_cet_appareil')}</button>
+      <button class="link more" onclick={() => (app.incoming = null)}>{tx('transfert.ignorer')}</button>
     </section>
 
 <style>

@@ -1,4 +1,5 @@
 <script>
+  import { tx } from '#lib/i18n/index.js';
   import { onMount, setContext } from 'svelte';
   import 'maplibre-gl/dist/maplibre-gl.css';
   import '#lib/ui/base.css';
@@ -121,7 +122,7 @@
   const SHORTCUTS_KEY = 'maison-travail';
   let shortcuts = $state(loadObj(SHORTCUTS_KEY));
   let assigning = $state(null);      // 'home' | 'work' : la prochaine adresse choisie devient ce raccourci
-  const SHORT_NAMES = { home: 'Maison', work: 'Travail' };
+  const SHORT_NAMES = { home: tx('transfert.maison'), work: tx('transfert.travail') };
   const placeShortcut = $derived(place ? ['home', 'work'].find((k) => shortcuts[k] && sameSpot(shortcuts[k], place)) : null);
 
   // Onglets de catégories
@@ -184,16 +185,16 @@
     if (!d || isNaN(d)) return null;
     const months = (Date.now() - d) / 2.63e9;
     const when = d.toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' });
-    return months <= 24 ? { ok: true, text: `Infos vérifiées en ${when}` } : { ok: false, text: `Infos non vérifiées depuis ${d.getFullYear()}` };
+    return months <= 24 ? { ok: true, text: tx('ecran.infos_verifiees_en', { when }) } : { ok: false, text: tx('ecran.infos_non_verifiees_depuis', { getFullYear: d.getFullYear() }) };
   });
   // Bandeau d'infos (distance, accès, entrée) : seulement ce qui est connu.
   const infoStrip = $derived.by(() => {
     const out = [];
-    if (me && place) out.push({ label: 'Distance', value: fmtDistance(dist(me.lat, me.lon, place.lat, place.lon)) });
-    const wc = { yes: 'Oui', limited: 'Partiel', no: 'Non' }[info?.wheelchair];
-    if (wc) out.push({ label: 'Accès fauteuil', value: wc, wc: true });
-    const fee = { no: 'Gratuite', yes: 'Payante' }[info?.fee];
-    if (fee) out.push({ label: 'Entrée', value: fee });
+    if (me && place) out.push({ label: tx('ecran.distance'), value: fmtDistance(dist(me.lat, me.lon, place.lat, place.lon)) });
+    const wc = { yes: tx('ecran.oui'), limited: tx('ecran.partiel'), no: tx('ecran.non') }[info?.wheelchair];
+    if (wc) out.push({ label: tx('ecran.acces_fauteuil'), value: wc, wc: true });
+    const fee = { no: tx('ecran.gratuite'), yes: tx('ecran.payante') }[info?.fee];
+    if (fee) out.push({ label: tx('ecran.entree'), value: fee });
     return out;
   });
   // Liens vers OpenStreetMap : c'est l'utilisateur qui modifie, sur le site d'OSM (nous n'écrivons rien).
@@ -204,11 +205,11 @@
   function favTap() {
     const was = inFav;
     setMembership('fav', !was);
-    if (!was) say(`Ajouté à ${listOf('fav').name}`, { label: 'Autre liste', run: () => (listPicker = true) });
+    if (!was) say(tx('ecran.ajoute_a', { name: listOf('fav').name }), { label: tx('ecran.autre_liste'), run: () => (listPicker = true) });
   }
   async function copyAddress() {
     placeMenu = false;
-    try { await navigator.clipboard.writeText([title, address].filter(Boolean).join(', ')); say('Adresse copiée'); } catch { /* refusé */ }
+    try { await navigator.clipboard.writeText([title, address].filter(Boolean).join(', ')); say(tx('ecran.adresse_copiee')); } catch { /* refusé */ }
   }
   const activeQuery = $derived(editing ? fieldQuery : query);
   // « restaurant ce soir 8e » : catégorie + moment + zone
@@ -228,19 +229,19 @@
     }
     return direct;
   });
-  const whenText = (w) => (!w ? '' : w.now ? 'ouverts maintenant' : `ouverts ${momentLabel(w.at)}`);
+  const whenText = (w) => (!w ? '' : w.now ? tx('ecran.ouverts_maintenant') : `ouverts ${momentLabel(w.at)}`);
   const areaText = (a) => (!a ? '' : a.arr ? arrName(a.arr) : a.text.replace(/^./, (x) => x.toUpperCase()));
   const showList = $derived(editing ? true : focused && (query.trim().length >= 2 || !query.trim()));
   const isAddress = $derived(place?.type === 'Adresse');
   const title = $derived(isAddress ? place.name.split(',')[0] : place?.name);
   const address = $derived(isAddress ? '' : (info?.address && info.address.includes(' ') ? info.address : '') || place?.address || '');
   const current = $derived(routes[mode]);
-  const STATION_TYPES = ['Station de métro', 'Station', 'Gare', 'Entrée de métro', 'Station de tram'];
+  const STATION_TYPES = [tx('ecran.station_de_metro'), tx('liste.station'), tx('ecran.gare'), tx('ecran.entree_de_metro'), tx('ecran.station_de_tram')];
   const isStation = $derived(!!place && STATION_TYPES.includes(place.type));
   // « Métro 4 · RER B » : les lignes qui passent, déduites des prochains passages.
   const stationKind = $derived(deps?.status === 'ok'
     ? [...deps.data.lines.reduce((acc, l) => {
-        const m = MODE_NAMES[l.mode] || 'Train';
+        const m = MODE_NAMES[l.mode] || tx('ecran.train');
         if (!acc.has(m)) acc.set(m, new Set());
         if (l.line !== m) acc.get(m).add(l.line);
         return acc;
@@ -286,7 +287,7 @@
       } catch (e) {
         if (e.name !== 'AbortError') {
           results = [];
-          searchError = 'La recherche ne répond pas. Vérifiez votre connexion et réessayez.';
+          searchError = tx('ecran.la_recherche_ne_repond_pas_verifiez');
         }
       } finally {
         searching = false;
@@ -336,7 +337,7 @@
     const m = dist(me.lat, me.lon, place.lat, place.lon) * 1.3;
     if (m < 60) return null;
     const min = Math.round(m / 80);
-    return min <= 45 ? `≈ ${min} min à pied` : `≈ ${fmtDistance(m)}`;   // (texte complet pour l’accessibilité)
+    return min <= 45 ? tx('ecran.min_a_pied', { min }) : `≈ ${fmtDistance(m)}`;   // (texte complet pour l’accessibilité)
   });
 
 
@@ -365,7 +366,7 @@
     const out = [];
     for (let i = 0; i < 7; i++) {
       const d = new Date(); d.setDate(d.getDate() + i);
-      out.push({ i, label: i === 0 ? "Aujourd'hui" : i === 1 ? 'Demain' : d.toLocaleDateString('fr-FR', { weekday: 'long' }).replace(/^./, (x) => x.toUpperCase()) });
+      out.push({ i, label: i === 0 ? tx('ecran.aujourd_hui') : i === 1 ? tx('ecran.demain') : d.toLocaleDateString('fr-FR', { weekday: 'long' }).replace(/^./, (x) => x.toUpperCase()) });
     }
     return out;
   });
@@ -457,14 +458,14 @@
   // Ce qu'affiche le bandeau du haut
   const navBanner = $derived.by(() => {
     if (!nav) return null;
-    if (nav.arrived) return { arrived: true, text: `Vous êtes arrivé`, sub: to?.label };
+    if (nav.arrived) return { arrived: true, text: tx('ecran.vous_etes_arrive', {  }), sub: to?.label };
     if (nav.kind === 'transit') {
       const st = nav.steps[nav.k];
       return { icon: st.type, text: st.text, sub: st.sub, then: nav.steps[nav.k + 1]?.text, line: st.leg };
     }
     const next = nav.steps[nav.k + 1];
-    if (!next) return { icon: 'arrive', dist: navDistance(nav.total - nav.s), text: `Arrivée : ${to.label}` };
-    return { icon: next.type, dist: navDistance(next.s - nav.s), text: next.text, then: nav.steps[nav.k + 2]?.text || `Arrivée : ${to.label}` };
+    if (!next) return { icon: 'arrive', dist: navDistance(nav.total - nav.s), text: tx('itin.arrivee_3', { label: to.label }) };
+    return { icon: next.type, dist: navDistance(next.s - nav.s), text: next.text, then: nav.steps[nav.k + 2]?.text || tx('itin.arrivee_3', { label: to.label }) };
   });
   const navRemaining = $derived.by(() => {
     if (!nav) return null;
@@ -671,7 +672,7 @@
 
 <svelte:window bind:innerHeight={innerH} />
 <div class="app" class:routing={directions} class:navigating={!!nav} style:--top-h={`${directions ? topH : searchH + 16}px`}>
-  <div class="map" bind:this={mapEl} aria-label="Carte"></div>
+  <div class="map" bind:this={mapEl} aria-label={tx('ecran.carte')}></div>
 
   <TopBar />
 

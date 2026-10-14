@@ -1,4 +1,5 @@
 <script>
+  import { tx } from '#lib/i18n/index.js';
   import { getContext } from 'svelte';
   import { ALL_CATEGORIES } from '#lib/categories.js';
   import ListDot from '#lib/ui/ListDot.svelte';
@@ -12,13 +13,13 @@
 
   <ul class="results" role="listbox">
     {#if app.editing}
-      <li class="note map-hint">Ou touchez la carte pour choisir un point.</li>
+      <li class="note map-hint">{tx('resultats.ou_touchez_la_carte_pour_choisir_un')}</li>
     {/if}
     {#if app.editing === 'from'}
       <li role="option" aria-selected="false">
         <button onmousedown={app.useMyPosition}>
           <span class="r-icon me-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M20 4 4 11l7 2 2 7z" class="solid" /></svg></span>
-          <span class="r-text"><span class="r-name">Votre position</span><span class="r-meta">Utiliser la localisation du téléphone</span></span>
+          <span class="r-text"><span class="r-name">{tx('resultats.votre_position')}</span><span class="r-meta">{tx('resultats.utiliser_la_localisation_du')}</span></span>
         </button>
       </li>
     {/if}
@@ -26,12 +27,12 @@
       <li class="pinned-li"><PinnedRow inSearch={true} /></li>
     {/if}
     {#if app.assigning && app.activeQuery.trim().length < 2}
-      <li class="note">Tapez l'adresse de votre {app.assigning === 'home' ? 'maison' : 'travail'}, puis choisissez-la dans la liste.
-        <button class="link" onmousedown={(e) => { e.preventDefault(); app.assigning = null; }}>Annuler</button></li>
+      <li class="note">{tx('resultats.tapez_adresse_de_votre_puis', { lieu: app.assigning === 'home' ? tx('resultats.maison') : tx('resultats.travail') })}
+        <button class="link" onmousedown={(e) => { e.preventDefault(); app.assigning = null; }}>{tx('resultats.annuler')}</button></li>
     {/if}
     {#if app.activeQuery.trim().length < 2 && app.favorites.length}
-      <li class="note recents-head"><span>Mes lieux</span>
-        {#if !app.editing}<button class="link" onmousedown={(e) => { e.preventDefault(); app.focused = false; document.activeElement?.blur(); app.pickCategory(ALL_CATEGORIES[0]); }}>Tout voir</button>{/if}</li>
+      <li class="note recents-head"><span>{tx('resultats.mes_lieux')}</span>
+        {#if !app.editing}<button class="link" onmousedown={(e) => { e.preventDefault(); app.focused = false; document.activeElement?.blur(); app.pickCategory(ALL_CATEGORIES[0]); }}>{tx('resultats.tout_voir')}</button>{/if}</li>
       {#each app.favorites.slice(0, 5) as r (r.id + r.lat)}
         <li role="option" aria-selected="false">
           <button onmousedown={() => app.pickResult(r)}>
@@ -45,8 +46,8 @@
       {/each}
     {/if}
     {#if app.activeQuery.trim().length < 2 && app.recents.length}
-      <li class="note recents-head"><span>Récents</span>
-        <button class="link" onmousedown={(e) => { e.preventDefault(); app.forgetRecents(); }}>Effacer</button></li>
+      <li class="note recents-head"><span>{tx('resultats.recents')}</span>
+        <button class="link" onmousedown={(e) => { e.preventDefault(); app.forgetRecents(); }}>{tx('resultats.effacer')}</button></li>
       {#each app.recents as r (r.id)}
         <li role="option" aria-selected="false">
           <button onmousedown={() => app.pickResult(r)}>
@@ -68,10 +69,10 @@
           <span class="r-text">
             {#if app.catHit.when || app.catHit.area}
               <span class="r-name">{app.catHit.label}{app.catHit.when ? ` ${app.whenText(app.catHit.when)}` : ''}</span>
-              <span class="r-meta">{app.catHit.area ? app.areaText(app.catHit.area) : 'Près de vous'}{app.catHit.when ? ' · selon les horaires connus' : ''}</span>
+              <span class="r-meta">{app.catHit.area ? app.areaText(app.catHit.area) : tx('resultats.pres_de_vous_2')}{app.catHit.when ? tx('resultats.selon_les_horaires_connus') : ''}</span>
             {:else}
-              <span class="r-name">{app.catHit.label} près de vous</span>
-              <span class="r-meta">Les plus proches, avec leurs horaires</span>
+              <span class="r-name">{tx('resultats.pres_de_vous', { label: app.catHit.label })}</span>
+              <span class="r-meta">{tx('resultats.les_plus_proches_avec_leurs_horaires')}</span>
             {/if}
           </span>
         </button>
@@ -91,15 +92,15 @@
       </li>
     {/each}
     {#if app.activeQuery.trim().length >= 2 && !app.searching && !app.results.length && !app.searchError}
-      <li class="note">Aucun résultat pour « {app.activeQuery.trim()} ». Essayez un nom de lieu ou une adresse.</li>
+      <li class="note">{tx('resultats.aucun_resultat_pour_essayez_un_nom', { recherche: app.activeQuery.trim() })}</li>
     {/if}
     {#if app.searchError}<li class="note">{app.searchError}</li>{/if}
-    {#if app.searching && !app.results.length}<li class="note">Recherche…</li>{/if}
+    {#if app.searching && !app.results.length}<li class="note">{tx('resultats.recherche')}</li>{/if}
     {#if !app.editing && app.activeQuery.trim().length < 2}
       <li class="list-foot">
-        <button class="link" onmousedown={(e) => { e.preventDefault(); app.importOpen = true; app.focused = false; document.activeElement?.blur(); }}>Importer vos lieux depuis Google Maps</button>
-        <button class="link" onmousedown={(e) => { e.preventDefault(); app.editChips = true; app.focused = false; document.activeElement?.blur(); }}>Personnaliser les raccourcis</button>
-        <span class="privacy-line">Ni compte, ni pistage : rien sur vous n'est collecté.</span>
+        <button class="link" onmousedown={(e) => { e.preventDefault(); app.importOpen = true; app.focused = false; document.activeElement?.blur(); }}>{tx('resultats.importer_vos_lieux_depuis_google')}</button>
+        <button class="link" onmousedown={(e) => { e.preventDefault(); app.editChips = true; app.focused = false; document.activeElement?.blur(); }}>{tx('recherche.personnaliser_les_raccourcis')}</button>
+        <span class="privacy-line">{tx('resultats.ni_compte_ni_pistage_rien_sur_vous')}</span>
       </li>
     {/if}
   </ul>

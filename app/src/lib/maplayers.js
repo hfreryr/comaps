@@ -1,5 +1,6 @@
 // Couches maison posées sur le fond de carte : tracés d'itinéraire et leurs étiquettes, repères de lieux.
 // Sorti de +page.svelte le 14/10/2026 (définitions pures : la page décide quand les afficher).
+import { tx } from '#lib/i18n/index.js';
 import { DARK_LAND } from './mapstyle.js';
 import { streetOpts } from './routeview.js';
 import { fmtDuration } from './routing.js';
@@ -94,7 +95,7 @@ export function routeTags(r, picked, zoom) {
     placed.push(best);
     // comme Plans et Maps : la durée sur le trajet choisi, l'écart (« +3 min ») sur les autres
     const dm = Math.round(o.duration / 60) - Math.round(sel.duration / 60);
-    const label = o === sel ? fmtDuration(o.duration) : dm > 0 ? `+${dm} min` : dm < 0 ? `−${-dm} min` : 'Même durée';
+    const label = o === sel ? fmtDuration(o.duration) : dm > 0 ? tx('itin.min', { dm }) : dm < 0 ? tx('itin.min_2', { n: -dm }) : tx('itin.meme_duree');
     return { type: 'Feature', geometry: { type: 'Point', coordinates: best }, properties: { i, sel: o === sel, label } };
   });
   return { type: 'FeatureCollection', features };

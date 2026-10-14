@@ -1,4 +1,5 @@
 <script>
+  import { tx } from '#lib/i18n/index.js';
   import { getContext } from 'svelte';
 
   // État et actions de la page (voir le bloc « app » de +page.svelte)
@@ -9,8 +10,8 @@
   {#if app.showPromise && !app.place && !app.category && !app.directions && !app.importOpen && !app.editChips}
     <div class="promise" role="note">
       <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2.5" /><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" /></svg>
-      <p><strong>Une carte qui ne vous piste pas.</strong> Ni compte, ni publicité, rien sur vous n'est collecté. Vos favoris restent sur votre téléphone. <a href="confidentialite" class="promise-link">Qui voit quoi ?</a></p>
-      <button onclick={app.closePromise}>Compris</button>
+      <p><strong>{tx('promesse.une_carte_qui_ne_vous_piste_pas')}</strong> {tx('promesse.ni_compte_ni_publicite_rien_sur_vous')} <a href="confidentialite" class="promise-link">{tx('promesse.qui_voit_quoi')}</a></p>
+      <button onclick={app.closePromise}>{tx('promesse.compris')}</button>
     </div>
   {/if}
 

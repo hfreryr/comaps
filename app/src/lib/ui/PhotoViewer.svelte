@@ -1,4 +1,5 @@
 <script>
+  import { tx } from '#lib/i18n/index.js';
   import { getContext } from 'svelte';
 
   // État et actions de la page (voir le bloc « app » de +page.svelte)
@@ -9,21 +10,21 @@
 
   {#if app.viewer === 'facade' && app.info?.facade}
     <!-- Devanture en plein écran : la photo 360° entière, qu'on fait défiler ; ouverte sur le lieu -->
-    <div class="viewer" role="dialog" aria-modal="true" aria-label="Devanture de {app.title}">
+    <div class="viewer" role="dialog" aria-modal="true" aria-label={tx('photos.devanture_de', { title: app.title })}>
       <div class="pano" use:panoScroll={app.info.facade.rel}>
-        <img src={app.info.facade.src} alt={`Vue à 360° devant ${app.title}`} draggable="false" />
+        <img src={app.info.facade.src} alt={tx('photos.vue_a_360_devant', { title: app.title })} draggable="false" />
       </div>
       <div class="viewer-top">
-        <span>Vue de la rue · faites défiler pour regarder autour</span>
-        <button class="viewer-close" onclick={() => (app.viewer = null)} aria-label="Fermer">
+        <span>{tx('photos.vue_de_la_rue_faites_defiler_pour')}</span>
+        <button class="viewer-close" onclick={() => (app.viewer = null)} aria-label={tx('photos.fermer')}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" /></svg>
         </button>
       </div>
-      <p class="viewer-credit"><a href={app.info.facade.page} target="_blank" rel="noopener">Photo : {app.info.facade.credit}{app.info.facade.date ? ` · ${app.info.facade.date.slice(0, 4)}` : ''} · ouvrir dans Panoramax</a></p>
+      <p class="viewer-credit"><a href={app.info.facade.page} target="_blank" rel="noopener">{tx('photos.photo_ouvrir_dans_panoramax', { credit: app.info.facade.credit, date: app.info.facade.date ? ` · ${app.info.facade.date.slice(0, 4)}` : '' })}</a></p>
     </div>
   {:else if app.viewer != null && app.wiki?.photos?.length}
     {@const ph = app.wiki.photos[app.viewerIdx] || app.wiki.photos[0]}
-    <div class="viewer" role="dialog" aria-modal="true" aria-label="Photos de {app.title}">
+    <div class="viewer" role="dialog" aria-modal="true" aria-label={tx('photos.photos_de', { title: app.title })}>
       <div class="viewer-strip" class:zoomed={app.zoom.s > 1} bind:this={app.viewerEl} style:transform={app.dragY ? `translateY(${app.dragY}px)` : null}
         style:opacity={app.dragY ? Math.max(0.3, 1 - app.dragY / 500) : null}
         ontouchstart={app.zoomStart} ontouchmove={app.zoomMove} ontouchend={app.zoomEnd} ondblclick={(e) => app.toggleZoom(e.clientX, e.clientY)}
@@ -35,19 +36,19 @@
       </div>
       <div class="viewer-top">
         <span>{app.viewerIdx + 1} / {app.wiki.photos.length}</span>
-        <button class="viewer-close" onclick={() => (app.viewer = null)} aria-label="Fermer">
+        <button class="viewer-close" onclick={() => (app.viewer = null)} aria-label={tx('photos.fermer')}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" /></svg>
         </button>
       </div>
       {#if app.wiki.photos.length > 1}
-        <button class="viewer-nav prev" disabled={app.viewerIdx === 0} aria-label="Photo précédente"
+        <button class="viewer-nav prev" disabled={app.viewerIdx === 0} aria-label={tx('photos.photo_precedente')}
           onclick={() => app.viewerEl.scrollBy({ left: -app.viewerEl.clientWidth, behavior: 'smooth' })}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg></button>
-        <button class="viewer-nav next" disabled={app.viewerIdx === app.wiki.photos.length - 1} aria-label="Photo suivante"
+        <button class="viewer-nav next" disabled={app.viewerIdx === app.wiki.photos.length - 1} aria-label={tx('photos.photo_suivante')}
           onclick={() => app.viewerEl.scrollBy({ left: app.viewerEl.clientWidth, behavior: 'smooth' })}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg></button>
       {/if}
-      <p class="viewer-credit"><a href={ph.page} target="_blank" rel="noopener">{ph.credit || 'Wikimedia Commons'} · Wikimedia Commons</a></p>
+      <p class="viewer-credit"><a href={ph.page} target="_blank" rel="noopener">{tx('photos.wikimedia_commons', { auteur: ph.credit || tx('photos.wikimedia_commons_2') })}</a></p>
     </div>
   {/if}
 

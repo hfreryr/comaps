@@ -1,6 +1,7 @@
 // Guidage pas à pas : tout est calculé sur le téléphone, à partir du trajet déjà reçu.
 // La position n'est envoyée à personne, sauf si l'on s'écarte du trajet : le nouveau calcul
 // d'itinéraire part alors de la position actuelle (comme au premier calcul).
+import { tx } from '#lib/i18n/index.js';
 
 const R = 111320;
 
@@ -69,11 +70,11 @@ export function navDistance(m) {
   if (m >= 1000) return `${(m / 1000).toFixed(1).replace('.', ',')} km`;
   if (m >= 200) return `${Math.round(m / 50) * 50} m`;
   if (m >= 30) return `${Math.round(m / 10) * 10} m`;
-  return 'Maintenant';
+  return tx('guidage.maintenant');
 }
 /** La même chose, à voix haute. */
 export function spokenDistance(m) {
-  if (m >= 1000) return `Dans ${(m / 1000).toFixed(1).replace('.', ',')} kilomètre${m >= 2000 ? 's' : ''}, `;
-  if (m >= 30) return `Dans ${m >= 200 ? Math.round(m / 50) * 50 : Math.round(m / 10) * 10} mètres, `;
+  if (m >= 1000) return tx('guidage.dans_kilometre', { km: (m / 1000).toFixed(1).replace('.', ','), n: m / 1000 });
+  if (m >= 30) return tx('guidage.dans_metres', { m: m >= 200 ? Math.round(m / 50) * 50 : Math.round(m / 10) * 10 });
   return '';
 }

@@ -1,4 +1,5 @@
 <script>
+  import { tx } from '#lib/i18n/index.js';
   import { getContext } from 'svelte';
   import { draggable } from '#lib/sheet.js';
   import ModeIcon from './ModeIcon.svelte';
@@ -13,13 +14,13 @@
 {#snippet transitBlock()}
       {#if app.isStation}
         <div class="deps" aria-live="polite">
-          <h2>Prochains passages</h2>
+          <h2>{tx('fiche.prochains_passages')}</h2>
           {#if !app.deps || app.deps.status === 'loading'}
-            <p class="muted">Recherche des prochains passages…</p>
+            <p class="muted">{tx('fiche.recherche_des_prochains_passages')}</p>
           {:else if app.deps.status === 'error'}
-            <p class="muted">Horaires indisponibles pour le moment. Réessayez dans un instant.</p>
+            <p class="muted">{tx('fiche.horaires_indisponibles_pour_le')}</p>
           {:else if app.deps.status === 'none'}
-            <p class="muted">Aucun passage prévu dans l'heure.</p>
+            <p class="muted">{tx('fiche.aucun_passage_prevu_dans_heure')}</p>
           {:else}
             <ul>
               {#each app.deps.data.lines as l}
@@ -27,26 +28,26 @@
                   <span class="badge" class:round={l.mode === 'SUBWAY' || l.mode === 'METRO'} style:background={l.color} style:color={l.textColor}>{l.line}</span>
                   <span class="dep-dir">{l.headsign}</span>
                   <span class="dep-times">
-                    {#if l.realTime}<span class="live" title="En temps réel" aria-label="En temps réel"></span>{/if}
+                    {#if l.realTime}<span class="live" title={tx('fiche.en_temps_reel')} aria-label={tx('fiche.en_temps_reel')}></span>{/if}
                     {#each l.times as t, i}<span class:first={i === 0}>{fmtWait(t, app.now)}</span>{#if i < l.times.length - 1}<span class="sep"> · </span>{/if}{/each}
                   </span>
                 </li>
               {/each}
             </ul>
-            <p class="credit">Horaires : <a href="https://transitous.org/sources/" target="_blank" rel="noopener">Transitous et réseaux de transport</a></p>
+            <p class="credit">{tx('fiche.horaires')} <a href="https://transitous.org/sources/" target="_blank" rel="noopener">{tx('fiche.transitous_et_reseaux_de_transport')}</a></p>
           {/if}
         </div>
       {/if}
       {#if app.exits?.status === 'ok' && app.exits.data.length}
         <div class="exits">
-          <h2>Sorties</h2>
+          <h2>{tx('fiche.sorties')}</h2>
           <ul>
             {#each app.allExits ? app.exits.data : app.exits.data.slice(0, 4) as e}
               <li><span class="exit-sq" aria-hidden="true"></span><span>{exitLabel(e)}</span>
-                {#if e.wheelchair}<span class="exit-tag">accessible</span>{:else if e.escalator}<span class="exit-tag">escalier mécanique</span>{/if}</li>
+                {#if e.wheelchair}<span class="exit-tag">{tx('fiche.accessible')}</span>{:else if e.escalator}<span class="exit-tag">{tx('fiche.escalier_mecanique')}</span>{/if}</li>
             {/each}
           </ul>
-          {#if app.exits.data.length > 4 && !app.allExits}<button class="link more" onclick={() => (app.allExits = true)}>Toutes les sorties ({app.exits.data.length})</button>{/if}
+          {#if app.exits.data.length > 4 && !app.allExits}<button class="link more" onclick={() => (app.allExits = true)}>{tx('fiche.toutes_les_sorties', { n: app.exits.data.length })}</button>{/if}
         </div>
       {/if}
 
@@ -56,22 +57,22 @@
       {#if app.wiki?.photos?.length}
         <div class="photos" class:single={app.wiki.photos.length === 1}>
           {#each app.wiki.photos as ph, i (ph.src)}
-            <button class="ph" onclick={() => (app.viewer = i)} aria-label={`Voir la photo ${i + 1} sur ${app.wiki.photos.length} en plein écran`}>
+            <button class="ph" onclick={() => (app.viewer = i)} aria-label={tx('fiche.voir_la_photo_sur_en_plein_ecran', { i: i + 1, n: app.wiki.photos.length })}>
               <img src={ph.src} alt={i === 0 ? app.title : ''} loading="lazy" />
-              {#if i === 0 && app.wiki.photos.length > 1}<span class="ph-count">{app.wiki.photos.length} photos</span>{/if}
+              {#if i === 0 && app.wiki.photos.length > 1}<span class="ph-count">{tx('fiche.photos', { n: app.wiki.photos.length })}</span>{/if}
             </button>
           {/each}
         </div>
-        <p class="ph-credit"><a href={app.wiki.photos[0].page} target="_blank" rel="noopener">Photos : Wikimedia Commons{app.wiki.photos[0].credit ? ` · ${app.wiki.photos[0].credit}` : ''}</a></p>
+        <p class="ph-credit"><a href={app.wiki.photos[0].page} target="_blank" rel="noopener">{tx('fiche.photos_wikimedia_commons', { auteurs: app.wiki.photos[0].credit ? ` · ${app.wiki.photos[0].credit}` : '' })}</a></p>
       {/if}
 {/snippet}
 {#snippet aboutBlock()}
       {#if app.wiki?.extract}
         <div class="about">
-          <h2>Informations</h2>
+          <h2>{tx('fiche.informations')}</h2>
           <p class:clamped={!app.moreText}>{app.wiki.extract}</p>
-          {#if !app.moreText && app.wiki.extract.length > 180}<button class="link more" onclick={() => (app.moreText = true)}>Plus</button>{/if}
-          <p class="credit">Plus d'infos sur <a href={app.wiki.url} target="_blank" rel="noopener">Wikipédia</a></p>
+          {#if !app.moreText && app.wiki.extract.length > 180}<button class="link more" onclick={() => (app.moreText = true)}>{tx('fiche.plus')}</button>{/if}
+          <p class="credit">{tx('fiche.plus_infos_sur')} <a href={app.wiki.url} target="_blank" rel="noopener">{tx('fiche.wikipedia')}</a></p>
         </div>
       {/if}
 
@@ -80,7 +81,7 @@
       <!-- Bon à savoir : infos notées par les contributeurs OSM, rien de déduit -->
       {#if app.info?.good?.length}
         <section class="psec">
-          <h2>Bon à savoir</h2>
+          <h2>{tx('fiche.bon_a_savoir')}</h2>
           <ul class="good">
             {#each app.info.good as g}
               <li class:no={!g.ok}>
@@ -96,81 +97,80 @@
 
       {#if app.week}
         <section class="psec">
-          <h2>Horaires</h2>
+          <h2>{tx('fiche.horaires_2')}</h2>
           <table class="week"><tbody>
             {#each app.week as d}<tr class:today={d.today}><th>{d.day}</th><td>{d.text}</td></tr>{/each}
           </tbody></table>
         </section>
       {:else if app.info?.expectsHours && !app.isStation}
         <section class="psec">
-          <h2>Horaires</h2>
-          <p class="muted small">Personne ne les a encore ajoutés à OpenStreetMap, la carte libre que nous utilisons.</p>
-          {#if app.osmEditUrl}<a class="link ext" href={app.osmEditUrl} target="_blank" rel="noopener">Ajouter les horaires ↗</a>{/if}
+          <h2>{tx('fiche.horaires_2')}</h2>
+          <p class="muted small">{tx('fiche.personne_ne_les_a_encore_ajoutes_a')}</p>
+          {#if app.osmEditUrl}<a class="link ext" href={app.osmEditUrl} target="_blank" rel="noopener">{tx('fiche.ajouter_les_horaires')}</a>{/if}
         </section>
       {/if}
 
       {#if app.info?.phone || app.info?.website || app.address}
         <section class="psec">
-          <h2>Détails</h2>
+          <h2>{tx('fiche.details')}</h2>
           <dl class="details">
             {#if app.info?.phone}
-              <div><dt>Téléphone</dt><dd><a href={`tel:${app.info.phone.replace(/\s/g, '')}`}>{app.info.phone}</a></dd></div>
+              <div><dt>{tx('fiche.telephone')}</dt><dd><a href={`tel:${app.info.phone.replace(/\s/g, '')}`}>{app.info.phone}</a></dd></div>
             {/if}
             {#if app.info?.website}
-              <div><dt>Site web</dt><dd><a href={href(app.info.website)} target="_blank" rel="noopener">{host(app.info.website)}</a></dd></div>
+              <div><dt>{tx('fiche.site_web')}</dt><dd><a href={href(app.info.website)} target="_blank" rel="noopener">{host(app.info.website)}</a></dd></div>
             {/if}
             {#if app.address}
-              <div><dt>Adresse</dt><dd class="selectable">{app.address}</dd></div>
+              <div><dt>{tx('fiche.adresse')}</dt><dd class="selectable">{app.address}</dd></div>
             {/if}
           </dl>
         </section>
       {/if}
 
       {#if app.placeShortcut}
-        <p class="sc-note">Votre {app.SHORT_NAMES[app.placeShortcut].toLowerCase()} · <button class="link" onclick={() => { const k = app.placeShortcut, old = app.shortcuts[k]; app.setShortcut(k, null); app.say(`${app.SHORT_NAMES[k]} retiré`, { label: 'Annuler', run: () => app.setShortcut(k, old) }); }}>Retirer</button></p>
+        <p class="sc-note">{tx('fiche.votre', { raccourci: app.SHORT_NAMES[app.placeShortcut].toLowerCase() })} <button class="link" onclick={() => { const k = app.placeShortcut, old = app.shortcuts[k]; app.setShortcut(k, null); app.say(tx('fiche.retire', { nom: app.SHORT_NAMES[k] }), { label: tx('resultats.annuler'), run: () => app.setShortcut(k, old) }); }}>{tx('fiche.retirer')}</button></p>
       {/if}
 
       {#if !app.isAddress}
         <div class="end-btns">
-          <button class="end-btn" class:on={app.isPinned} onclick={() => { const was = app.isPinned; app.togglePin(app.place); app.say(was ? 'Désépinglé' : 'Épinglé en haut de Mes lieux'); }}>
+          <button class="end-btn" class:on={app.isPinned} onclick={() => { const was = app.isPinned; app.togglePin(app.place); app.say(was ? tx('fiche.desepingle') : tx('fiche.epingle_en_haut_de_mes_lieux')); }}>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3.5h6l-1 6 3.5 3.5h-11L10 9.5zM12 13v7.5" /></svg>
-            <span>{app.isPinned ? 'Épinglé' : 'Épingler'}</span>
+            <span>{app.isPinned ? tx('fiche.epingle') : tx('fiche.epingler')}</span>
           </button>
-          <a class="end-btn" aria-label="Signaler un problème sur OpenStreetMap" href={app.osmNoteUrl} target="_blank" rel="noopener">
+          <a class="end-btn" aria-label={tx('fiche.signaler_un_probleme_sur')} href={app.osmNoteUrl} target="_blank" rel="noopener">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4 21 19.5H3z" /><path d="M12 10v4.5M12 17v.3" /></svg>
-            <span>Signaler</span>
+            <span>{tx('fiche.signaler')}</span>
           </a>
         </div>
       {/if}
       {#if app.info?.covered === false}
-        <p class="contrib">Ce lieu est hors de la zone couverte par nos données détaillées (Paris pour l'instant) : seules les infos de la carte sont affichées.</p>
+        <p class="contrib">{tx('fiche.ce_lieu_est_hors_de_la_zone_couverte')}</p>
       {/if}
       <p class="contrib">
-        {#if app.osmDate}Données OpenStreetMap du {app.osmDate}. {/if}Une info manque ou est fausse ?
-        {#if app.osmEditUrl}<a href={app.osmEditUrl} target="_blank" rel="noopener">Complétez-la sur OpenStreetMap ↗</a>{:else}<a href={app.osmNoteUrl} target="_blank" rel="noopener">Signalez-la sur OpenStreetMap ↗</a>{/if},
-        la carte libre que nous utilisons. Indiquez ce que vous constatez sur place, sans recopier Google Maps : sa licence l'interdit.
+        {#if app.osmDate}{tx('fiche.donnees_openstreetmap_du', { osmDate: app.osmDate })} {/if}{tx('fiche.une_info_manque_ou_est_fausse')}
+        {#if app.osmEditUrl}<a href={app.osmEditUrl} target="_blank" rel="noopener">{tx('fiche.completez_la_sur_openstreetmap')}</a>{:else}<a href={app.osmNoteUrl} target="_blank" rel="noopener">{tx('fiche.signalez_la_sur_openstreetmap')}</a>{/if}{tx('fiche.la_carte_libre_que_nous_utilisons')}
       </p>
 {/snippet}
 
     <section class="sheet" aria-label={app.place.name} use:draggable={{ key: app.place.id, onDismiss: app.closePlace }} onsheetmove={(e) => (app.placeSheetH = e.detail.height)}>
-      <button class="grip" aria-label="Agrandir la fiche"></button>
-      <button class="close" onclick={app.closePlace} aria-label="Fermer la fiche">
+      <button class="grip" aria-label={tx('liste.agrandir_la_fiche')}></button>
+      <button class="close" onclick={app.closePlace} aria-label={tx('fiche.fermer_la_fiche')}>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" /></svg>
       </button>
 
-      <button class="share left" onclick={app.sharePlace} aria-label="Partager">
+      <button class="share left" onclick={app.sharePlace} aria-label={tx('liste.partager')}>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5v11M8 7.5l4-4 4 4M6 11.5H5v8h14v-8h-1" /></svg>
       </button>
       <div class="phead">
         <h1>{app.title}</h1>
         <p class="kind">{app.isAddress
-          ? (app.place.name.split(',').slice(1).join(',').trim() || app.place.address || 'Adresse')
-          : [app.stationKind || app.info?.kind || app.place.type, app.info?.cuisine && app.info.cuisine.split(';')[0].replace(/_/g, ' ')].filter(Boolean).join(' · ') || 'Lieu'}</p>
+          ? (app.place.name.split(',').slice(1).join(',').trim() || app.place.address || tx('fiche.adresse'))
+          : [app.stationKind || app.info?.kind || app.place.type, app.info?.cuisine && app.info.cuisine.split(';')[0].replace(/_/g, ' ')].filter(Boolean).join(' · ') || tx('fiche.lieu')}</p>
       </div>
 
       <!-- En un coup d'œil : ouvert ? loin ? encore à jour ? -->
       <p class="glance">
-        {#if app.info === null}<span class="muted">Chargement…</span>
+        {#if app.info === null}<span class="muted">{tx('fiche.chargement')}</span>
         {:else if app.status}<span class="st" class:is-open={app.status.open === true} class:is-closed={app.status.open === false}>{app.status.label}</span>{/if}
       </p>
       {#if app.freshness}
@@ -186,19 +186,19 @@
             <span>{app.walkEta.replace(' à pied', '').replace('≈ ', '')}</span>
           {:else}
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8 21.2 12 12 21.2 2.8 12z" class="solid" /><path d="M9.5 14.5v-2.2a1.5 1.5 0 0 1 1.5-1.5h4M13 8.8l2 2-2 2" class="on-solid" /></svg>
-            <span>Itinéraire</span>
+            <span>{tx('fiche.itineraire')}</span>
           {/if}
         </button>
         {#if app.info?.phone}
           <a class="action" href={`tel:${app.info.phone.replace(/\s/g, '')}`}>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.6 3.5 9 3l2 4.6-2.3 1.6a12 12 0 0 0 6.1 6.1l1.6-2.3L21 15l-.5 2.4A3 3 0 0 1 17.6 20C10 20 4 14 4 6.4a3 3 0 0 1 2.6-2.9z" /></svg>
-            <span>Appeler</span>
+            <span>{tx('fiche.appeler')}</span>
           </a>
         {/if}
         {#if app.info?.website}
           <a class="action" href={href(app.info.website)} target="_blank" rel="noopener">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M3.5 12h17M12 3.5c2.5 2.6 3.6 5.4 3.6 8.5s-1.1 5.9-3.6 8.5M12 3.5C9.5 6.1 8.4 8.9 8.4 12s1.1 5.9 3.6 8.5" /></svg>
-            <span>Site web</span>
+            <span>{tx('fiche.site_web')}</span>
           </a>
         {/if}
       </div>
@@ -225,23 +225,23 @@
           <div class="pmenu" role="menu">
             {#if !app.isStation}
               {#each ['home', 'work'] as k}
-                <button role="menuitem" onclick={() => { app.placeMenu = false; if (app.placeShortcut === k) { const old = app.shortcuts[k]; app.setShortcut(k, null); app.say(`${app.SHORT_NAMES[k]} retiré`, { label: 'Annuler', run: () => app.setShortcut(k, old) }); } else { app.setShortcut(k, app.place); app.say(`${app.SHORT_NAMES[k]} enregistré · gardé sur cet appareil`); } }}>
-                  {app.placeShortcut === k ? `Retirer « ${app.SHORT_NAMES[k]} »` : `Définir comme ${app.SHORT_NAMES[k]}`}
+                <button role="menuitem" onclick={() => { app.placeMenu = false; if (app.placeShortcut === k) { const old = app.shortcuts[k]; app.setShortcut(k, null); app.say(tx('fiche.retire', { nom: app.SHORT_NAMES[k] }), { label: tx('resultats.annuler'), run: () => app.setShortcut(k, old) }); } else { app.setShortcut(k, app.place); app.say(tx('fiche.enregistre_garde_sur_cet_appareil', { nom: app.SHORT_NAMES[k] })); } }}>
+                  {app.placeShortcut === k ? tx('fiche.retirer_2', { nom: app.SHORT_NAMES[k] }) : tx('fiche.definir_comme', { raccourci: app.SHORT_NAMES[k] })}
                 </button>
               {/each}
             {/if}
-            <button role="menuitem" onclick={app.copyAddress}>Copier l'adresse</button>
-            <button role="menuitem" onclick={() => { app.placeMenu = false; app.sharePlace(); }}>Partager</button>
+            <button role="menuitem" onclick={app.copyAddress}>{tx('fiche.copier_adresse')}</button>
+            <button role="menuitem" onclick={() => { app.placeMenu = false; app.sharePlace(); }}>{tx('liste.partager')}</button>
           </div>
         {/if}
         <div class="fab">
-          <button class:on={app.inFav} onclick={app.favTap} aria-pressed={app.inFav} aria-label={app.inFav ? `Retirer de ${app.listOf('fav').name}` : `Ajouter à ${app.listOf('fav').name}`}>
+          <button class:on={app.inFav} onclick={app.favTap} aria-pressed={app.inFav} aria-label={app.inFav ? tx('fiche.retirer_de', { name: app.listOf('fav').name }) : tx('fiche.ajouter_a', { name: app.listOf('fav').name })}>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.3l-1.3-1.2C6 14.9 3 12.2 3 8.9 3 6.2 5.1 4 7.8 4c1.5 0 3 .7 4.2 1.9C13.2 4.7 14.7 4 16.2 4 18.9 4 21 6.2 21 8.9c0 3.3-3 6-7.7 10.2z" /></svg>
           </button>
-          <button class:on={app.isFav && app.savedEntry.lists.some((x) => x !== 'fav')} onclick={() => (app.listPicker = true)} aria-label="Ajouter à une liste">
+          <button class:on={app.isFav && app.savedEntry.lists.some((x) => x !== 'fav')} onclick={() => (app.listPicker = true)} aria-label={tx('fiche.ajouter_a_une_liste')}>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
           </button>
-          <button onclick={() => (app.placeMenu = !app.placeMenu)} aria-expanded={app.placeMenu} aria-label="Plus d'options">
+          <button onclick={() => (app.placeMenu = !app.placeMenu)} aria-expanded={app.placeMenu} aria-label={tx('fiche.plus_options')}>
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="1.4" class="solid" /><circle cx="12" cy="12" r="1.4" class="solid" /><circle cx="18" cy="12" r="1.4" class="solid" /></svg>
           </button>
         </div>

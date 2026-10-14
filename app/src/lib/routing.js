@@ -1,3 +1,4 @@
+import { tx } from '#lib/i18n/index.js';
 import { city, inBox } from './cities/index.js';
 import { dataBase } from './config.js';
 // Itinéraires.
@@ -114,7 +115,7 @@ function parseTrip(trip, mode, via) {
     raw.push(...shape);
     coords.push(...streetLine(shape));
     steps.push(...simplifySteps(leg.maneuvers, offset));
-    if (i < trip.legs.length - 1) steps.push({ text: `Arrêt : ${via.label}`, speak: `Arrêt : ${via.label}`, distance: 0, stop: true, type: 'stop', idx: raw.length - 1 });
+    if (i < trip.legs.length - 1) steps.push({ text: tx('itin.arret_3', { label: via.label }), speak: tx('itin.arret_3', { label: via.label }), distance: 0, stop: true, type: 'stop', idx: raw.length - 1 });
   });
   return { duration: trip.summary.time, distance: trip.summary.length * 1000, coords, raw, steps };
 }
@@ -166,8 +167,8 @@ export async function trafficEstimate(from, to, when = new Date()) {
   if (measured == null) return { factor: 1, label: null };
   const weight = (inBox(city.trafficBox, from) ? 0.5 : 0) + (inBox(city.trafficBox, to) ? 0.5 : 0);   // hors de Paris, pas de mesure : on n'allonge pas
   const factor = 1 + (measured - 1) * weight;
-  const level = measured < 1.2 ? 'fluide' : measured < 1.45 ? 'modéré' : measured < 1.7 ? 'chargé' : 'très chargé';
-  return { factor, measured, label: weight ? `trafic habituel ${level} le ${jour} vers ${heure} h` : null };
+  const level = measured < 1.2 ? tx('itin.fluide') : measured < 1.45 ? tx('itin.modere') : measured < 1.7 ? tx('itin.charge') : tx('itin.tres_charge');
+  return { factor, measured, label: weight ? tx('itin.trafic_habituel_le_vers_h', { level, jour, heure }) : null };
 }
 
 /** Transports en commun : plusieurs propositions, triées par heure d'arrivée. */
@@ -194,8 +195,8 @@ export async function transitRoutes(from, to, signal, when = new Date()) {
         color: l.routeColor ? `#${l.routeColor}` : '#5B6573',
         textColor: l.routeTextColor ? `#${l.routeTextColor}` : '#FFFFFF',
         headsign: l.headsign || '',
-        from: l.from?.name === 'START' ? 'Départ' : l.from?.name,
-        to: l.to?.name === 'END' ? 'Arrivée' : l.to?.name,
+        from: l.from?.name === 'START' ? tx('recherche.depart') : l.from?.name,
+        to: l.to?.name === 'END' ? tx('recherche.arrivee') : l.to?.name,
         toPos: l.to?.lat != null ? { lat: l.to.lat, lon: l.to.lon } : null,
         fromStop: l.from?.stopId || null,
         toStop: l.to?.stopId || null,
@@ -233,7 +234,7 @@ export async function transitWithStop(from, via, to, signal, when = new Date()) 
     const w = await streetRoute(a, b, 'walk', signal);
     const start = new Date(t), end = new Date(+t + w.duration * 1000);
     return [{ duration: w.duration, start, end, board: null, next: [],
-      legs: [{ mode: 'WALK', from: a.label || 'Départ', to: b.label, start, end, duration: w.duration, distance: w.distance, coords: w.coords }] }];
+      legs: [{ mode: 'WALK', from: a.label || tx('recherche.depart'), to: b.label, start, end, duration: w.duration, distance: w.distance, coords: w.coords }] }];
   };
   const firsts = (await segment(from, via, when)).slice(0, 3);
   const out = [];
@@ -296,7 +297,7 @@ export async function departures(name, lat, lon, signal) {
     const key = `${s.mode}|${s.routeShortName}|${dest}`;
     let g = groups.get(key);
     if (!g) {
-      g = { mode: s.mode, line: s.routeShortName || MODE_NAMES[s.mode] || 'Train', headsign: dest,
+      g = { mode: s.mode, line: s.routeShortName || MODE_NAMES[s.mode] || tx('ecran.train'), headsign: dest,
         color: s.routeColor ? `#${s.routeColor}` : '#5B6573',
         textColor: s.routeTextColor ? `#${s.routeTextColor}` : '#FFFFFF', times: [], realTime: false };
       groups.set(key, g);
@@ -314,15 +315,15 @@ export async function departures(name, lat, lon, signal) {
 /** « 2 min », « à quai » ou l'heure si c'est loin. */
 export function fmtWait(d, now = Date.now()) {
   const m = Math.round((d - now) / 60000);
-  if (m <= 0) return 'à quai';
+  if (m <= 0) return tx('itin.a_quai');
   if (m < 60) return `${m} min`;
   return fmtTime(d);
 }
 
 export const MODE_NAMES = {
-  SUBWAY: 'Métro', METRO: 'Métro', BUS: 'Bus', TRAM: 'Tram', RAIL: 'Train', REGIONAL_RAIL: 'RER',
-  SUBURBAN: 'RER', COACH: 'Car', FERRY: 'Bateau', FUNICULAR: 'Funiculaire', CABLE_CAR: 'Téléphérique',
-  HIGHSPEED_RAIL: 'Train', LONG_DISTANCE: 'Train', NIGHT_RAIL: 'Train de nuit', REGIONAL_FAST_RAIL: 'Train'
+  SUBWAY: tx('itin.metro'), METRO: tx('itin.metro'), BUS: tx('itin.bus'), TRAM: tx('itin.tram'), RAIL: tx('ecran.train'), REGIONAL_RAIL: 'RER',
+  SUBURBAN: 'RER', COACH: tx('itin.car'), FERRY: tx('itin.bateau'), FUNICULAR: tx('itin.funiculaire'), CABLE_CAR: tx('itin.telepherique'),
+  HIGHSPEED_RAIL: tx('ecran.train'), LONG_DISTANCE: tx('ecran.train'), NIGHT_RAIL: tx('itin.train_de_nuit'), REGIONAL_FAST_RAIL: tx('ecran.train')
 };
 
 export function fmtDuration(seconds) {

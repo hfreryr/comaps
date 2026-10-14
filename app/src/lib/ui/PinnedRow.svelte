@@ -1,4 +1,5 @@
 <script>
+  import { tx } from '#lib/i18n/index.js';
   import { getContext } from 'svelte';
   import ListDot from '#lib/ui/ListDot.svelte';
 
@@ -15,7 +16,7 @@
         onclick={inSearch ? undefined : () => app.useShortcut(k)}>
         <span class="pin-circle home">{#if k === 'home'}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.5 12 5l8 6.5M6.5 10v9.5h11V10" /><path d="M10.2 19.5v-4.8h3.6v4.8" /></svg>{:else}<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="7.5" width="17" height="12" rx="2.5" /><path d="M9 7.5V6a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 6v1.5M3.5 12.5h17" /></svg>{/if}</span>
         <span class="pin-name">{app.SHORT_NAMES[k]}</span>
-        <span class="pin-sub">{app.shortcuts[k] ? 'Itinéraire' : 'Ajouter'}</span>
+        <span class="pin-sub">{app.shortcuts[k] ? tx('fiche.itineraire') : tx('resultats.ajouter')}</span>
       </button>
     {/each}
     {#each app.pinnedPlaces as f (app.placeKey(f))}

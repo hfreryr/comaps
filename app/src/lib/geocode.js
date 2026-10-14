@@ -6,6 +6,7 @@
 //    à remplacer par notre propre instance avant tout lancement public.
 //
 // Ce qui est envoyé : le texte tapé et un point de référence (centre de la carte ou position), rien d'autre.
+import { tx } from '#lib/i18n/index.js';
 import { city } from './cities/index.js';
 import { typeLabel } from './places.js';
 
@@ -26,7 +27,7 @@ function fromPhoton(f) {
     osmType: { N: 'node', W: 'way', R: 'relation' }[p.osm_type],
     osmId: p.osm_id,
     name: p.name || addr,
-    type: isAddress ? 'Adresse' : typeLabel(p.osm_key, p.osm_value),
+    type: isAddress ? tx('fiche.adresse') : typeLabel(p.osm_key, p.osm_value),
     subclass: isAddress ? null : p.osm_value,
     address: isAddress ? [p.postcode, p.city].filter(Boolean).join(' ') : addr,
     lat, lon
@@ -40,7 +41,7 @@ function fromGeopf(f) {
   return {
     id: `ban:${p.id}`,
     name: street ? `${p.name}, ${p.postcode} ${p.city}` : `${p.name}, ${p.postcode} ${p.city}`,
-    type: street ? 'Rue' : 'Adresse',
+    type: street ? tx('resultats.rue') : tx('fiche.adresse'),
     subclass: null,
     address: `${p.postcode} ${p.city}`,
     lat, lon,

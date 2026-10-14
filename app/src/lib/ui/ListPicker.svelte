@@ -1,4 +1,5 @@
 <script>
+  import { tx } from '#lib/i18n/index.js';
   import { getContext } from 'svelte';
   import ListDot from '#lib/ui/ListDot.svelte';
   import { draggable } from '#lib/sheet.js';
@@ -8,12 +9,12 @@
 </script>
 
 
-    <section class="sheet" aria-label="Enregistrer dans" use:draggable={{ key: 'picker', onDismiss: () => (app.listPicker = false) }}>
-      <button class="grip" aria-label="Agrandir la fiche"></button>
-      <button class="close" onclick={() => (app.listPicker = false)} aria-label="Fermer">
+    <section class="sheet" aria-label={tx('enregistrer.enregistrer_dans')} use:draggable={{ key: 'picker', onDismiss: () => (app.listPicker = false) }}>
+      <button class="grip" aria-label={tx('liste.agrandir_la_fiche')}></button>
+      <button class="close" onclick={() => (app.listPicker = false)} aria-label={tx('photos.fermer')}>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" /></svg>
       </button>
-      <h1>Enregistrer dans</h1>
+      <h1>{tx('enregistrer.enregistrer_dans')}</h1>
       <p class="kind">{app.place.name}</p>
       <ul class="pick-lists">
         {#each app.lists as l (l.id)}
@@ -27,14 +28,14 @@
         {/each}
       </ul>
       <form class="new-list" onsubmit={(e) => { e.preventDefault(); app.createList(app.newListName, (id) => app.setMembership(id, true)); app.newListName = ''; }}>
-        <input bind:value={app.newListName} placeholder="Nouvelle liste…" aria-label="Nom de la nouvelle liste" maxlength="40" />
-        <button class="link" disabled={!app.newListName.trim()}>Créer</button>
+        <input bind:value={app.newListName} placeholder={tx('liste.nouvelle_liste')} aria-label={tx('liste.nom_de_la_nouvelle_liste')} maxlength="40" />
+        <button class="link" disabled={!app.newListName.trim()}>{tx('liste.creer')}</button>
       </form>
       <label class="pin-toggle">
         <input type="checkbox" checked={app.pins.includes(app.placeKey(app.place))} onchange={() => app.togglePin(app.place)} />
-        Épingler en haut de la recherche
+        {tx('enregistrer.epingler_en_haut_de_la_recherche')}
       </label>
-      <button class="go wide done" onclick={() => (app.listPicker = false)}>Terminé</button>
+      <button class="go wide done" onclick={() => (app.listPicker = false)}>{tx('enregistrer.termine')}</button>
     </section>
 
 <style>

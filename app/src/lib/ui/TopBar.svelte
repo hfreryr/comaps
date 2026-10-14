@@ -1,4 +1,5 @@
 <script>
+  import { tx } from '#lib/i18n/index.js';
   import { getContext } from 'svelte';
   import ResultList from '#lib/ui/ResultList.svelte';
 
@@ -11,11 +12,11 @@
     <header class="top">
       <div class="search" class:open={app.showList} bind:offsetHeight={app.searchH}>
         <svg class="lens" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="M15.5 15.5 20 20" /></svg>
-        <input id="search" type="search" placeholder="Rechercher un lieu ou une adresse" aria-label="Rechercher un lieu ou une adresse"
+        <input id="search" type="search" placeholder={tx('recherche.rechercher_un_lieu_ou_une_adresse')} aria-label={tx('recherche.rechercher_un_lieu_ou_une_adresse')}
           autocomplete="off" enterkeyhint="search" bind:value={app.query}
           onfocus={() => { app.focused = true; app.editChips = false; app.importOpen = false; app.showModes = false; app.closePlace(); app.clearCategory(); }} onblur={() => setTimeout(() => (app.focused = false), 150)} onkeydown={app.onKey} />
         {#if app.query}
-          <button class="icon-btn" onclick={app.clearSearch} aria-label="Effacer la recherche">
+          <button class="icon-btn" onclick={app.clearSearch} aria-label={tx('recherche.effacer_la_recherche')}>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" /></svg>
           </button>
         {/if}
@@ -24,14 +25,14 @@
 
       {#if !app.showList && !app.place}
         <!-- masqués quand une fiche lieu est ouverte : ils ne servent pas à ce moment-là et cachent la carte -->
-        <nav class="chips" aria-label="Catégories">
+        <nav class="chips" aria-label={tx('recherche.categories')}>
           {#each app.chipList as c (c.key)}
             <button class="chip" class:on={app.category?.key === c.key} onclick={() => app.pickCategory(c)} style:--fam={app.famColor(c)} aria-pressed={app.category?.key === c.key}>
               {#if c.saved}<svg class="chip-heart" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.3l-1.3-1.2C6 14.9 3 12.2 3 8.9 3 6.2 5.1 4 7.8 4c1.5 0 3 .7 4.2 1.9C13.2 4.7 14.7 4 16.2 4 18.9 4 21 6.2 21 8.9c0 3.3-3 6-7.7 10.2z" /></svg>
               {:else}<span class="chip-dot" aria-hidden="true"></span>{/if}{c.label}
             </button>
           {/each}
-          <button class="chip edit" class:on-edit={app.editChips} onclick={() => { app.editChips = !app.editChips; app.importOpen = false; }} aria-label="Personnaliser les raccourcis" aria-expanded={app.editChips}>
+          <button class="chip edit" class:on-edit={app.editChips} onclick={() => { app.editChips = !app.editChips; app.importOpen = false; }} aria-label={tx('recherche.personnaliser_les_raccourcis')} aria-expanded={app.editChips}>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4" /></svg>
           </button>
         </nav>
@@ -40,16 +41,16 @@
   {:else if !app.nav}
     <header class="top dir" bind:offsetHeight={app.topH}>
       <div class="dir-card" class:open={app.editing}>
-        <button class="icon-btn back" onclick={app.closeDirections} aria-label="Revenir à la fiche du lieu">
+        <button class="icon-btn back" onclick={app.closeDirections} aria-label={tx('recherche.revenir_a_la_fiche_du_lieu')}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
         </button>
         <div class="fields">
-          {#each [['from', app.from, 'Choisir un point de départ'], ...(app.showVia ? [['via', app.via, 'Choisir un arrêt']] : []), ['to', app.to, 'Choisir une destination']] as [which, pt, ph] (which)}
+          {#each [['from', app.from, tx('recherche.choisir_un_point_de_depart')], ...(app.showVia ? [['via', app.via, tx('recherche.choisir_un_arret')]] : []), ['to', app.to, tx('recherche.choisir_une_destination')]] as [which, pt, ph] (which)}
             <div class="field" class:editing={app.editing === which} class:via-field={which === 'via'}>
               <span class="field-mark {which}" aria-hidden="true"></span>
               {#if app.editing === which}
                 <input id={`field-${which}`} bind:this={app.fieldEl} bind:value={app.fieldQuery} placeholder={ph} autocomplete="off"
-                  aria-label={{ from: 'Départ', via: 'Arrêt', to: 'Arrivée' }[which]} onkeydown={app.onKey}
+                  aria-label={{ from: tx('recherche.depart'), via: tx('itin.arret'), to: tx('recherche.arrivee') }[which]} onkeydown={app.onKey}
                   onblur={() => { app.lastEdit = { which, at: Date.now() }; setTimeout(() => { if (app.editing === which && app.pointOf(which)) app.editing = null; }, 250); }} />
               {:else}
                 <button class="field-btn" class:placeholder={!pt} onclick={() => app.editField(which)}>
@@ -57,14 +58,14 @@
                 </button>
               {/if}
               {#if which === 'via'}
-                <button class="icon-btn rm-stop" onclick={app.removeStop} aria-label="Retirer l'arrêt">
+                <button class="icon-btn rm-stop" onclick={app.removeStop} aria-label={tx('recherche.retirer_arret')}>
                   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" /></svg>
                 </button>
               {/if}
             </div>
           {/each}
         </div>
-        <button class="icon-btn swap" onclick={app.swap} aria-label="Inverser départ et arrivée" disabled={!app.from || !app.to}>
+        <button class="icon-btn swap" onclick={app.swap} aria-label={tx('recherche.inverser_depart_et_arrivee')} disabled={!app.from || !app.to}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4v15M4.5 7.5 8 4l3.5 3.5M16 20V5M12.5 16.5 16 20l3.5-3.5" /></svg>
         </button>
         {#if app.editing}<ResultList />{/if}

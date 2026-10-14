@@ -1,5 +1,6 @@
 // Mes lieux : listes, épingles, Maison et Travail, transfert et sauvegarde.
 // Code sorti de +page.svelte : il lit et modifie l'état de l'écran par l'objet « app » (bloc « app » de la page).
+import { tx } from '#lib/i18n/index.js';
 import { LIST_COLORS, backupFile, mergeInto, pack, packList, readBackup, restore, snapshot } from '#lib/myplaces.js';
 import { PARIS } from '#lib/places.js';
 import qrcode from 'qrcode-generator';
@@ -27,7 +28,7 @@ export function createMyPlaces(app) {
     if (app.savedEntry) { app.listPicker = true; return; }
     app.favorites = [{ ...keepOf(p), lists: ['fav'] }, ...app.favorites];
     saveAll();
-    app.say(`Enregistré dans ${app.listOf('fav').name}`, { label: 'Changer', run: () => (app.listPicker = true) });
+    app.say(tx('meslieux.enregistre_dans', { name: app.listOf('fav').name }), { label: tx('meslieux.changer'), run: () => (app.listPicker = true) });
   }
   function setMembership(listId, on) {
     const p = app.place;
@@ -40,7 +41,7 @@ export function createMyPlaces(app) {
         const before = app.favorites, beforePins = app.pins;
         app.favorites = app.favorites.filter((f) => f !== ex);
         app.pins = app.pins.filter((k) => k !== app.placeKey(ex));
-        app.say('Retiré de Mes lieux', { label: 'Annuler', run: () => { app.favorites = before; app.pins = beforePins; saveAll(); } });
+        app.say(tx('meslieux.retire_de_mes_lieux'), { label: tx('resultats.annuler'), run: () => { app.favorites = before; app.pins = beforePins; saveAll(); } });
       } else app.favorites = app.favorites.map((f) => (f === ex ? { ...f, lists: ls } : f));
     }
     saveAll();
@@ -62,7 +63,7 @@ export function createMyPlaces(app) {
     app.swiped = null;
     saveAll();
     refreshSaved();
-    app.say(`« ${saved.name} » retiré de ${app.listOf(listId).name}`, { label: 'Annuler', run: () => { app.favorites = before; app.pins = beforePins; saveAll(); refreshSaved(); } });
+    app.say(tx('meslieux.retire_de', { name: saved.name, name2: app.listOf(listId).name }), { label: tx('resultats.annuler'), run: () => { app.favorites = before; app.pins = beforePins; saveAll(); refreshSaved(); } });
   }
   function createList(name, then) {
     const n = name.trim();
@@ -77,7 +78,7 @@ export function createMyPlaces(app) {
     return l;
   }
   function renameList(l) {
-    const n = prompt('Nouveau nom de la liste', l.name)?.trim();
+    const n = prompt(tx('meslieux.nouveau_nom_de_la_liste'), l.name)?.trim();
     if (!n) return;
     app.lists = app.lists.map((x) => (x.id === l.id ? { ...x, name: n } : x));
     saveAll();
@@ -89,7 +90,7 @@ export function createMyPlaces(app) {
     app.savedList = null;
     saveAll();
     refreshSaved();
-    app.say(`Liste « ${l.name} » supprimée`, { label: 'Annuler', run: () => { app.lists = before.lists; app.favorites = before.favorites; saveAll(); refreshSaved(); } });
+    app.say(tx('meslieux.liste_supprimee', { name: l.name }), { label: tx('resultats.annuler'), run: () => { app.lists = before.lists; app.favorites = before.favorites; saveAll(); refreshSaved(); } });
   }
   // Mes lieux sur la carte et dans la liste, triés par distance
   function refreshSaved() {
@@ -116,17 +117,17 @@ export function createMyPlaces(app) {
     const places = app.favorites.filter((f) => f.lists.includes(l.id));
     const u = new URL(location.href);
     u.hash = `liste=${await packList(l, places)}`;
-    const data = { title: l.name, text: `${l.name} · ${places.length} lieu${places.length > 1 ? 'x' : ''}`, url: u.toString() };
+    const data = { title: l.name, text: tx('meslieux.lieu', { nom: l.name, n: places.length }), url: u.toString() };
     try {
       if (navigator.share) await navigator.share(data);
-      else { await navigator.clipboard.writeText(data.url); app.say('Lien de la liste copié'); }
+      else { await navigator.clipboard.writeText(data.url); app.say(tx('meslieux.lien_de_la_liste_copie')); }
     } catch { /* partage annulé */ }
   }
   // Ajouter une liste reçue par lien
   function keepIncomingList() {
     const { list, places } = app.incoming;
     let name = list.name;
-    if (app.lists.some((l) => l.name.toLowerCase() === name.toLowerCase())) name = `${name} (partagée)`;
+    if (app.lists.some((l) => l.name.toLowerCase() === name.toLowerCase())) name = tx('meslieux.partagee', { name });
     const l = { id: `l${Date.now().toString(36)}`, name, icon: list.icon || 'star', color: list.color || LIST_COLORS[2] };
     const m = mergeInto({ lists: app.lists, places: app.favorites }, { lists: [l], places: places.map((p) => ({ ...p, lists: [l.id] })) }, sameSpot);
     app.lists = m.lists;
@@ -134,7 +135,7 @@ export function createMyPlaces(app) {
     saveAll();
     app.incoming = null;
     app.clearCategory();
-    app.say(`Liste « ${name} » ajoutée à Mes lieux`);
+    app.say(tx('meslieux.liste_ajoutee_a_mes_lieux', { name }));
   }
   async function makeTransfer() {
     app.hubPanel = 'transfer';
@@ -154,8 +155,8 @@ export function createMyPlaces(app) {
   }
   async function shareTransfer() {
     try {
-      if (navigator.share) await navigator.share({ title: 'Mes lieux · Untracked Maps', url: app.transfer.url });
-      else { await navigator.clipboard.writeText(app.transfer.url); app.say('Lien copié'); }
+      if (navigator.share) await navigator.share({ title: tx('meslieux.mes_lieux_untracked_maps'), url: app.transfer.url });
+      else { await navigator.clipboard.writeText(app.transfer.url); app.say(tx('meslieux.lien_copie')); }
     } catch { /* annulé */ }
   }
   function applyIncoming(data) {
@@ -173,7 +174,7 @@ export function createMyPlaces(app) {
     const file = await backupFile(snapshot({ lists: app.lists, places: app.favorites, shortcuts: app.shortcuts, pins: app.pins, chips: app.chipPrefs }), app.backupPassword.trim());
     app.backupPassword = '';
     try {
-      if (navigator.canShare?.({ files: [file] })) await navigator.share({ files: [file], title: 'Sauvegarde de Mes lieux' });
+      if (navigator.canShare?.({ files: [file] })) await navigator.share({ files: [file], title: tx('meslieux.sauvegarde_de_mes_lieux') });
       else {
         const a = document.createElement('a');
         a.href = URL.createObjectURL(file);
@@ -184,7 +185,7 @@ export function createMyPlaces(app) {
       app.lastBackup = Date.now();
       try { localStorage.setItem(app.BACKUP_KEY, String(app.lastBackup)); } catch { /* rien */ }
       app.hubPanel = null;
-      app.say('Sauvegarde créée : rangez-la dans votre iCloud, Proton Drive…');
+      app.say(tx('meslieux.sauvegarde_creee_rangez_la_dans'));
     } catch { /* partage annulé */ }
   }
   async function doRestore(file = app.restoreFile) {
@@ -196,9 +197,9 @@ export function createMyPlaces(app) {
       const added = applyIncoming(r.data);
       app.restoreFile = null; app.restoreNeedsPw = false; app.restorePassword = ''; app.hubPanel = null;
       refreshSaved();
-      app.say(added ? `${added} lieu${added > 1 ? 'x' : ''} restauré${added > 1 ? 's' : ''}` : 'Tout était déjà là');
+      app.say(added ? tx('meslieux.lieu_restaure', { n: added }) : tx('meslieux.tout_etait_deja_la'));
     } catch (e) {
-      app.say(app.restoreNeedsPw ? 'Mot de passe incorrect' : 'Ce fichier n\'est pas une sauvegarde d\'Untracked Maps');
+      app.say(app.restoreNeedsPw ? tx('meslieux.mot_de_passe_incorrect') : tx('meslieux.ce_fichier_est_pas_une_sauvegarde'));
     }
   }
 

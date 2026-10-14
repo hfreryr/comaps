@@ -1,6 +1,7 @@
 // Fiche du bas d'écran qu'on fait glisser du doigt (téléphone uniquement), comme dans les apps
 // de cartes de référence : aperçu (titre seul), mi-hauteur (par défaut) et plein écran.
 // Glisser vers le bas depuis l'aperçu ferme la fiche ; toucher la poignée agrandit ou réduit.
+import { tx } from '#lib/i18n/index.js';
 
 const PEEK = 150;          // hauteur de l'aperçu, en pixels
 const TOP_GAP = 64;        // marge laissée en haut en plein écran, pour voir qu'on est sur une carte
@@ -60,7 +61,7 @@ export function draggable(node, params = {}) {
     emit(h[snap]);
     const grip = node.querySelector('.grip');
     if (grip) {
-      grip.setAttribute('aria-label', snap === 'full' ? 'Réduire la fiche' : 'Agrandir la fiche');
+      grip.setAttribute('aria-label', snap === 'full' ? tx('ecran.reduire_la_fiche') : tx('liste.agrandir_la_fiche'));
       grip.toggleAttribute('hidden', h.full <= h.peek);
     }
   }

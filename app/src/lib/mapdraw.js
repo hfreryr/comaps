@@ -1,5 +1,6 @@
 // Dessin sur la carte : itinéraire, lieux, sélection, cadrage, toucher la carte.
 // Code sorti de +page.svelte : il lit et modifie l'état de l'écran par l'objet « app » (bloc « app » de la page).
+import { tx } from '#lib/i18n/index.js';
 import { addPlaceLayers, addRouteLayers, empty, routeTags as tagsFor } from '#lib/maplayers.js';
 import { darken, osmRef, pinFor, pinImageId } from '#lib/mapstyle.js';
 import * as maplibregl from 'maplibre-gl';
@@ -123,7 +124,7 @@ export function createMapDraw(app) {
     openPoint(e.lngLat);
   }
   async function openPoint({ lng, lat }) {
-    const p = { id: `pt${lng},${lat}`, name: 'Point sélectionné', type: 'Adresse', address: '', lat, lon: lng };
+    const p = { id: `pt${lng},${lat}`, name: tx('carte.point_selectionne'), type: tx('fiche.adresse'), address: '', lat, lon: lng };
     clearSelection();
     placeMarker(lng, lat);
     app.place = p;
@@ -134,7 +135,7 @@ export function createMapDraw(app) {
     app.moreText = false;
     app.showWeek = false;
     const label = await reverseAddress(lat, lng).catch(() => null);
-    if (app.place === p || app.place?.id === p.id) { app.place = { ...p, name: label || 'Point sélectionné' }; app.remember(app.place); }
+    if (app.place === p || app.place?.id === p.id) { app.place = { ...p, name: label || tx('carte.point_selectionne') }; app.remember(app.place); }
   }
   function openFeature(f, layerId = f.layer?.id) {
     const [osmType, osmId] = (f.properties.osm || '').split('/');
@@ -150,7 +151,7 @@ export function createMapDraw(app) {
       pin, hide,
       id: String(f.id), ...ref, name: app.category && !app.category.transit ? app.displayName(f, app.category) : f.properties.name,
       type: typeLabel('', f.properties.subclass) || typeLabel('', f.properties.class)
-        || { culture: 'Culture', sight: 'Lieu remarquable', nature: 'Parc ou jardin', health: 'Hôpital', train: 'Gare', shop: 'Grand magasin' }[f.properties.family],
+        || { culture: tx('carte.culture'), sight: tx('carte.lieu_remarquable'), nature: tx('carte.parc_ou_jardin'), health: tx('carte.hopital'), train: tx('ecran.gare'), shop: tx('carte.grand_magasin') }[f.properties.family],
       address: '', lat, lon
     });
   }
