@@ -62,9 +62,17 @@ Sur la capture iPhone, Untracked occupe :
 
 Propositions 1, 2 et 3 appliquées.
 
-Proposition 4 (ouvrir la fiche lieu plus bas) : **en attente**. Les captures reçues de Google Maps et de Plans montrent la fiche dépliée en entier, pas sa hauteur d'ouverture. Ce qu'elles confirment :
-- l'ordre en tête de fiche, le même que le nôtre : nom, type, état, boutons ;
-- une galerie de photos juste après les boutons.
+Proposition 4 (ouvrir la fiche lieu plus bas) : **abandonnée après mesure.** Captures du 14/10, fiche telle qu'elle s'ouvre en touchant un lieu :
+
+| | Haut de la fiche | Hauteur de la fiche | Carte visible |
+|---|---|---|---|
+| Plans | 56 % de l'écran | 44 % | ≈ 50 % (rien en haut) |
+| Google Maps | 53 % | 47 % | ≈ 40 % (barre de recherche en haut) |
+| Untracked (Chromium) | 54 % | 46 % | 47 % |
+
+Notre hauteur d'ouverture est donc la même que celle des références. Ce que montrent leurs fiches à l'ouverture : nom, type, état, boutons, puis une bande d'infos (Plans) ou « Bon à savoir » (Google), puis des photos.
+
+Constat utile, vu sur les deux captures : **une vignette de vue de la rue posée sur la carte**, en bas à gauche, juste au-dessus de la fiche (jumelles « Look Around » chez Apple, Street View chez Google). C'est l'emplacement naturel de nos photos de devanture Panoramax, au lieu d'une section dans la fiche. → proposition 5.
 
 ## Hors de notre main
 La barre de Safari prend environ 10 % de l'écran. L'app installée sur l'écran d'accueil la supprime, mais la localisation y est bloquée par un bug d'iOS 26/27.
