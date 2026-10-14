@@ -1,0 +1,103 @@
+<script>
+  import { getContext } from 'svelte';
+
+  // État et actions de la page (voir le bloc « app » de +page.svelte)
+  const app = getContext('app');
+</script>
+
+
+  {#if !app.directions}
+    <div class="modes-ctl">
+      {#if Math.abs(app.bearing) > 1 || app.pitch > 1}
+        <button class="round-btn compass" onclick={() => app.map.easeTo({ bearing: 0, pitch: 0, duration: 500 })} aria-label="Remettre le nord en haut">
+          <svg viewBox="0 0 24 24" aria-hidden="true" style:transform={`rotate(${-app.bearing}deg)`}><path d="M12 3 15.5 12h-7z" class="solid north" /><path d="M8.5 12h7L12 21z" /></svg>
+        </button>
+      {/if}
+      {#if app.showModes}
+        <div class="modes-pop" role="menu" aria-label="Type de carte">
+          <button role="menuitemradio" aria-checked={app.mapMode === 'plan'} class:on={app.mapMode === 'plan'} onclick={() => app.setMapMode('plan')}>
+            <span class="thumb plan" aria-hidden="true"></span>Plan
+          </button>
+          <button role="menuitemradio" aria-checked={app.mapMode === 'transit'} class:on={app.mapMode === 'transit'} onclick={() => app.setMapMode('transit')}>
+            <span class="thumb transit" aria-hidden="true"></span>Transports
+          </button>
+          <label class="saved-toggle">
+            <input type="checkbox" checked={app.showSaved} onchange={(e) => { app.showSaved = e.currentTarget.checked; try { localStorage.setItem('mes-lieux-carte', app.showSaved ? 'oui' : 'non'); } catch { /* rien */ } }} />
+            Mes lieux sur la carte
+          </label>
+        </div>
+      {/if}
+      <button class="round-btn" onclick={() => (app.showModes = !app.showModes)} aria-label="Type de carte" aria-expanded={app.showModes}>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3.5 8.5 4.5L12 12.5 3.5 8z" /><path d="m3.5 12 8.5 4.5 8.5-4.5M3.5 16l8.5 4.5 8.5-4.5" /></svg>
+      </button>
+    </div>
+  {/if}
+  <button class="locate" class:busy={app.locating} class:following={app.followMode !== 'none'} onclick={app.locate}
+    aria-label={app.followMode === 'follow' ? 'Orienter la carte dans votre direction' : app.followMode === 'heading' ? 'Remettre le nord en haut' : 'Me localiser'}>
+    {#if app.followMode === 'heading'}
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5 17 13H7z" class="solid" /><path d="M7 13h10l-5 8.5z" /><circle cx="12" cy="13" r="1.3" class="solid" /></svg>
+    {:else}
+      <svg viewBox="0 0 24 24" aria-hidden="true" class:hollow={app.followMode === 'none'}><path d="M20 4 4 11l7 2 2 7z" class="solid" /></svg>
+    {/if}
+  </button>
+
+<style>
+  svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  svg .solid { fill: currentColor; stroke: none; }
+  input {
+    border: 0; background: none; font: inherit; font-size: 17px; color: var(--ink);
+    padding: 12px 0; min-width: 0; outline: none; width: 100%;
+  }
+  input::placeholder { color: var(--muted); }
+  input::-webkit-search-cancel-button { display: none; }
+
+
+  /* ——— Localisation et messages ——— */
+  .locate {
+    position: absolute; z-index: 2; right: 12px; bottom: calc(52px + env(safe-area-inset-bottom));
+    width: 48px; height: 48px; border-radius: 50%; border: 0; background: var(--card); box-shadow: var(--shadow-float);
+    display: grid; place-items: center; cursor: pointer; color: var(--accent);
+  }
+  :global(.routing) .locate { display: none; }
+  .modes-ctl { position: absolute; z-index: 2; right: 12px; bottom: calc(110px + env(safe-area-inset-bottom)); display: grid; justify-items: end; gap: 10px; }
+  .round-btn {
+    width: 48px; height: 48px; border-radius: 50%; border: 0; background: var(--card); box-shadow: var(--shadow-float);
+    display: grid; place-items: center; cursor: pointer; color: var(--ink);
+  }
+  .round-btn svg { width: 22px; height: 22px; }
+  .modes-pop { display: flex; gap: 10px; padding: 12px; background: var(--card); border-radius: 18px; box-shadow: var(--shadow-float); }
+  .modes-pop button {
+    display: grid; justify-items: center; gap: 6px; border: 0; background: none; cursor: pointer; font-size: 13px; font-weight: 600; padding: 0;
+  }
+  .thumb { width: 76px; height: 54px; border-radius: 12px; border: 2px solid transparent; background-size: cover; }
+  .modes-pop .on .thumb { border-color: var(--accent); }
+  .modes-pop .on { color: var(--accent); }
+  .thumb.plan { background: linear-gradient(115deg, transparent 45%, #fff 45% 52%, transparent 52%), linear-gradient(25deg, transparent 60%, #fff 60% 66%, transparent 66%), radial-gradient(circle at 25% 70%, #d4ebcb 0 18%, transparent 19%), #f1eee8; }
+  .thumb.transit { background: linear-gradient(110deg, transparent 40%, #ffbe00 40% 46%, transparent 46%), linear-gradient(20deg, transparent 52%, #0055c8 52% 58%, transparent 58%), linear-gradient(160deg, transparent 62%, #e3051c 62% 68%, transparent 68%), linear-gradient(75deg, transparent 28%, #00643c 28% 34%, transparent 34%), #f1eee8; }
+  .locate svg { width: 21px; height: 21px; }
+  .locate svg.hollow .solid { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; }
+  .locate.following { color: var(--accent); }
+  .locate.busy svg { animation: pulse 1s ease-in-out infinite; }
+  /* ——— Choix de l'itinéraire ——— */
+
+  /* ——— Guidage ——— */
+  :global(.navigating) .modes-ctl, :global(.navigating) .locate { display: none; }
+  .saved-toggle { display: flex; align-items: center; gap: 10px; font-size: 15px; padding: 14px 0 6px; cursor: pointer; }
+  .saved-toggle input { width: 20px; height: 20px; accent-color: var(--accent-btn); }
+  .modes-pop .saved-toggle { grid-column: 1 / -1; font-size: 13px; font-weight: 600; padding: 4px 0 0; }
+  .modes-pop { flex-wrap: wrap; }
+  .compass svg { width: 24px; height: 24px; transition: transform 0.1s; }
+  .compass .north { fill: var(--closed); }
+
+  /* ——— Grand écran : panneaux à gauche ——— */
+  @media (min-width: 768px) {
+
+    .locate { bottom: 40px; right: 16px; }
+    .modes-ctl { bottom: 100px; right: 16px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+
+    .locate.busy svg { animation: none; }
+  }
+</style>

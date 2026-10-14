@@ -7,7 +7,8 @@ import { readFileSync } from 'node:fs';
 import { packList, pack, snapshot, DEFAULT_LISTS } from '../../src/lib/myplaces.js';
 
 const PORT = 4199;
-const preview = spawn('npx', ['vite', 'preview', '--port', String(PORT), '--strictPort'], { stdio: 'ignore', detached: true });
+// le site construit (build/), servi tel quel, comme sur GitHub Pages (vite preview dépend de fichiers que svelte-check efface)
+const preview = spawn('python3', ['-m', 'http.server', String(PORT), '-d', new URL('../../build', import.meta.url).pathname], { stdio: 'ignore', detached: true });
 // on attend que le serveur réponde (au plus 30 s)
 for (let i = 0; i < 60; i++) {
   try { if ((await fetch(`http://localhost:${PORT}/`)).ok) break; } catch { /* pas encore prêt */ }
@@ -45,9 +46,20 @@ const tests = {
     assert(!errors.length, errors.join(' | '));
     await ctx.close();
   },
+  async 'vue de la rue : vignette puis visionneuse plein écran'() {
+    // lieu des tuiles locales avec une photo de devanture (Panoramax)
+    const { p, ctx, errors } = await page();
+    await p.fill('#search', 'Etam rue de Rennes'); await p.waitForSelector('.results li[role=option] button', { timeout: 20000 }); await pick(p);
+    await p.waitForSelector('.street-thumb', { timeout: 20000 });
+    await p.click('.street-thumb'); await p.waitForSelector('.viewer .pano', { timeout: 10000 });
+    await p.click('.viewer-close'); await p.waitForTimeout(500);
+    assert(!(await p.$('.viewer')), 'la visionneuse ne se ferme pas');
+    assert(!errors.length, errors.join(' | '));
+    await ctx.close();
+  },
   async 'adresse via Géoplateforme'() {
     const { p, ctx } = await page();
-    await p.fill('#search', '57 rue de rennes'); await p.waitForSelector('.results li[role=option]', { timeout: 15000 });
+    await p.fill('#search', '57 rue de rennes'); await p.waitForSelector('.results li[role=option]', { timeout: 30000 });
     const first = await p.$eval('.results li[role=option]', (e) => e.innerText);
     assert(/75006/.test(first), `première adresse hors Paris : ${first}`);
     await ctx.close();

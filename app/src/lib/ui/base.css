@@ -81,3 +81,114 @@
   .sheet { animation: none; transition: none; }
   .dots { animation: none; }
 }
+
+/* ——— Thème, page et éléments posés sur la carte (venus de +page.svelte) ——— */
+
+:root {
+  --accent: #2a5bd7;
+  --ink: #1c1d1f;
+  --muted: #6c7077;
+  --line: #ececee;
+  --card: #ffffff;
+  --fill: #f3f3f5;
+  --fav: #D63A7A;
+  --open: #1e8e3e;
+  --closed: #c5221f;
+  --shadow-float: 0 0 0 0.5px rgb(0 0 0 / 0.06), 0 2px 6px rgb(0 0 0 / 0.08), 0 8px 24px rgb(0 0 0 / 0.08);
+  --shadow-chip: 0 0 0 0.5px rgb(0 0 0 / 0.07), 0 1px 4px rgb(0 0 0 / 0.12);
+  --shadow-sheet: 0 -1px 0 rgb(0 0 0 / 0.04), 0 -8px 30px rgb(0 0 0 / 0.12);
+  --ui: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --page: #f4efdf;
+  --accent-btn: #2a5bd7;
+  --soft-accent: #f5f8ff;
+  --me-bg: #e8eefc;
+  --grip: #d8d8dc;
+  --faint: #b4b7bc;
+  --rail: #c9ccd1;
+  --walk-rail: #9aa3ae;
+  --end: #d93a2f;
+  /* Échelle de tailles unique (densité proche de Google Maps). Les champs de saisie restent à 16 px :
+     en dessous, Safari zoome sur la page au moment de taper. */
+  --fs-body: 15px;
+  --fs-meta: 13.5px;
+  --fs-small: 12.5px;
+  --gutter: 16px;
+  color-scheme: light;
+}
+/* Mode sombre : suit le réglage du téléphone. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --accent: #6b9bff;
+    --ink: #eceef1;
+    --muted: #9aa0a7;
+    --line: #30343b;
+    --card: #1c1f24;
+    --fill: #2a2e35;
+    --fav: #f06ba0;
+    --open: #4cc46b;
+    --closed: #ff6b61;
+    --shadow-float: 0 0 0 0.5px rgb(255 255 255 / 0.06), 0 2px 8px rgb(0 0 0 / 0.5), 0 8px 24px rgb(0 0 0 / 0.4);
+    --shadow-chip: 0 0 0 0.5px rgb(255 255 255 / 0.08), 0 1px 4px rgb(0 0 0 / 0.5);
+    --shadow-sheet: 0 -1px 0 rgb(255 255 255 / 0.05), 0 -8px 30px rgb(0 0 0 / 0.5);
+    --page: #1e2126;
+    --accent-btn: #3a6fe0;
+    --soft-accent: #1f2836;
+    --me-bg: #22304a;
+    --grip: #4a4f57;
+    --faint: #5d636b;
+    --rail: #4a4f57;
+    --walk-rail: #6f7782;
+    --end: #ff6b61;
+    color-scheme: dark;
+  }
+
+
+}
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+.pin {
+  width: 30px; height: 40px;
+  background: no-repeat center / contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 40'%3E%3Cpath d='M15 1.5C7.5 1.5 1.5 7.4 1.5 14.7 1.5 25 15 38.5 15 38.5S28.5 25 28.5 14.7C28.5 7.4 22.5 1.5 15 1.5z' fill='%23D93A2F' stroke='%23fff' stroke-width='2'/%3E%3Ccircle cx='15' cy='14.5' r='5' fill='%23fff'/%3E%3C/svg%3E");
+  filter: drop-shadow(0 3px 4px rgb(0 0 0 / 0.3));
+}
+.me { width: 24px; height: 24px; position: relative; }
+.me .me-dot {
+  position: absolute; inset: 0; border-radius: 50%; background: var(--accent); box-sizing: border-box;
+  border: 3px solid #fff; box-shadow: 0 0 0 10px rgb(42 91 215 / 0.16), 0 1px 4px rgb(0 0 0 / 0.3);
+}
+/* Faisceau de direction : un éventail bleu dégradé qui part du point (comme Plans et Maps) */
+.me .me-beam {
+  position: absolute; left: 50%; bottom: 50%; width: 76px; height: 64px; margin-left: -38px; display: none;
+  background: radial-gradient(ellipse 50% 100% at 50% 100%, rgb(42 91 215 / 0.55), rgb(42 91 215 / 0) 100%);
+  clip-path: polygon(50% 100%, 6% 0, 94% 0);
+}
+.me.has-heading .me-beam { display: block; }
+.me.navigating .me-beam, .me.navigating .me-dot { display: none; }
+.me.navigating {
+  width: 0; height: 0; border-radius: 0; background: none; box-shadow: none;
+  border-left: 13px solid transparent; border-right: 13px solid transparent; border-bottom: 30px solid var(--accent);
+  filter: drop-shadow(0 0 2px #fff) drop-shadow(0 0 1px #fff) drop-shadow(0 2px 4px rgb(0 0 0 / 0.35));
+}
+/* ——— Devantures (Panoramax) ——— */
+.facade { display: block; position: relative; overflow: hidden; container-type: inline-size; aspect-ratio: 4 / 3; background: var(--fill); }
+.facade img { position: absolute; width: 800cqw; height: 400cqw; max-width: none; left: calc(50cqw - var(--fx) * 800cqw); top: -155cqw; }
+.pin-photo { display: block; padding: 0; border: 3px solid #fff; border-radius: 50%; overflow: hidden; background: var(--fill); cursor: pointer;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.3); }
+.pin-photo.s64 { width: 64px; height: 64px; }
+.pin-photo.s40 { width: 40px; height: 40px; }
+.pin-photo .facade { width: 100%; height: 100%; aspect-ratio: 1; }
+.pin-photo .facade img { top: -170cqw; }
+
+.maplibregl-ctrl-attrib { font-family: var(--ui); font-size: 11px; }
+@media (prefers-color-scheme: dark) {
+  .maplibregl-ctrl-attrib { background: rgb(28 31 36 / 0.8) !important; color: var(--muted); }
+  .maplibregl-ctrl-attrib a { color: var(--muted) !important; }
+  .maplibregl-ctrl-attrib-button { filter: invert(1); }
+
+
+}
+/* Flèche classique sur la carte, main fermée seulement pendant qu'on la fait glisser. */
+.maplibregl-canvas-container.maplibregl-interactive { cursor: default; }
+.maplibregl-canvas-container.maplibregl-interactive:active { cursor: grabbing; }
+.maplibregl-ctrl-bottom-right { margin-bottom: env(safe-area-inset-bottom); }
