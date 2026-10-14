@@ -21,6 +21,7 @@ jobs:
         env: { PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1' }
       - run: npm audit --audit-level=high      # échoue si une dépendance a une faille grave connue
       - run: npm test
+      - run: npm run check             # aucun nom utilisé sans être défini
       - run: npm run build
   pipeline:
     runs-on: ubuntu-latest
