@@ -25,23 +25,25 @@ Durées : estimations de temps de travail, pas des mesures.
 Aujourd'hui : 6 tests de bout en bout (fiche lieu, adresse, « restaurant ce soir 8e », liste de catégorie, transports, rechargement de liste). **Aucun test unitaire.** Le pipeline Python n'a **aucun test**, alors que `CLAUDE.md` en exige pour la logique de comparaison.
 
 **Tests unitaires** (lanceur intégré de Node, `node --test` : aucune dépendance ajoutée)
-- [ ] `hours.js` : ouvert / fermé / ouvre à, jours fériés, horaires après minuit.
-- [ ] `intent.js` et `categories.js` : « restaurant ce soir 8e », « métro le plus proche »…
-- [ ] `myplaces.js` : empaquetage et dépaquetage d'une liste partagée, sauvegarde chiffrée et non chiffrée, fusion.
-- [ ] `importgoogle.js` : un fichier d'export Google Maps type.
-- [ ] `routeview.js`, `rame.js` (sortie la plus proche), `placestore.js` (calcul des tuiles).
+- [x] `hours.js` : ouvert / fermé / ouvre à, jours fériés, horaires après minuit.
+- [x] `intent.js` et `categories.js` : « restaurant ce soir 8e », « métro le plus proche »…
+- [x] `myplaces.js` : empaquetage et dépaquetage d'une liste partagée, sauvegarde chiffrée et non chiffrée, fusion.
+- [x] `importgoogle.js` : un fichier d'export Google Maps type.
+- [x] `routeview.js`, `rame.js` (sortie la plus proche), `placestore.js` (calcul des tuiles).
 
 **Tests de bout en bout à ajouter**
-- [ ] Mes lieux : ajouter un favori, créer, renommer et supprimer une liste, épingler.
-- [ ] Sauvegarde puis restauration, avec et sans mot de passe.
-- [ ] Ouvrir un lien de liste partagée, ouvrir un lien de transfert.
-- [ ] Raccourcis Maison et Travail, personnalisation des raccourcis.
-- [ ] Fiche d'une station : prochains passages, sorties.
-- [ ] Guidage : démarrer puis terminer.
-- [ ] Mode sombre et grand écran (captures).
+- [x] Mes lieux : ajouter un favori, créer, renommer et supprimer une liste, épingler.
+- [x] Sauvegarde puis restauration, avec et sans mot de passe.
+- [x] Ouvrir un lien de liste partagée, ouvrir un lien de transfert.
+- [x] Raccourcis Maison et Travail, personnalisation des raccourcis.
+- [x] Fiche d'une station : prochains passages, sorties.
+- [x] Guidage : démarrer puis terminer.
+- [x] Mode sombre et grand écran (captures).
+
+**Bug trouvé par ces tests et corrigé** : dans Mes lieux, le champ « Nouvelle liste… » faisait 0 pixel de large (un style destiné aux lignes de listes s'appliquait aussi au bouton « Créer »). Il était impossible de créer une liste depuis l'accueil de Mes lieux.
 
 **Pipeline**
-- [ ] Tests `pytest` de `pipeline/compare.py` sur un petit jeu de données fixe.
+- [x] Tests `pytest` de `pipeline/compare.py` sur un petit jeu de données fixe.
 
 ## Étape 2 : sécurité (2 à 4 h)
 Surface d'attaque réduite (site statique, ni serveur, ni comptes, données sur le téléphone), mais :
@@ -85,7 +87,7 @@ Le fichier principal est passé de 3 770 à 3 340 lignes.
 | Étape | État | Date |
 |---|---|---|
 | 0. Règles | fait (proposition de changement) | 14/10 |
-| 1. Tests | à faire | |
+| 1. Tests | fait : 39 tests unitaires, 12 de bout en bout, 5 pipeline ; un bug trouvé et corrigé | 14/10 |
 | 2. Sécurité | à faire | |
 | 3. Rangement | commencé (3 parties sorties) | 14/10 |
 | 4. Textes | à faire | |

@@ -2997,7 +2997,7 @@
   .pin-btn.unset .pin-sub { color: var(--accent); }
   .hub-h { font-size: 15px; font-weight: 700; margin: 18px 0 4px; }
   .hub-lists, .pick-lists { list-style: none; margin: 0; padding: 0; }
-  .hub-lists button, .pick-lists label { display: grid; grid-template-columns: 34px 1fr auto auto; gap: 12px; align-items: center; width: 100%;
+  .hub-lists > li > button, .pick-lists label {   /* (pas le bouton « Créer » du champ de nouvelle liste : il écrasait le champ à 0 px) */ display: grid; grid-template-columns: 34px 1fr auto auto; gap: 12px; align-items: center; width: 100%;
     min-height: 52px; border: 0; background: none; padding: 0; text-align: left; cursor: pointer; border-bottom: 1px solid var(--line); font-size: 16px; }
   .pick-lists label { grid-template-columns: 32px 1fr auto 28px; }
   .pick-lists input { width: 22px; height: 22px; accent-color: var(--accent-btn); }

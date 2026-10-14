@@ -10,6 +10,8 @@ curl -o data/paris.osm.pbf https://download.openstreetmap.fr/extracts/europe/fra
 python pipeline/run.py --arrondissement 6
 ```
 
+Tests de la logique de comparaison (sans réseau ni données) : `python -m pytest pipeline/tests`
+
 Résultats dans `data/out/` :
 
 | Fichier | Contenu |

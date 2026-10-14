@@ -3,6 +3,8 @@
 // avant une publication, pas en intégration continue.   Usage : npm run e2e
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { packList, pack, snapshot, DEFAULT_LISTS } from '../../src/lib/myplaces.js';
 
 const PORT = 4199;
 const preview = spawn('npx', ['vite', 'preview', '--port', String(PORT), '--strictPort'], { stdio: 'ignore', detached: true });
@@ -16,14 +18,14 @@ const browser = await chromium.launch({ ...proxy, args: ['--use-gl=swiftshader',
 let failed = 0;
 const assert = (cond, msg) => { if (!cond) throw new Error(msg); };
 
-async function page(opts = {}) {
+async function page(opts = {}, hash = '') {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, locale: 'fr-FR', timezoneId: 'Europe/Paris',
     geolocation: { latitude: 48.851, longitude: 2.339 }, permissions: ['geolocation'], ...opts });
   await ctx.addInitScript(() => localStorage.setItem('promesse-vue', '1'));
   const p = await ctx.newPage();
   const errors = [];
   p.on('pageerror', (e) => errors.push(e.message));
-  await p.goto(`http://localhost:${PORT}/`, { waitUntil: 'networkidle' });
+  await p.goto(`http://localhost:${PORT}/${hash}`, { waitUntil: 'networkidle' });
   await p.waitForTimeout(2500);
   return { p, ctx, errors };
 }
@@ -65,6 +67,107 @@ const tests = {
     assert((await p.locator('.chip.on').count()) === 1, 'catégorie non marquée active');
     await ctx.close();
   },
+  async 'Mes lieux : favori, nouvelle liste, renommer, supprimer'() {
+    const { p, ctx, errors } = await page();
+    await p.fill('#search', "Ed's rue Muller"); await p.waitForSelector('.results li[role=option] button', { timeout: 20000 }); await pick(p); await p.waitForTimeout(3000);
+    await p.click('.fab button >> nth=0');                       // cœur : ajouté aux Favoris
+    await p.waitForSelector('.toast'); assert(/Favoris/.test(await p.textContent('.toast')), 'pas de confirmation du favori');
+    await p.click('.close'); await p.waitForTimeout(500);
+    await p.click('.chip:has-text("Mes lieux")'); await p.waitForTimeout(1200);
+    await p.fill('.hub-lists .new-list input', 'Brunch'); await p.press('.hub-lists .new-list input', 'Enter'); await p.waitForTimeout(500);
+    assert(await p.locator('.hub-lists li:has-text("Brunch")').count() === 1, 'liste non créée');
+    assert(/1/.test(await p.textContent('.hub-lists li:has-text("Favoris") .pl-count')), 'favori absent de la liste');
+    await p.click('.hub-lists li:has-text("Brunch") button'); await p.waitForTimeout(500);
+    p.once('dialog', (d) => d.accept('Brunch du dimanche'));
+    await p.click('.list-actions button:has-text("Renommer")'); await p.waitForTimeout(500);
+    assert(/Brunch du dimanche/.test(await p.textContent('.list-title')), 'liste non renommée');
+    p.once('dialog', (d) => d.accept());
+    await p.click('.list-actions button:has-text("Supprimer")'); await p.waitForTimeout(800);
+    assert(await p.locator('.hub-lists li:has-text("Brunch")').count() === 0, 'liste non supprimée');
+    assert(!errors.length, errors.join(' | '));
+    await ctx.close();
+  },
+  async 'Maison et raccourcis personnalisés'() {
+    const { p, ctx, errors } = await page();
+    await p.fill('#search', "Ed's rue Muller"); await p.waitForSelector('.results li[role=option] button', { timeout: 20000 }); await pick(p); await p.waitForTimeout(3000);
+    await p.click('.fab button[aria-label="Plus d\'options"]');
+    await p.click('.pmenu button:has-text("Définir comme Maison")'); await p.waitForTimeout(500);
+    assert(/Maison enregistré/.test(await p.textContent('.toast')), 'Maison non enregistrée');
+    await p.click('.close'); await p.waitForTimeout(500);
+    await p.click('.chip.edit'); await p.waitForTimeout(800);
+    await p.click('.ce-toggle[aria-label="Afficher Cafés"]');
+    await p.fill('input[aria-label="Nom du raccourci Restaurants"]', 'Restos'); await p.press('input[aria-label="Nom du raccourci Restaurants"]', 'Tab');
+    await p.click('section[aria-label="Personnaliser les raccourcis"] .close'); await p.waitForTimeout(500);
+    const chips = await p.$$eval('.chips .chip', (els) => els.map((e) => e.textContent.trim()));
+    assert(chips.includes('Restos') && !chips.includes('Cafés'), `raccourcis non appliqués : ${chips.join(', ')}`);
+    await p.reload({ waitUntil: 'networkidle' }); await p.waitForTimeout(2000);
+    assert((await p.$$eval('.chips .chip', (els) => els.map((e) => e.textContent.trim()))).includes('Restos'), 'raccourcis non gardés après rechargement');
+    await p.click('#search'); await p.waitForTimeout(800);
+    assert(/Itinéraire/.test(await p.textContent('.pinned')), 'Maison absente des raccourcis de recherche');
+    assert(!errors.length, errors.join(' | '));
+    await ctx.close();
+  },
+  async 'sauvegarde puis restauration (avec mot de passe)'() {
+    let { p, ctx } = await page();
+    await p.evaluate(() => localStorage.setItem('lieux-favoris', JSON.stringify([{ id: 'node1', name: 'Lieu sauvegardé', lat: 48.85, lon: 2.34, lists: ['fav'] }])));
+    await p.reload({ waitUntil: 'networkidle' }); await p.waitForTimeout(2000);
+    await p.click('.chip:has-text("Mes lieux")'); await p.waitForTimeout(1000);
+    await p.click('.row-btn:has-text("Sauvegarder")');
+    await p.fill('label.pw input', 'secret');
+    const [dl] = await Promise.all([p.waitForEvent('download'), p.click('button:has-text("Créer la sauvegarde")')]);
+    const file = `/tmp/untracked-e2e-sauvegarde-${Date.now()}.json`;
+    await dl.saveAs(file);
+    assert(!readFileSync(file, 'utf8').includes('Lieu sauvegardé'), 'sauvegarde chiffrée lisible en clair');
+    await ctx.close();
+    ({ p, ctx } = await page());
+    await p.click('.chip:has-text("Mes lieux")'); await p.waitForTimeout(1000);
+    await p.click('.row-btn:has-text("Restaurer")');
+    await p.setInputFiles('label.import-btn input[type=file]', file); await p.waitForTimeout(1500);
+    await p.fill('label.pw input', 'faux'); await p.click('button:has-text("Restaurer")'); await p.waitForTimeout(2500);
+    assert(/incorrect/.test(await p.textContent('.toast')), 'mauvais mot de passe non signalé');
+    await p.fill('label.pw input', 'secret'); await p.click('button:has-text("Restaurer")'); await p.waitForTimeout(2500);
+    assert(/1 lieu restauré/.test(await p.textContent('.toast')), 'restauration non confirmée');
+    await ctx.close();
+  },
+  async 'lien de liste partagée et lien de transfert'() {
+    const lien = await packList({ name: 'Sorties', icon: 'star', color: '#2A5BD7' }, [{ name: 'Le Comptoir', lat: 48.8515, lon: 2.3387, osmType: 'node', osmId: 1 }]);
+    let { p, ctx } = await page({}, `#liste=${lien}`);
+    await p.waitForSelector('.list-title', { timeout: 8000 });
+    assert(/Sorties/.test(await p.textContent('.list-title')) && /Liste partagée/.test(await p.textContent('.sheet .kind')), 'liste partagée non affichée');
+    await p.click('button:has-text("Ajouter à Mes lieux")'); await p.waitForTimeout(800);
+    assert(/Sorties/.test(await p.evaluate(() => localStorage.getItem('mes-listes') || '')), 'liste non enregistrée');
+    await ctx.close();
+    const t = await pack(snapshot({ lists: DEFAULT_LISTS, places: [{ name: 'Chez moi', lat: 48.86, lon: 2.35, lists: ['fav'] }], shortcuts: { home: { name: 'Chez moi', lat: 48.86, lon: 2.35 } } }));
+    ({ p, ctx } = await page({}, `#transfert=${t}`));
+    await p.waitForSelector('section[aria-label="Récupérer vos lieux"]', { timeout: 8000 });
+    assert(/Maison/.test(await p.textContent('section[aria-label="Récupérer vos lieux"]')), 'Maison absente du transfert');
+    await ctx.close();
+    ({ p, ctx } = await page({}, '#liste=lien-abime'));
+    await p.waitForSelector('.toast', { timeout: 8000 });
+    assert(/incomplet/.test(await p.textContent('.toast')), 'lien abîmé non signalé');
+    await ctx.close();
+  },
+  async 'station de métro : prochains passages et sorties'() {
+    const { p, ctx } = await page();
+    await p.fill('#search', 'Odéon métro'); await p.waitForSelector('.results li[role=option] button', { timeout: 20000 });
+    await p.dispatchEvent('.results li[role=option]:has-text("Station") button >> nth=0', 'mousedown').catch(() => pick(p));
+    await p.waitForTimeout(6000);
+    const txt = await p.$eval('section.sheet', (e) => e.innerText);
+    assert(/Sorties/.test(txt), 'sorties absentes');
+    assert((await p.locator('.deps li').count()) > 0 || /passage/i.test(txt), 'prochains passages absents');
+    await ctx.close();
+  },
+  async 'guidage à pied : démarrer puis terminer'() {
+    const { p, ctx, errors } = await page({ geolocation: { latitude: 48.853, longitude: 2.34 } });
+    await p.fill('#search', 'Panthéon'); await p.waitForSelector('.results li[role=option] button', { timeout: 20000 }); await pick(p); await p.waitForTimeout(2500);
+    await p.click('.action.primary'); await p.waitForTimeout(6000);
+    await p.click('.mode-tabs .mode-tab >> nth=0'); await p.waitForTimeout(3000);
+    await p.click('.sum-actions .go'); await p.waitForSelector('.nav-top', { timeout: 8000 });
+    await p.click('.nav-end'); await p.waitForTimeout(800);
+    assert((await p.locator('.nav-top').count()) === 0, 'guidage non terminé');
+    assert(!errors.length, errors.join(' | '));
+    await ctx.close();
+  },
   async 'transports : sortie conseillée et trajet à pied recalculé'() {
     const { p, ctx } = await page({ geolocation: { latitude: 48.8867, longitude: 2.3431 } });
     let valhalla = 0; p.on('request', (r) => { if (r.url().includes('valhalla')) valhalla++; });
@@ -88,7 +191,8 @@ const tests = {
   }
 };
 
-for (const [name, fn] of Object.entries(tests)) {
+// E2E_ONLY=mot : ne lancer que les tests dont le nom contient ce mot
+for (const [name, fn] of Object.entries(tests).filter(([n]) => !process.env.E2E_ONLY || n.includes(process.env.E2E_ONLY))) {
   try { await fn(); console.log('✓', name); } catch (e) { failed++; console.log('✗', name, '—', e.message); }
 }
 await browser.close();

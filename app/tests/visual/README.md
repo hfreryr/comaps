@@ -18,6 +18,7 @@ Parcours capturés, en mode clair et sombre :
 - écran d'itinéraire entier ;
 - guidage ;
 - liste de catégorie ;
-- fiche ouverte depuis la liste.
+- fiche ouverte depuis la liste ;
+- sur grand écran : fiche lieu et itinéraire.
 
 Les écarts dus aux heures et aux horaires en temps réel sont attendus.
