@@ -10,6 +10,8 @@
   import { empty, addRouteLayers, addPlaceLayers, routeTags as tagsFor } from '#lib/maplayers.js';
   import RouteSheet from '#lib/ui/RouteSheet.svelte';
   import NavView from '#lib/ui/NavView.svelte';
+  import CategorySheet from '#lib/ui/CategorySheet.svelte';
+  import PinnedRow from '#lib/ui/PinnedRow.svelte';
   import PlaceSheet from '#lib/ui/PlaceSheet.svelte';
   import ListDot from '#lib/ui/ListDot.svelte';
   import Facade from '#lib/ui/Facade.svelte';
@@ -1930,12 +1932,27 @@
     get SHORT_NAMES() { return SHORT_NAMES; },
     get address() { return address; },
     get allExits() { return allExits; }, set allExits(v) { allExits = v; },
+    get applyOpenFilter() { return applyOpenFilter; },
+    get backupAge() { return backupAge; },
+    get backupPassword() { return backupPassword; }, set backupPassword(v) { backupPassword = v; },
+    get category() { return category; }, set category(v) { category = v; },
+    get chipList() { return chipList; },
+    get clearCategory() { return clearCategory; },
     get closePlace() { return closePlace; },
     get copyAddress() { return copyAddress; },
+    get createList() { return createList; },
+    get deleteList() { return deleteList; },
     get deps() { return deps; }, set deps(v) { deps = v; },
+    get displayName() { return displayName; },
+    get doRestore() { return doRestore; },
+    get editChips() { return editChips; }, set editChips(v) { editChips = v; },
     get exits() { return exits; }, set exits(v) { exits = v; },
+    get famColor() { return famColor; },
     get favTap() { return favTap; },
+    get favorites() { return favorites; }, set favorites(v) { favorites = v; },
     get freshness() { return freshness; },
+    get hubPanel() { return hubPanel; }, set hubPanel(v) { hubPanel = v; },
+    get importOpen() { return importOpen; }, set importOpen(v) { importOpen = v; },
     get inFav() { return inFav; },
     get info() { return info; }, set info(v) { info = v; },
     get infoStrip() { return infoStrip; },
@@ -1943,27 +1960,64 @@
     get isFav() { return isFav; },
     get isPinned() { return isPinned; },
     get isStation() { return isStation; },
+    get keepIncomingList() { return keepIncomingList; },
+    get listEditing() { return listEditing; }, set listEditing(v) { listEditing = v; },
     get listOf() { return listOf; },
     get listPicker() { return listPicker; }, set listPicker(v) { listPicker = v; },
+    get lists() { return lists; }, set lists(v) { lists = v; },
+    get makeBackup() { return makeBackup; },
+    get makeTransfer() { return makeTransfer; },
+    get momentFrom() { return momentFrom; },
+    get momentPicker() { return momentPicker; }, set momentPicker(v) { momentPicker = v; },
     get moreText() { return moreText; }, set moreText(v) { moreText = v; },
+    get nearby() { return nearby; }, set nearby(v) { nearby = v; },
+    get nearbyDone() { return nearbyDone; }, set nearbyDone(v) { nearbyDone = v; },
+    get nearbyFromMe() { return nearbyFromMe; }, set nearbyFromMe(v) { nearbyFromMe = v; },
+    get newListName() { return newListName; }, set newListName(v) { newListName = v; },
     get now() { return now; }, set now(v) { now = v; },
+    get openAt() { return openAt; }, set openAt(v) { openAt = v; },
+    get openCounts() { return openCounts; }, set openCounts(v) { openCounts = v; },
+    get openFeature() { return openFeature; },
+    get openPlace() { return openPlace; },
+    get openSavedList() { return openSavedList; },
     get osmDate() { return osmDate; }, set osmDate(v) { osmDate = v; },
     get osmEditUrl() { return osmEditUrl; },
     get osmNoteUrl() { return osmNoteUrl; },
+    get pickResult() { return pickResult; },
+    get pickerDay() { return pickerDay; },
+    get pickerDays() { return pickerDays; },
+    get pickerHours() { return pickerHours; },
+    get pickerTime() { return pickerTime; },
+    get pinnedPlaces() { return pinnedPlaces; },
     get place() { return place; }, set place(v) { place = v; },
     get placeMenu() { return placeMenu; }, set placeMenu(v) { placeMenu = v; },
     get placeSheetH() { return placeSheetH; }, set placeSheetH(v) { placeSheetH = v; },
     get placeShortcut() { return placeShortcut; },
+    get quickMoment() { return quickMoment; },
+    get refreshSaved() { return refreshSaved; },
+    get removeFromList() { return removeFromList; },
+    get renameList() { return renameList; },
+    get restoreNeedsPw() { return restoreNeedsPw; }, set restoreNeedsPw(v) { restoreNeedsPw = v; },
+    get restorePassword() { return restorePassword; }, set restorePassword(v) { restorePassword = v; },
     get savedEntry() { return savedEntry; },
+    get savedList() { return savedList; }, set savedList(v) { savedList = v; },
     get say() { return say; },
+    get setOpenAt() { return setOpenAt; },
     get setShortcut() { return setShortcut; },
+    get shareList() { return shareList; },
     get sharePlace() { return sharePlace; },
+    get shareTransfer() { return shareTransfer; },
     get shortcuts() { return shortcuts; }, set shortcuts(v) { shortcuts = v; },
+    get showUnknown() { return showUnknown; }, set showUnknown(v) { showUnknown = v; },
     get startDirections() { return startDirections; },
     get stationKind() { return stationKind; },
     get status() { return status; },
+    get swipeStart() { return swipeStart; }, set swipeStart(v) { swipeStart = v; },
+    get swiped() { return swiped; }, set swiped(v) { swiped = v; },
     get title() { return title; },
     get togglePin() { return togglePin; },
+    get transfer() { return transfer; }, set transfer(v) { transfer = v; },
+    get useShortcut() { return useShortcut; },
     get viewer() { return viewer; }, set viewer(v) { viewer = v; },
     get walkEta() { return walkEta; },
     get week() { return week; },
@@ -1976,28 +2030,6 @@
 
 
 
-
-{#snippet pinnedRow(inSearch)}
-  <div class="pinned" role="list">
-    {#each ['home', 'work'] as k}
-      <button role="listitem" class="pin-btn" class:unset={!shortcuts[k]}
-        onmousedown={inSearch ? (e) => { e.preventDefault(); useShortcut(k); } : undefined}
-        onclick={inSearch ? undefined : () => useShortcut(k)}>
-        <span class="pin-circle home">{#if k === 'home'}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.5 12 5l8 6.5M6.5 10v9.5h11V10" /><path d="M10.2 19.5v-4.8h3.6v4.8" /></svg>{:else}<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="7.5" width="17" height="12" rx="2.5" /><path d="M9 7.5V6a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 6v1.5M3.5 12.5h17" /></svg>{/if}</span>
-        <span class="pin-name">{SHORT_NAMES[k]}</span>
-        <span class="pin-sub">{shortcuts[k] ? 'Itinéraire' : 'Ajouter'}</span>
-      </button>
-    {/each}
-    {#each pinnedPlaces as f (placeKey(f))}
-      <button role="listitem" class="pin-btn"
-        onmousedown={inSearch ? (e) => { e.preventDefault(); pickResult({ ...f }); } : undefined}
-        onclick={inSearch ? undefined : () => openPlace({ ...f, pin: { glyph: listOf(f.lists[0]).icon, color: listOf(f.lists[0]).color } })}>
-        <ListDot l={listOf(f.lists[0])} size={44} />
-        <span class="pin-name">{f.name}</span>
-      </button>
-    {/each}
-  </div>
-{/snippet}
 
 {#snippet resultList()}
   <ul class="results" role="listbox">
@@ -2013,7 +2045,7 @@
       </li>
     {/if}
     {#if activeQuery.trim().length < 2}
-      <li class="pinned-li">{@render pinnedRow(true)}</li>
+      <li class="pinned-li"><PinnedRow inSearch={true} /></li>
     {/if}
     {#if assigning && activeQuery.trim().length < 2}
       <li class="note">Tapez l'adresse de votre {assigning === 'home' ? 'maison' : 'travail'}, puis choisissez-la dans la liste.
@@ -2364,183 +2396,7 @@
   {:else if category && !directions}
     <!-- Liste d'une catégorie : ouverte en aperçu (la carte reste visible), on l'agrandit si on veut la liste ;
          la faire glisser vers le bas la réduit sans fermer la catégorie (seule la croix ou le raccourci la ferment). -->
-    <section class="sheet" aria-label={category.label} use:draggable={category.saved ? { key: category.label, onDismiss: clearCategory } : { key: category.label, start: 'peek' }}>
-      <button class="grip" aria-label="Agrandir la fiche"></button>
-      <button class="close" onclick={clearCategory} aria-label="Fermer la liste">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" /></svg>
-      </button>
-      {#if category.saved && !savedList && !category.shared && !hubPanel}
-        <h1>{chipList.find((c) => c.key === 'saved')?.label || 'Mes lieux'}</h1>
-        {@render pinnedRow(false)}
-        <h2 class="hub-h">Listes</h2>
-        <ul class="hub-lists">
-          {#each lists as l (l.id)}
-            <li><button onclick={() => openSavedList(l.id)}>
-              <ListDot l={l} size={34} />
-              <span class="pl-name">{l.name}</span>
-              <span class="pl-count">{favorites.filter((f) => f.lists.includes(l.id)).length}</span>
-              <svg class="chev-r" viewBox="0 0 24 24" aria-hidden="true"><path d="m10 7 5 5-5 5" /></svg>
-            </button></li>
-          {/each}
-          <li>
-            {#if hubPanel === 'newlist'}{:else}
-              <form class="new-list" onsubmit={(e) => { e.preventDefault(); createList(newListName); newListName = ''; }}>
-                <input bind:value={newListName} placeholder="Nouvelle liste…" aria-label="Nom de la nouvelle liste" maxlength="40" />
-                <button class="link" disabled={!newListName.trim()}>Créer</button>
-              </form>
-            {/if}
-          </li>
-        </ul>
-        <h2 class="hub-h">Vos données</h2>
-        <ul class="rows hub-rows">
-          <li class="row"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14" /></svg>
-            <button class="row-btn" onclick={() => { importOpen = true; }}><span>Importer depuis Google Maps</span></button></li>
-          <li class="row"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="1" /><rect x="13.5" y="3.5" width="7" height="7" rx="1" /><rect x="3.5" y="13.5" width="7" height="7" rx="1" /><path d="M13.5 13.5h3v3h-3zM18 18h2.5M20.5 13.5V16" /></svg>
-            <button class="row-btn" onclick={makeTransfer}><span>Transférer vers un autre appareil</span></button></li>
-          <li class="row"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 18.5h10.5a4 4 0 0 0 .5-8 6 6 0 0 0-11.6-1.6A4.8 4.8 0 0 0 7 18.5z" /><path d="M12 11v5M9.8 13.2 12 11l2.2 2.2" /></svg>
-            <button class="row-btn" onclick={() => (hubPanel = 'backup')}><span>Sauvegarder<small class="why" class:warn={favorites.length >= 5 && (backupAge === null || backupAge > 30)}>{backupAge === null ? 'Jamais sauvegardé' : backupAge === 0 ? 'Dernière sauvegarde aujourd\'hui' : `Dernière sauvegarde il y a ${backupAge} jour${backupAge > 1 ? 's' : ''}`}</small></span></button></li>
-          <li class="row"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3M4.5 4.5v4h4" /></svg>
-            <button class="row-btn" onclick={() => (hubPanel = 'restore')}><span>Restaurer une sauvegarde</span></button></li>
-          <li class="row"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4" /></svg>
-            <button class="row-btn" onclick={() => { clearCategory(); editChips = true; }}><span>Personnaliser les raccourcis</span></button></li>
-        </ul>
-        <p class="credit">Vos lieux restent sur cet appareil : ni compte, ni serveur. Sauvegardez-les pour ne pas les perdre.</p>
-      {:else if category.saved && hubPanel === 'transfer'}
-        <button class="link back-link" onclick={() => (hubPanel = null)}>‹ Mes lieux</button>
-        <h1>Transférer</h1>
-        <p class="kind">Ouvrez ce lien ou scannez ce code sur l'autre appareil.</p>
-        {#if !transfer}<p class="muted">Préparation…</p>
-        {:else}
-          {#if transfer.qr}<div class="qr" aria-label="QR code de transfert">{@html transfer.qr}</div>
-          {:else}<p class="credit">Trop de lieux pour un QR code : envoyez-vous le lien (AirDrop, Signal à vous-même…).</p>{/if}
-          <button class="go wide done" onclick={shareTransfer}>Envoyer le lien</button>
-          <p class="credit">⚠️ Ce lien contient tous vos lieux : envoyez-le seulement à vous-même. Il n'est stocké sur aucun serveur.</p>
-        {/if}
-      {:else if category.saved && hubPanel === 'backup'}
-        <button class="link back-link" onclick={() => (hubPanel = null)}>‹ Mes lieux</button>
-        <h1>Sauvegarder</h1>
-        <p class="kind">Un fichier avec vos listes, Maison, Travail et vos raccourcis, à ranger où vous voulez : iCloud Drive, Proton Drive, un ordinateur…</p>
-        <label class="pw">Mot de passe (facultatif, pour chiffrer le fichier)
-          <input type="password" bind:value={backupPassword} autocomplete="new-password" placeholder="Aucun" /></label>
-        {#if backupPassword}<p class="credit">Sans ce mot de passe, personne ne pourra lire le fichier, vous non plus : notez-le.</p>{/if}
-        <button class="go wide done" onclick={makeBackup}>Créer la sauvegarde</button>
-      {:else if category.saved && hubPanel === 'restore'}
-        <button class="link back-link" onclick={() => { hubPanel = null; restoreNeedsPw = false; }}>‹ Mes lieux</button>
-        <h1>Restaurer</h1>
-        <p class="kind">Choisissez un fichier de sauvegarde d'Untracked Maps. Ses lieux s'ajoutent à ceux de cet appareil.</p>
-        {#if restoreNeedsPw}
-          <label class="pw">Ce fichier est protégé : mot de passe
-            <input type="password" bind:value={restorePassword} autocomplete="current-password" /></label>
-          <button class="go wide done" onclick={() => doRestore()}>Restaurer</button>
-        {:else}
-          <label class="action primary import-btn">
-            <input type="file" accept=".json,application/json" hidden onchange={(e) => { const f = e.currentTarget.files?.[0]; e.currentTarget.value = ''; doRestore(f); }} />
-            Choisir le fichier
-          </label>
-        {/if}
-      {:else if category.saved}
-        {@const l = category.shared ? category : listOf(savedList)}
-        {#if !category.shared}<button class="link back-link" onclick={() => { savedList = null; refreshSaved(); }}>‹ Mes lieux</button>{/if}
-        <h1 class="list-title"><ListDot l={l} size={30} />{l.name || category.label}</h1>
-        <p class="kind">{category.shared ? `Liste partagée · ${nearby.length} lieu${nearby.length > 1 ? 'x' : ''}` : nearby.length ? `${nearby.length} lieu${nearby.length > 1 ? 'x' : ''}, ${nearbyFromMe ? 'les plus proches de vous d\'abord' : 'par distance'}` : 'Aucun lieu pour l\'instant : touchez « Enregistrer » sur la fiche d\'un lieu.'}</p>
-        <div class="list-actions">
-          {#if category.shared}
-            <button class="go" onclick={keepIncomingList}>Ajouter à Mes lieux</button>
-          {:else}
-            {#if nearby.length}<button class="link" onclick={() => { listEditing = !listEditing; swiped = null; }}>{listEditing ? 'Terminé' : 'Modifier'}</button>{/if}
-            {#if nearby.length && !listEditing}<button class="link" onclick={() => shareList(l)}>Partager</button>{/if}
-            <button class="link" onclick={() => renameList(l)}>Renommer</button>
-            {#if !['fav', 'todo'].includes(l.id)}<button class="link danger" onclick={() => deleteList(l)}>Supprimer</button>{/if}
-          {/if}
-        </div>
-      {:else}
-      <h1>{chipList.find((c) => c.key === category.key)?.label || category.label}</h1>
-      {#if openAt && openCounts}
-        <p class="kind">{openCounts.open ? `${openCounts.open} ouvert${openCounts.open > 1 ? 's' : ''} ${openAt.now ? 'maintenant' : momentLabel(openAt.at).replace(/ (\d)/, ' à $1')}` : `Aucun ouvert ${openAt.now ? 'maintenant' : momentLabel(openAt.at).replace(/ (\d)/, ' à $1')} dans cette zone`}</p>
-      {:else}
-        <p class="kind">{nearby.length ? (nearbyFromMe ? 'Les plus proches de vous' : 'Autour du centre de la carte') : nearbyDone ? 'Aucun dans cette zone. Déplacez la carte pour chercher ailleurs.' : 'Recherche…'}</p>
-      {/if}
-      {#if !category.transit}
-        <div class="open-pills">
-          <button class="opill" class:on={openAt?.now} aria-pressed={!!openAt?.now} onclick={() => setOpenAt(openAt?.now ? null : { now: true })}>Ouvert maintenant</button>
-          <button class="opill" class:on={!!openAt?.at} aria-expanded={momentPicker} onclick={() => (momentPicker = !momentPicker)}>
-            {openAt?.at ? momentLabel(openAt.at).replace(/^./, (x) => x.toUpperCase()) : 'Ouvert à…'}
-            <svg viewBox="0 0 24 24" aria-hidden="true" class="chev" class:flip={momentPicker}><path d="m7 10 5 5 5-5" /></svg>
-          </button>
-          {#if openAt}<button class="opill-x" onclick={() => setOpenAt(null)} aria-label="Retirer le filtre d'horaires">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" /></svg></button>{/if}
-        </div>
-        {#if momentPicker}
-          <div class="moment">
-            <div class="moment-quick">
-              <button onclick={() => quickMoment('midi')}>Midi</button>
-              <button onclick={() => quickMoment('soir')}>Ce soir</button>
-              <button onclick={() => quickMoment('demain-soir')}>Demain soir</button>
-            </div>
-            <div class="moment-sel">
-              <select aria-label="Jour" value={pickerDay} onchange={(e) => { const [h, m] = pickerTime.split(':').map(Number); setOpenAt({ at: momentFrom(+e.currentTarget.value, h, m) }); momentPicker = true; }}>
-                {#each pickerDays as d}<option value={d.i}>{d.label}</option>{/each}
-              </select>
-              <select aria-label="Heure" value={pickerTime} onchange={(e) => { const [h, m] = e.currentTarget.value.split(':').map(Number); setOpenAt({ at: momentFrom(pickerDay, h, m) }); momentPicker = true; }}>
-                {#each pickerHours as [h, m]}<option value={`${h}:${m}`}>{h} h {m ? '30' : ''}</option>{/each}
-              </select>
-            </div>
-          </div>
-        {/if}
-      {/if}
-      {/if}
-      <ul class="nearby">
-        {#each nearby as { f, d, st, deps: sd, saved: sv } (f.id)}
-          <li class:swipe-row={category.saved && savedList && sv} class:swiped={swiped === f.id || (listEditing && savedList && sv)}
-            ontouchstart={category.saved && savedList && sv ? (e) => (swipeStart = { x: e.touches[0].clientX, y: e.touches[0].clientY, id: f.id }) : undefined}
-            ontouchmove={category.saved && savedList && sv ? (e) => {
-              if (!swipeStart) return;
-              const dx = e.touches[0].clientX - swipeStart.x, dy = e.touches[0].clientY - swipeStart.y;
-              if (Math.abs(dx) > 30 && Math.abs(dx) > Math.abs(dy) * 1.5) { swiped = dx < 0 ? swipeStart.id : null; swipeStart = null; }
-            } : undefined}>
-            {#if category.saved && savedList && sv}
-              <button class="swipe-del" onclick={() => removeFromList(sv, savedList)} aria-label={`Retirer ${sv.name} de la liste`}>
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 7V5h4v2M7 7l1 13h8l1-13M10.5 10.5v6M13.5 10.5v6" /></svg>
-              </button>
-            {/if}
-            {#if !(category.saved && (hubPanel || (!savedList && !category.shared)))}
-            <button class="n-main" onclick={() => { if (swiped) { swiped = null; return; } nearby.find((n) => n.f === f)?.saved ? openPlace({ ...nearby.find((n) => n.f === f).saved }) : openFeature(f); }}>
-              <span class="n-dot" style:--fam={category.saved ? (category.shared ? category.color : listOf(nearby.find((n) => n.f === f)?.saved?.lists?.[0]).color) : famColor(category)} aria-hidden="true"></span>
-              <span class="r-text">
-                <span class="r-name">{displayName(f, category)}</span>
-                {#if category.transit}
-                  {#if sd?.status === 'ok'}
-                    {#each sd.data.lines.slice(0, 4) as l}
-                      <span class="n-dep">
-                        <span class="badge small" class:round={l.mode === 'SUBWAY' || l.mode === 'METRO'} style:background={l.color} style:color={l.textColor}>{l.line}</span>
-                        <span class="n-dir">{l.headsign}</span>
-                        <span class="n-time">{fmtWait(l.times[0], now)}</span>
-                      </span>
-                    {/each}
-                  {:else if sd?.status === 'loading'}
-                    <span class="r-meta">Prochains passages…</span>
-                  {:else if sd?.status === 'none'}
-                    <span class="r-meta">Aucun passage dans l'heure</span>
-                  {:else}
-                    <span class="r-meta">{typeLabel('', f.properties.subclass) || 'Station'} · touchez pour les horaires</span>
-                  {/if}
-                {:else}
-                <span class="r-meta">{category.saved ? [nearby.find((n) => n.f === f)?.saved?.type, nearby.find((n) => n.f === f)?.saved?.address].filter(Boolean).join(' · ') || 'Lieu enregistré' : typeLabel('', f.properties.subclass) || category.label}{#if st?.open != null}{' · '}<span class:is-open={st.open} class:is-closed={!st.open}>{st.label}</span>{/if}</span>
-                {/if}
-              </span>
-              <span class="n-dist">{fmtDistance(d)}</span>
-            </button>
-            {/if}
-          </li>
-        {/each}
-      </ul>
-      {#if openAt && openCounts?.unknown && !category?.saved}
-        <button class="unknown-row" onclick={() => { showUnknown = !showUnknown; applyOpenFilter(); }}>
-          {showUnknown ? 'Masquer' : 'Afficher'} les {openCounts.unknown} lieux aux horaires inconnus
-          <small>Personne ne les a encore indiqués sur OpenStreetMap : certains sont peut-être ouverts.</small>
-        </button>
-      {/if}
-    </section>
+    <CategorySheet />
   {/if}
 </div>
 
@@ -2786,17 +2642,14 @@
   .pinned { display: flex; gap: 14px; overflow-x: auto; padding: 8px 2px 6px; scrollbar-width: none; }
   .pinned::-webkit-scrollbar { display: none; }
   .results .pinned-li { padding: 4px 14px 2px; }
-  .results .pinned .pin-btn, .pin-btn { display: grid; justify-items: center; align-content: start; gap: 3px; width: 64px; flex: none;
+  .pin-btn { display: grid; justify-items: center; align-content: start; gap: 3px; width: 64px; flex: none;
     padding: 0; border: 0; background: none; cursor: pointer; grid-template-columns: none; }
   .pin-circle { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--accent-btn); color: #fff; }
-  .pin-circle svg { width: 22px; height: 22px; }
-  .pin-btn.unset .pin-circle { background: var(--fill); color: var(--accent); }
   .pin-name { font-size: 12.5px; font-weight: 600; max-width: 64px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .pin-sub { font-size: 11.5px; color: var(--muted); }
-  .pin-btn.unset .pin-sub { color: var(--accent); }
   .hub-h { font-size: 15px; font-weight: 700; margin: 18px 0 4px; }
   .hub-lists, .pick-lists { list-style: none; margin: 0; padding: 0; }
-  .hub-lists > li > button, .pick-lists label {   /* (pas le bouton « Créer » du champ de nouvelle liste : il écrasait le champ à 0 px) */ display: grid; grid-template-columns: 34px 1fr auto auto; gap: 12px; align-items: center; width: 100%;
+  .pick-lists label {   /* (pas le bouton « Créer » du champ de nouvelle liste : il écrasait le champ à 0 px) */ display: grid; grid-template-columns: 34px 1fr auto auto; gap: 12px; align-items: center; width: 100%;
     min-height: 52px; border: 0; background: none; padding: 0; text-align: left; cursor: pointer; border-bottom: 1px solid var(--line); font-size: 16px; }
   .pick-lists label { grid-template-columns: 32px 1fr auto 28px; }
   .pick-lists input { width: 22px; height: 22px; accent-color: var(--accent-btn); }
@@ -2810,17 +2663,14 @@
   .modes-pop .saved-toggle { grid-column: 1 / -1; font-size: 13px; font-weight: 600; padding: 4px 0 0; }
   .modes-pop { flex-wrap: wrap; }
   .go.wide.done { width: 100%; margin: 14px 0 4px; height: 46px; background: var(--accent-btn); }
-  .hub-rows .row-btn span { display: grid; }
   .why.warn { color: #D0731B; font-weight: 600; }
   .back-link { margin: 6px 0 2px; font-size: 15px; }
   .list-title { display: flex; align-items: center; gap: 10px; }
   .list-actions { display: flex; gap: 18px; align-items: center; margin-top: 8px; }
-  .list-actions .link { font-size: 15px; }
   .link.danger { color: var(--closed); }
   .qr { display: grid; place-items: center; margin: 14px auto 4px; width: min(260px, 70vw); background: #fff; border-radius: 12px; padding: 8px; }
   .qr :global(svg) { width: 100%; height: auto; display: block; }
   .pw { display: grid; gap: 6px; font-size: 14px; color: var(--muted); margin-top: 14px; }
-  .pw input { font: inherit; font-size: 16px; color: var(--ink); background: var(--fill); border: 0; border-radius: 12px; padding: 12px 14px; }
   .action.saved { color: var(--lc, var(--fav)); }
   /* ——— Photos ——— */
   .photos { display: flex; gap: 6px; overflow-x: auto; scroll-snap-type: x mandatory; margin: 16px calc(-1 * var(--gutter)) 0; padding: 0 var(--gutter); scrollbar-width: none; }
@@ -2854,22 +2704,6 @@
     font-size: 12.5px; background: linear-gradient(transparent, rgb(0 0 0 / 0.6)); }
   .viewer-credit a { color: rgb(255 255 255 / 0.85); text-decoration: none; }
   .swipe-row { position: relative; overflow: hidden; }
-  .nearby button { box-sizing: border-box; }
-  .swipe-row .n-main { position: relative; z-index: 1; background: var(--card); transition: width 0.2s ease; }
-  /* Poubelle visible : la ligne se rétrécit (le texte reste lisible) au lieu de glisser hors de la fiche */
-  .swipe-row.swiped .n-main { width: calc(100% - 72px); }
-  .nearby .swipe-del { position: absolute; padding: 0; right: 0; top: 0; bottom: 0; width: 72px; border: 0; border-top: 1px solid var(--line);
-    background: var(--closed); color: #fff; display: grid; grid-template-columns: 1fr; place-items: center; cursor: pointer; }
-  .nearby button.swipe-del:hover { background: color-mix(in srgb, var(--closed) 85%, #000); }
-  /* Ordinateur (souris) : au survol d'une ligne, une petite poubelle remplace la distance */
-  @media (hover: hover) and (pointer: fine) {
-    .swipe-row:not(.swiped) .swipe-del { z-index: 2; top: 50%; bottom: auto; right: 14px; width: 38px; height: 38px; margin-top: -19px;
-      border: 0; border-radius: 50%; background: var(--fill); color: var(--closed); opacity: 0; transition: opacity 0.12s; }
-    .swipe-row:not(.swiped):hover .swipe-del, .swipe-row:not(.swiped) .swipe-del:focus-visible { opacity: 1; }
-    .nearby .swipe-row:not(.swiped) button.swipe-del:hover { background: color-mix(in srgb, var(--closed) 16%, var(--card)); }
-    .swipe-row:not(.swiped):hover .n-dist { visibility: hidden; }
-  }
-  .swipe-del svg { width: 22px; height: 22px; stroke-width: 2; }
   .chip-heart { width: 15px; height: 15px; fill: var(--fam); stroke: none; }
   .chip.on .chip-heart { fill: #fff; }
   .chip.edit.on-edit { background: var(--accent-btn); color: #fff; }
@@ -2887,8 +2721,8 @@
   .kind { margin: 0; color: var(--muted); font-size: 15px; }
   .kind::first-letter { text-transform: uppercase; }
   .status { margin: 6px 0 0; font-size: 15.5px; font-weight: 600; }
-  .status.is-open, .r-meta .is-open { color: var(--open); }
-  .status.is-closed, .r-meta .is-closed { color: var(--closed); }
+  .status.is-open { color: var(--open); }
+  .status.is-closed { color: var(--closed); }
   .muted { color: var(--muted); font-weight: 400; }
 
   .promise-link { color: inherit; font-weight: 600; text-decoration: underline; }
@@ -2922,22 +2756,15 @@
 
   /* ——— Filtre « ouvert à… » ——— */
   .open-pills { display: flex; gap: 8px; margin: 10px 0 2px; align-items: center; overflow-x: auto; scrollbar-width: none; }
-  .open-pills > * { flex: none; }
   .opill { display: inline-flex; align-items: center; gap: 4px; height: 34px; padding: 0 12px; border-radius: 17px; border: 1px solid var(--line);
     background: var(--card); color: var(--ink); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
-  .opill .chev { width: 16px; height: 16px; }
   .opill.on { background: var(--accent-btn); border-color: var(--accent-btn); color: #fff; }
-  .opill.on .chev { color: #fff; }
   .opill-x { width: 34px; height: 34px; border-radius: 50%; border: 0; background: var(--fill); color: var(--muted); display: grid; place-items: center; cursor: pointer; }
-  .opill-x svg { width: 15px; height: 15px; stroke-width: 2.4; }
   .moment { margin: 8px 0 4px; padding: 10px; background: var(--fill); border-radius: 14px; display: grid; gap: 8px; }
   .moment-quick { display: flex; gap: 6px; flex-wrap: wrap; }
-  .moment-quick button { height: 32px; padding: 0 12px; border-radius: 16px; border: 0; background: var(--card); color: var(--accent); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
   .moment-sel { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .moment-sel select { font: inherit; font-size: 16px; color: var(--ink); background: var(--card); border: 0; border-radius: 10px; padding: 9px 10px; }
   .unknown-row { display: block; width: 100%; text-align: left; border: 0; border-top: 1px solid var(--line); background: none; padding: 14px 0 4px;
     font: inherit; font-size: 15px; font-weight: 600; color: var(--accent); cursor: pointer; }
-  .unknown-row small { display: block; font-weight: 400; font-size: 13px; color: var(--muted); margin-top: 3px; }
 
   /* ——— Fiche lieu, façon Plans ——— */
   .share.left { left: 14px; right: auto; }
@@ -2987,11 +2814,6 @@
   .week { border-collapse: collapse; font-size: 15px; font-variant-numeric: tabular-nums; }
 
   .nearby { list-style: none; margin: 12px calc(-1 * var(--gutter)) 0; padding: 0; }
-  .nearby button {
-    display: grid; grid-template-columns: 20px 1fr auto; gap: 14px; align-items: center; width: 100%;
-    border: 0; background: none; padding: 10px var(--gutter); text-align: left; cursor: pointer; border-top: 1px solid var(--line);
-  }
-  .nearby button:hover { background: var(--fill); }
   .n-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--fam); box-shadow: 0 0 0 2px var(--card), 0 0 0 3px var(--line); justify-self: center; }
   .n-dist { color: var(--muted); font-size: 14px; font-variant-numeric: tabular-nums; }
 

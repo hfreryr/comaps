@@ -48,7 +48,7 @@ const tests = {
   },
   async 'adresse via Géoplateforme'() {
     const { p, ctx } = await page();
-    await p.fill('#search', '57 rue de rennes'); await p.waitForSelector('.results li[role=option]', { timeout: 15000 });
+    await p.fill('#search', '57 rue de rennes'); await p.waitForSelector('.results li[role=option]', { timeout: 30000 });
     const first = await p.$eval('.results li[role=option]', (e) => e.innerText);
     assert(/75006/.test(first), `première adresse hors Paris : ${first}`);
     await ctx.close();
