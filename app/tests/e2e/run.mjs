@@ -134,6 +134,29 @@ const tests = {
     assert((await p.locator('.chip.on').count()) === 1, 'catégorie non marquée active');
     await ctx.close();
   },
+  async 'retirer un lieu d\'une liste depuis le menu « ⋯ » de sa fiche'() {
+    const { p, ctx, errors } = await page();
+    await p.click('.chip:has-text("Restaurants")'); await p.waitForTimeout(6000);
+    await p.click('.nearby li button >> nth=0'); await p.waitForTimeout(3000);
+    await p.click('.fab button >> nth=0'); await p.waitForTimeout(500);              // cœur : ajouté aux Favoris
+    await p.click('.fab button >> nth=2');                                           // ⋯
+    await p.click('.pmenu button:has-text("Enregistré dans")');
+    await p.waitForSelector('.pick-lists'); await p.uncheck('.pick-lists li:has-text("Favoris") input'); await p.waitForTimeout(400);
+    await p.click('.done'); await p.waitForTimeout(500);
+    assert((await p.locator('.fab button.on').count()) === 0, 'toujours enregistré');
+    assert(!errors.length, errors.join(' | '));
+    await ctx.close();
+  },
+  async 'chercher « fleuriste » propose de l\'ajouter aux raccourcis'() {
+    const { p, ctx, errors } = await page();
+    assert((await p.locator('.chip:has-text("Fleuristes")').count()) === 0, 'déjà en raccourci');
+    await p.fill('#search', 'fleuriste'); await p.waitForTimeout(1500); await p.press('#search', 'Enter');
+    await p.waitForSelector('.add-chip', { timeout: 10000 }); await p.click('.add-chip'); await p.waitForTimeout(500);
+    assert((await p.locator('.chip:has-text("Fleuristes")').count()) === 1, 'raccourci non ajouté');
+    assert((await p.locator('.add-chip').count()) === 0, 'le bouton reste affiché');
+    assert(!errors.length, errors.join(' | '));
+    await ctx.close();
+  },
   async 'Mes lieux : favori, nouvelle liste, renommer, supprimer'() {
     const { p, ctx, errors } = await page();
     await p.fill('#search', "Ed's rue Muller"); await p.waitForSelector('.results li.opt button', { timeout: 20000 }); await pick(p); await p.waitForTimeout(3000);

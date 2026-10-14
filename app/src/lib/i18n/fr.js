@@ -53,6 +53,8 @@ export default {
   'resultats.maison': 'maison',
   'resultats.travail': 'travail',
   // ——— Liste d'une catégorie et Mes lieux ———
+  'liste.ajouter_aux_raccourcis': '+ Ajouter « {nom} » à vos raccourcis',
+  'liste.raccourci_ajoute': '« {nom} » ajouté à vos raccourcis',
   'liste.agrandir_la_fiche': 'Agrandir la fiche',
   'liste.fermer_la_liste': 'Fermer la liste',
   'liste.listes': 'Listes',
@@ -160,6 +162,7 @@ export default {
   'fiche.chargement': 'Chargement…',
   'fiche.itineraire': 'Itinéraire',
   'fiche.appeler': 'Appeler',
+  'fiche.enregistre_dans_listes': 'Enregistré dans {listes} · Modifier',
   'fiche.copier_adresse': 'Copier l\'adresse',
   'fiche.ajouter_a_une_liste': 'Ajouter à une liste',
   'fiche.plus_options': 'Plus d\'options',
