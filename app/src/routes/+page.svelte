@@ -10,6 +10,9 @@
   import { empty, addRouteLayers, addPlaceLayers, routeTags as tagsFor } from '#lib/maplayers.js';
   import RouteSheet from '#lib/ui/RouteSheet.svelte';
   import NavView from '#lib/ui/NavView.svelte';
+  import PhotoViewer from '#lib/ui/PhotoViewer.svelte';
+  import TopBar from '#lib/ui/TopBar.svelte';
+  import ResultList from '#lib/ui/ResultList.svelte';
   import CategorySheet from '#lib/ui/CategorySheet.svelte';
   import PinnedRow from '#lib/ui/PinnedRow.svelte';
   import PlaceSheet from '#lib/ui/PlaceSheet.svelte';
@@ -1930,27 +1933,43 @@
   // <app> État et actions partagés avec les composants de l'écran (getContext('app')). Bloc généré : un nom par ligne.
   const app = {
     get SHORT_NAMES() { return SHORT_NAMES; },
+    get active() { return active; }, set active(v) { active = v; },
+    get activeQuery() { return activeQuery; },
     get address() { return address; },
     get allExits() { return allExits; }, set allExits(v) { allExits = v; },
     get applyOpenFilter() { return applyOpenFilter; },
+    get areaText() { return areaText; },
+    get assigning() { return assigning; }, set assigning(v) { assigning = v; },
     get backupAge() { return backupAge; },
     get backupPassword() { return backupPassword; }, set backupPassword(v) { backupPassword = v; },
+    get catHit() { return catHit; },
     get category() { return category; }, set category(v) { category = v; },
     get chipList() { return chipList; },
     get clearCategory() { return clearCategory; },
+    get clearSearch() { return clearSearch; },
+    get closeDirections() { return closeDirections; },
     get closePlace() { return closePlace; },
     get copyAddress() { return copyAddress; },
     get createList() { return createList; },
     get deleteList() { return deleteList; },
     get deps() { return deps; }, set deps(v) { deps = v; },
+    get directions() { return directions; }, set directions(v) { directions = v; },
     get displayName() { return displayName; },
     get doRestore() { return doRestore; },
+    get dragY() { return dragY; }, set dragY(v) { dragY = v; },
     get editChips() { return editChips; }, set editChips(v) { editChips = v; },
+    get editField() { return editField; },
+    get editing() { return editing; }, set editing(v) { editing = v; },
     get exits() { return exits; }, set exits(v) { exits = v; },
     get famColor() { return famColor; },
     get favTap() { return favTap; },
     get favorites() { return favorites; }, set favorites(v) { favorites = v; },
+    get fieldEl() { return fieldEl; }, set fieldEl(v) { fieldEl = v; },
+    get fieldQuery() { return fieldQuery; }, set fieldQuery(v) { fieldQuery = v; },
+    get focused() { return focused; }, set focused(v) { focused = v; },
+    get forgetRecents() { return forgetRecents; },
     get freshness() { return freshness; },
+    get from() { return from; }, set from(v) { from = v; },
     get hubPanel() { return hubPanel; }, set hubPanel(v) { hubPanel = v; },
     get importOpen() { return importOpen; }, set importOpen(v) { importOpen = v; },
     get inFav() { return inFav; },
@@ -1961,6 +1980,7 @@
     get isPinned() { return isPinned; },
     get isStation() { return isStation; },
     get keepIncomingList() { return keepIncomingList; },
+    get lastEdit() { return lastEdit; }, set lastEdit(v) { lastEdit = v; },
     get listEditing() { return listEditing; }, set listEditing(v) { listEditing = v; },
     get listOf() { return listOf; },
     get listPicker() { return listPicker; }, set listPicker(v) { listPicker = v; },
@@ -1970,12 +1990,15 @@
     get momentFrom() { return momentFrom; },
     get momentPicker() { return momentPicker; }, set momentPicker(v) { momentPicker = v; },
     get moreText() { return moreText; }, set moreText(v) { moreText = v; },
+    get nav() { return nav; }, set nav(v) { nav = v; },
     get nearby() { return nearby; }, set nearby(v) { nearby = v; },
     get nearbyDone() { return nearbyDone; }, set nearbyDone(v) { nearbyDone = v; },
     get nearbyFromMe() { return nearbyFromMe; }, set nearbyFromMe(v) { nearbyFromMe = v; },
     get newListName() { return newListName; }, set newListName(v) { newListName = v; },
     get now() { return now; }, set now(v) { now = v; },
+    get onKey() { return onKey; },
     get openAt() { return openAt; }, set openAt(v) { openAt = v; },
+    get openCategoryFromSearch() { return openCategoryFromSearch; },
     get openCounts() { return openCounts; }, set openCounts(v) { openCounts = v; },
     get openFeature() { return openFeature; },
     get openPlace() { return openPlace; },
@@ -1983,6 +2006,7 @@
     get osmDate() { return osmDate; }, set osmDate(v) { osmDate = v; },
     get osmEditUrl() { return osmEditUrl; },
     get osmNoteUrl() { return osmNoteUrl; },
+    get pickCategory() { return pickCategory; },
     get pickResult() { return pickResult; },
     get pickerDay() { return pickerDay; },
     get pickerDays() { return pickerDays; },
@@ -1993,35 +2017,59 @@
     get placeMenu() { return placeMenu; }, set placeMenu(v) { placeMenu = v; },
     get placeSheetH() { return placeSheetH; }, set placeSheetH(v) { placeSheetH = v; },
     get placeShortcut() { return placeShortcut; },
+    get pointOf() { return pointOf; },
+    get query() { return query; }, set query(v) { query = v; },
     get quickMoment() { return quickMoment; },
+    get recents() { return recents; }, set recents(v) { recents = v; },
     get refreshSaved() { return refreshSaved; },
     get removeFromList() { return removeFromList; },
+    get removeStop() { return removeStop; },
     get renameList() { return renameList; },
     get restoreNeedsPw() { return restoreNeedsPw; }, set restoreNeedsPw(v) { restoreNeedsPw = v; },
     get restorePassword() { return restorePassword; }, set restorePassword(v) { restorePassword = v; },
+    get results() { return results; }, set results(v) { results = v; },
     get savedEntry() { return savedEntry; },
     get savedList() { return savedList; }, set savedList(v) { savedList = v; },
     get say() { return say; },
+    get searchError() { return searchError; }, set searchError(v) { searchError = v; },
+    get searchH() { return searchH; }, set searchH(v) { searchH = v; },
+    get searching() { return searching; }, set searching(v) { searching = v; },
     get setOpenAt() { return setOpenAt; },
     get setShortcut() { return setShortcut; },
     get shareList() { return shareList; },
     get sharePlace() { return sharePlace; },
     get shareTransfer() { return shareTransfer; },
     get shortcuts() { return shortcuts; }, set shortcuts(v) { shortcuts = v; },
+    get showList() { return showList; },
+    get showModes() { return showModes; }, set showModes(v) { showModes = v; },
     get showUnknown() { return showUnknown; }, set showUnknown(v) { showUnknown = v; },
+    get showVia() { return showVia; }, set showVia(v) { showVia = v; },
     get startDirections() { return startDirections; },
     get stationKind() { return stationKind; },
     get status() { return status; },
+    get swap() { return swap; },
     get swipeStart() { return swipeStart; }, set swipeStart(v) { swipeStart = v; },
     get swiped() { return swiped; }, set swiped(v) { swiped = v; },
     get title() { return title; },
+    get to() { return to; }, set to(v) { to = v; },
     get togglePin() { return togglePin; },
+    get toggleZoom() { return toggleZoom; },
+    get topH() { return topH; }, set topH(v) { topH = v; },
     get transfer() { return transfer; }, set transfer(v) { transfer = v; },
+    get useMyPosition() { return useMyPosition; },
     get useShortcut() { return useShortcut; },
+    get via() { return via; }, set via(v) { via = v; },
     get viewer() { return viewer; }, set viewer(v) { viewer = v; },
+    get viewerEl() { return viewerEl; }, set viewerEl(v) { viewerEl = v; },
+    get viewerIdx() { return viewerIdx; }, set viewerIdx(v) { viewerIdx = v; },
     get walkEta() { return walkEta; },
     get week() { return week; },
+    get whenText() { return whenText; },
     get wiki() { return wiki; }, set wiki(v) { wiki = v; },
+    get zoom() { return zoom; }, set zoom(v) { zoom = v; },
+    get zoomEnd() { return zoomEnd; },
+    get zoomMove() { return zoomMove; },
+    get zoomStart() { return zoomStart; },
   };
   setContext('app', app);
   // </app>
@@ -2031,102 +2079,6 @@
 
 
 
-{#snippet resultList()}
-  <ul class="results" role="listbox">
-    {#if editing}
-      <li class="note map-hint">Ou touchez la carte pour choisir un point.</li>
-    {/if}
-    {#if editing === 'from'}
-      <li role="option" aria-selected="false">
-        <button onmousedown={useMyPosition}>
-          <span class="r-icon me-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M20 4 4 11l7 2 2 7z" class="solid" /></svg></span>
-          <span class="r-text"><span class="r-name">Votre position</span><span class="r-meta">Utiliser la localisation du téléphone</span></span>
-        </button>
-      </li>
-    {/if}
-    {#if activeQuery.trim().length < 2}
-      <li class="pinned-li"><PinnedRow inSearch={true} /></li>
-    {/if}
-    {#if assigning && activeQuery.trim().length < 2}
-      <li class="note">Tapez l'adresse de votre {assigning === 'home' ? 'maison' : 'travail'}, puis choisissez-la dans la liste.
-        <button class="link" onmousedown={(e) => { e.preventDefault(); assigning = null; }}>Annuler</button></li>
-    {/if}
-    {#if activeQuery.trim().length < 2 && favorites.length}
-      <li class="note recents-head"><span>Mes lieux</span>
-        {#if !editing}<button class="link" onmousedown={(e) => { e.preventDefault(); focused = false; document.activeElement?.blur(); pickCategory(ALL_CATEGORIES[0]); }}>Tout voir</button>{/if}</li>
-      {#each favorites.slice(0, 5) as r (r.id + r.lat)}
-        <li role="option" aria-selected="false">
-          <button onmousedown={() => pickResult(r)}>
-            <ListDot l={listOf(r.lists?.[0])} size={32} />
-            <span class="r-text">
-              <span class="r-name">{r.name}</span>
-              <span class="r-meta">{[r.type, r.address].filter(Boolean).join(' · ')}</span>
-            </span>
-          </button>
-        </li>
-      {/each}
-    {/if}
-    {#if activeQuery.trim().length < 2 && recents.length}
-      <li class="note recents-head"><span>Récents</span>
-        <button class="link" onmousedown={(e) => { e.preventDefault(); forgetRecents(); }}>Effacer</button></li>
-      {#each recents as r (r.id)}
-        <li role="option" aria-selected="false">
-          <button onmousedown={() => pickResult(r)}>
-            <span class="r-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></svg>
-            </span>
-            <span class="r-text">
-              <span class="r-name">{r.name}</span>
-              <span class="r-meta">{[r.type, r.address].filter(Boolean).join(' · ')}</span>
-            </span>
-          </button>
-        </li>
-      {/each}
-    {/if}
-    {#if catHit}
-      <li role="option" aria-selected="false">
-        <button onmousedown={openCategoryFromSearch}>
-          <span class="r-icon cat-icon" style:--fam={famColor(catHit)} aria-hidden="true"></span>
-          <span class="r-text">
-            {#if catHit.when || catHit.area}
-              <span class="r-name">{catHit.label}{catHit.when ? ` ${whenText(catHit.when)}` : ''}</span>
-              <span class="r-meta">{catHit.area ? areaText(catHit.area) : 'Près de vous'}{catHit.when ? ' · selon les horaires connus' : ''}</span>
-            {:else}
-              <span class="r-name">{catHit.label} près de vous</span>
-              <span class="r-meta">Les plus proches, avec leurs horaires</span>
-            {/if}
-          </span>
-        </button>
-      </li>
-    {/if}
-    {#each results as r, i (r.id)}
-      <li role="option" aria-selected={i === active}>
-        <button class:active={i === active} onmousedown={() => pickResult(r)}>
-          <span class="r-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z" /><circle cx="12" cy="9.5" r="2.5" /></svg>
-          </span>
-          <span class="r-text">
-            <span class="r-name">{r.name}</span>
-            <span class="r-meta">{[r.type, r.address].filter(Boolean).join(' · ')}</span>
-          </span>
-        </button>
-      </li>
-    {/each}
-    {#if activeQuery.trim().length >= 2 && !searching && !results.length && !searchError}
-      <li class="note">Aucun résultat pour « {activeQuery.trim()} ». Essayez un nom de lieu ou une adresse.</li>
-    {/if}
-    {#if searchError}<li class="note">{searchError}</li>{/if}
-    {#if searching && !results.length}<li class="note">Recherche…</li>{/if}
-    {#if !editing && activeQuery.trim().length < 2}
-      <li class="list-foot">
-        <button class="link" onmousedown={(e) => { e.preventDefault(); importOpen = true; focused = false; document.activeElement?.blur(); }}>Importer vos lieux depuis Google Maps</button>
-        <button class="link" onmousedown={(e) => { e.preventDefault(); editChips = true; focused = false; document.activeElement?.blur(); }}>Personnaliser les raccourcis</button>
-        <span class="privacy-line">Ni compte, ni pistage : rien sur vous n'est collecté.</span>
-      </li>
-    {/if}
-  </ul>
-{/snippet}
-
 
 
 
@@ -2135,71 +2087,7 @@
 <div class="app" class:routing={directions} class:navigating={!!nav} style:--top-h={`${directions ? topH : searchH + 16}px`}>
   <div class="map" bind:this={mapEl} aria-label="Carte"></div>
 
-  {#if !directions}
-    <header class="top">
-      <div class="search" class:open={showList} bind:offsetHeight={searchH}>
-        <svg class="lens" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="M15.5 15.5 20 20" /></svg>
-        <input id="search" type="search" placeholder="Rechercher un lieu ou une adresse" aria-label="Rechercher un lieu ou une adresse"
-          autocomplete="off" enterkeyhint="search" bind:value={query}
-          onfocus={() => { focused = true; editChips = false; importOpen = false; showModes = false; closePlace(); clearCategory(); }} onblur={() => setTimeout(() => (focused = false), 150)} onkeydown={onKey} />
-        {#if query}
-          <button class="icon-btn" onclick={clearSearch} aria-label="Effacer la recherche">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" /></svg>
-          </button>
-        {/if}
-        {#if showList}{@render resultList()}{/if}
-      </div>
-
-      {#if !showList && !place}
-        <!-- masqués quand une fiche lieu est ouverte : ils ne servent pas à ce moment-là et cachent la carte -->
-        <nav class="chips" aria-label="Catégories">
-          {#each chipList as c (c.key)}
-            <button class="chip" class:on={category?.key === c.key} onclick={() => pickCategory(c)} style:--fam={famColor(c)} aria-pressed={category?.key === c.key}>
-              {#if c.saved}<svg class="chip-heart" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.3l-1.3-1.2C6 14.9 3 12.2 3 8.9 3 6.2 5.1 4 7.8 4c1.5 0 3 .7 4.2 1.9C13.2 4.7 14.7 4 16.2 4 18.9 4 21 6.2 21 8.9c0 3.3-3 6-7.7 10.2z" /></svg>
-              {:else}<span class="chip-dot" aria-hidden="true"></span>{/if}{c.label}
-            </button>
-          {/each}
-          <button class="chip edit" class:on-edit={editChips} onclick={() => { editChips = !editChips; importOpen = false; }} aria-label="Personnaliser les raccourcis" aria-expanded={editChips}>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4" /></svg>
-          </button>
-        </nav>
-      {/if}
-    </header>
-  {:else if !nav}
-    <header class="top dir" bind:offsetHeight={topH}>
-      <div class="dir-card" class:open={editing}>
-        <button class="icon-btn back" onclick={closeDirections} aria-label="Revenir à la fiche du lieu">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
-        </button>
-        <div class="fields">
-          {#each [['from', from, 'Choisir un point de départ'], ...(showVia ? [['via', via, 'Choisir un arrêt']] : []), ['to', to, 'Choisir une destination']] as [which, pt, ph] (which)}
-            <div class="field" class:editing={editing === which} class:via-field={which === 'via'}>
-              <span class="field-mark {which}" aria-hidden="true"></span>
-              {#if editing === which}
-                <input id={`field-${which}`} bind:this={fieldEl} bind:value={fieldQuery} placeholder={ph} autocomplete="off"
-                  aria-label={{ from: 'Départ', via: 'Arrêt', to: 'Arrivée' }[which]} onkeydown={onKey}
-                  onblur={() => { lastEdit = { which, at: Date.now() }; setTimeout(() => { if (editing === which && pointOf(which)) editing = null; }, 250); }} />
-              {:else}
-                <button class="field-btn" class:placeholder={!pt} onclick={() => editField(which)}>
-                  {pt ? pt.label : ph}
-                </button>
-              {/if}
-              {#if which === 'via'}
-                <button class="icon-btn rm-stop" onclick={removeStop} aria-label="Retirer l'arrêt">
-                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" /></svg>
-                </button>
-              {/if}
-            </div>
-          {/each}
-        </div>
-        <button class="icon-btn swap" onclick={swap} aria-label="Inverser départ et arrivée" disabled={!from || !to}>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4v15M4.5 7.5 8 4l3.5 3.5M16 20V5M12.5 16.5 16 20l3.5-3.5" /></svg>
-        </button>
-        {#if editing}{@render resultList()}{/if}
-      </div>
-
-    </header>
-  {/if}
+  <TopBar />
 
   {#if !directions}
     <div class="modes-ctl">
@@ -2248,49 +2136,7 @@
       <span class="st-src">Panoramax</span>
     </button>
   {/if}
-  {#if viewer === 'facade' && info?.facade}
-    <!-- Devanture en plein écran : la photo 360° entière, qu'on fait défiler ; ouverte sur le lieu -->
-    <div class="viewer" role="dialog" aria-modal="true" aria-label="Devanture de {title}">
-      <div class="pano" use:panoScroll={info.facade.rel}>
-        <img src={info.facade.src} alt={`Vue à 360° devant ${title}`} draggable="false" />
-      </div>
-      <div class="viewer-top">
-        <span>Vue de la rue · faites défiler pour regarder autour</span>
-        <button class="viewer-close" onclick={() => (viewer = null)} aria-label="Fermer">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" /></svg>
-        </button>
-      </div>
-      <p class="viewer-credit"><a href={info.facade.page} target="_blank" rel="noopener">Photo : {info.facade.credit}{info.facade.date ? ` · ${info.facade.date.slice(0, 4)}` : ''} · ouvrir dans Panoramax</a></p>
-    </div>
-  {:else if viewer != null && wiki?.photos?.length}
-    {@const ph = wiki.photos[viewerIdx] || wiki.photos[0]}
-    <div class="viewer" role="dialog" aria-modal="true" aria-label="Photos de {title}">
-      <div class="viewer-strip" class:zoomed={zoom.s > 1} bind:this={viewerEl} style:transform={dragY ? `translateY(${dragY}px)` : null}
-        style:opacity={dragY ? Math.max(0.3, 1 - dragY / 500) : null}
-        ontouchstart={zoomStart} ontouchmove={zoomMove} ontouchend={zoomEnd} ondblclick={(e) => toggleZoom(e.clientX, e.clientY)}
-        onscroll={(e) => { const i = Math.round(e.currentTarget.scrollLeft / e.currentTarget.clientWidth); if (i !== viewerIdx) { viewerIdx = i; zoom = { s: 1, x: 0, y: 0 }; } }}>
-        {#each wiki.photos as p, i (p.src)}
-          <div class="viewer-slide"><img src={Math.abs(i - viewerIdx) <= 1 ? p.full : p.src} alt={i === 0 ? title : ''} draggable="false"
-            style:transform={i === viewerIdx && zoom.s > 1 ? `translate(${zoom.x}px, ${zoom.y}px) scale(${zoom.s})` : null} /></div>
-        {/each}
-      </div>
-      <div class="viewer-top">
-        <span>{viewerIdx + 1} / {wiki.photos.length}</span>
-        <button class="viewer-close" onclick={() => (viewer = null)} aria-label="Fermer">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" /></svg>
-        </button>
-      </div>
-      {#if wiki.photos.length > 1}
-        <button class="viewer-nav prev" disabled={viewerIdx === 0} aria-label="Photo précédente"
-          onclick={() => viewerEl.scrollBy({ left: -viewerEl.clientWidth, behavior: 'smooth' })}>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg></button>
-        <button class="viewer-nav next" disabled={viewerIdx === wiki.photos.length - 1} aria-label="Photo suivante"
-          onclick={() => viewerEl.scrollBy({ left: viewerEl.clientWidth, behavior: 'smooth' })}>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg></button>
-      {/if}
-      <p class="viewer-credit"><a href={ph.page} target="_blank" rel="noopener">{ph.credit || 'Wikimedia Commons'} · Wikimedia Commons</a></p>
-    </div>
-  {/if}
+  <PhotoViewer />
   {#if toast}<p class="toast" role="status">{toast}{#if toastAction}<button onclick={undoToast}>{toastAction.label}</button>{/if}</p>{/if}
   {#if showPromise && !place && !category && !directions && !importOpen && !editChips}
     <div class="promise" role="note">
@@ -2458,6 +2304,7 @@
       --end: #ff6b61;
       color-scheme: dark;
     }
+  
   }
   :global(html, body) {
     margin: 0; height: 100%; overflow: hidden; background: var(--page);
@@ -2471,21 +2318,6 @@
   .map { position: absolute; inset: 0; }
   svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   svg .solid { fill: currentColor; stroke: none; }
-
-  /* ——— Haut d'écran ——— */
-  .top {
-    position: absolute; z-index: 3; left: 0; right: 0;
-    top: env(safe-area-inset-top); padding: 10px 12px 0; pointer-events: none;
-    display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px;   /* minmax(0) : le contenu ne peut pas élargir la colonne */
-  }
-  .top > * { pointer-events: auto; min-width: 0; }
-  .search {
-    max-width: 440px;
-    background: var(--card); border-radius: 28px; box-shadow: var(--shadow-float);
-    display: grid; grid-template-columns: 48px 1fr auto; align-items: center;
-  }
-  .search.open { border-radius: 24px; }
-  .lens { width: 20px; height: 20px; justify-self: center; color: var(--muted); stroke-width: 2.2; }
   input {
     border: 0; background: none; font: inherit; font-size: 17px; color: var(--ink);
     padding: 12px 0; min-width: 0; outline: none; width: 100%;
@@ -2495,69 +2327,6 @@
   .icon-btn { border: 0; background: none; width: 46px; height: 46px; cursor: pointer; display: grid; place-items: center; color: var(--muted); }
   .icon-btn svg { width: 20px; height: 20px; stroke-width: 2; }
   .icon-btn:disabled { opacity: 0.35; cursor: default; }
-
-  .results { grid-column: 1 / -1; list-style: none; margin: 0; padding: 6px 0 8px; border-top: 1px solid var(--line); max-height: 60vh; overflow-y: auto; }
-  .results button {
-    display: grid; grid-template-columns: 48px 1fr; align-items: center; width: 100%; text-align: left;
-    border: 0; background: none; padding: 9px 16px 9px 0; cursor: pointer;
-  }
-  .results button:hover, .results button.active { background: var(--fill); }
-  .r-icon { justify-self: center; width: 32px; height: 32px; border-radius: 50%; background: var(--fill); display: grid; place-items: center; color: var(--muted); }
-  .r-icon svg { width: 18px; height: 18px; }
-  .r-icon.cat-icon::after { content: ''; width: 12px; height: 12px; border-radius: 50%; background: var(--fam); }
-  .me-icon { background: var(--me-bg); color: var(--accent); }
-  .r-text { display: grid; gap: 1px; min-width: 0; }
-  .r-name { font-size: 16px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .r-meta { font-size: 14px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .note { padding: 12px 16px 12px 48px; color: var(--muted); font-size: 15px; line-height: 1.4; }
-
-  /* La zone qui défile garde de la place autour des boutons pour ne pas rogner leur ombre,
-     et s'estompe à droite pour indiquer qu'on peut faire défiler. */
-  .chips {
-    display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none;
-    margin: -4px -12px -16px; padding: 4px 12px 16px;
-    -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 32px), transparent);
-            mask-image: linear-gradient(90deg, #000 calc(100% - 32px), transparent);
-  }
-  .chips::-webkit-scrollbar { display: none; }
-  .chip {
-    flex: none; display: inline-flex; align-items: center; gap: 7px;
-    height: 32px; padding: 0 12px 0 10px; border: 0; border-radius: 16px;
-    background: var(--card); box-shadow: var(--shadow-chip); font-size: 14px; font-weight: 500; cursor: pointer;
-  }
-  .chip-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--fam); }
-  .chip.on { background: var(--fam); color: #fff; }
-  .chip.on .chip-dot { background: #fff; }
-
-  /* ——— Panneau d'itinéraire ——— */
-  .dir-card {
-    background: var(--card); border-radius: 22px; box-shadow: var(--shadow-float);
-    display: grid; grid-template-columns: 40px 1fr 44px; align-items: center; padding: 2px 0;
-  }
-  .back { width: 40px; color: var(--ink); }
-  .fields { display: grid; position: relative; }
-  .field { display: grid; grid-template-columns: 22px 1fr; align-items: center; min-height: 40px; }
-  .field + .field { border-top: 1px solid var(--line); }
-  .field-mark { width: 10px; height: 10px; border-radius: 50%; justify-self: center; }
-  .field-mark.from { border: 2.5px solid var(--ink); width: 7px; height: 7px; }
-  .field-mark.to { background: var(--end); }
-  .fields::before {
-    content: ''; position: absolute; left: 10px; top: 26px; bottom: 26px; width: 2px;
-    background: repeating-linear-gradient(var(--rail) 0 2px, transparent 2px 5px);
-  }
-  .field-btn {
-    border: 0; background: none; text-align: left; padding: 9px 8px 9px 6px; font-size: var(--fs-body); cursor: pointer;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  }
-  .field-btn.placeholder { color: var(--muted); }
-  .field input { padding: 9px 8px 9px 6px; font-size: 16px; }
-  .field.editing { background: var(--fill); border-radius: 10px; }
-  .swap svg { width: 22px; height: 22px; color: var(--ink); }
-  .dir-card .results { margin-top: 4px; }
-  .field.via-field { grid-template-columns: 22px 1fr 44px; }
-  .field-mark.via { width: 7px; height: 7px; border-radius: 2px; border: 2.5px solid var(--muted); background: var(--card); }
-  .rm-stop { width: 36px; height: 36px; color: var(--muted); }
-  .rm-stop svg { width: 18px; height: 18px; }
 
 
   /* ——— Localisation et messages ——— */
@@ -2582,7 +2351,6 @@
   .modes-pop .on { color: var(--accent); }
   .thumb.plan { background: linear-gradient(115deg, transparent 45%, #fff 45% 52%, transparent 52%), linear-gradient(25deg, transparent 60%, #fff 60% 66%, transparent 66%), radial-gradient(circle at 25% 70%, #d4ebcb 0 18%, transparent 19%), #f1eee8; }
   .thumb.transit { background: linear-gradient(110deg, transparent 40%, #ffbe00 40% 46%, transparent 46%), linear-gradient(20deg, transparent 52%, #0055c8 52% 58%, transparent 58%), linear-gradient(160deg, transparent 62%, #e3051c 62% 68%, transparent 68%), linear-gradient(75deg, transparent 28%, #00643c 28% 34%, transparent 34%), #f1eee8; }
-  .map-hint { color: var(--accent); font-size: 14px; padding-top: 10px; padding-bottom: 6px; }
   .locate svg { width: 21px; height: 21px; }
   .locate svg.hollow .solid { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; }
   .locate.following { color: var(--accent); }
@@ -2614,8 +2382,6 @@
   :global(.me.has-heading .me-beam) { display: block; }
   :global(.me.navigating .me-beam), :global(.me.navigating .me-dot) { display: none; }
 
-  .results .recents-head { display: flex; padding-right: 16px; justify-content: space-between; align-items: center; font-weight: 600; color: var(--ink) !important; }
-  .results .link { width: auto; flex: none; display: inline; padding: 4px 0; }
   .link { border: 0; background: none; color: var(--accent); font: inherit; font-weight: 500; cursor: pointer; padding: 4px 0; }
 
   /* ——— Fiches ——— */
@@ -2625,9 +2391,7 @@
   }
   .close svg { width: 16px; height: 16px; stroke-width: 2.4; }
   /* Zone de toucher d'au moins 44 px autour des petits boutons ronds */
-  .close::after, .share::after { content: ''; position: absolute; inset: -6px; }
-  .results .list-foot .link { min-height: 40px; }
-  .rm-stop { width: 44px; height: 44px; }
+  .close::after { content: ''; position: absolute; inset: -6px; }
   /* ——— Choix de l'itinéraire ——— */
 
   /* ——— Guidage ——— */
@@ -2638,23 +2402,12 @@
     border-left: 13px solid transparent; border-right: 13px solid transparent; border-bottom: 30px solid var(--accent);
     filter: drop-shadow(0 0 2px #fff) drop-shadow(0 0 1px #fff) drop-shadow(0 2px 4px rgb(0 0 0 / 0.35));
   }
-  /* ——— Mes lieux ——— */
-  .pinned { display: flex; gap: 14px; overflow-x: auto; padding: 8px 2px 6px; scrollbar-width: none; }
-  .pinned::-webkit-scrollbar { display: none; }
-  .results .pinned-li { padding: 4px 14px 2px; }
-  .pin-btn { display: grid; justify-items: center; align-content: start; gap: 3px; width: 64px; flex: none;
-    padding: 0; border: 0; background: none; cursor: pointer; grid-template-columns: none; }
-  .pin-circle { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--accent-btn); color: #fff; }
-  .pin-name { font-size: 12.5px; font-weight: 600; max-width: 64px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .pin-sub { font-size: 11.5px; color: var(--muted); }
-  .hub-h { font-size: 15px; font-weight: 700; margin: 18px 0 4px; }
-  .hub-lists, .pick-lists { list-style: none; margin: 0; padding: 0; }
+  .pick-lists { list-style: none; margin: 0; padding: 0; }
   .pick-lists label {   /* (pas le bouton « Créer » du champ de nouvelle liste : il écrasait le champ à 0 px) */ display: grid; grid-template-columns: 34px 1fr auto auto; gap: 12px; align-items: center; width: 100%;
     min-height: 52px; border: 0; background: none; padding: 0; text-align: left; cursor: pointer; border-bottom: 1px solid var(--line); font-size: 16px; }
   .pick-lists label { grid-template-columns: 32px 1fr auto 28px; }
   .pick-lists input { width: 22px; height: 22px; accent-color: var(--accent-btn); }
   .pl-count { color: var(--muted); font-size: 14px; font-variant-numeric: tabular-nums; }
-  .chev-r { width: 18px; height: 18px; color: var(--faint); }
   .new-list { display: flex; gap: 8px; align-items: center; min-height: 50px; border-bottom: 1px solid var(--line); }
   .new-list input { flex: 1; border: 0; background: none; font: inherit; font-size: 16px; color: var(--ink); padding: 10px 0; min-width: 0; }
   .new-list .link:disabled { opacity: 0.4; }
@@ -2663,24 +2416,6 @@
   .modes-pop .saved-toggle { grid-column: 1 / -1; font-size: 13px; font-weight: 600; padding: 4px 0 0; }
   .modes-pop { flex-wrap: wrap; }
   .go.wide.done { width: 100%; margin: 14px 0 4px; height: 46px; background: var(--accent-btn); }
-  .why.warn { color: #D0731B; font-weight: 600; }
-  .back-link { margin: 6px 0 2px; font-size: 15px; }
-  .list-title { display: flex; align-items: center; gap: 10px; }
-  .list-actions { display: flex; gap: 18px; align-items: center; margin-top: 8px; }
-  .link.danger { color: var(--closed); }
-  .qr { display: grid; place-items: center; margin: 14px auto 4px; width: min(260px, 70vw); background: #fff; border-radius: 12px; padding: 8px; }
-  .qr :global(svg) { width: 100%; height: auto; display: block; }
-  .pw { display: grid; gap: 6px; font-size: 14px; color: var(--muted); margin-top: 14px; }
-  .action.saved { color: var(--lc, var(--fav)); }
-  /* ——— Photos ——— */
-  .photos { display: flex; gap: 6px; overflow-x: auto; scroll-snap-type: x mandatory; margin: 16px calc(-1 * var(--gutter)) 0; padding: 0 var(--gutter); scrollbar-width: none; }
-  .photos::-webkit-scrollbar { display: none; }
-  .ph { flex: none; position: relative; width: 72%; aspect-ratio: 4 / 3; border: 0; padding: 0; border-radius: 14px; overflow: hidden;
-    background: var(--fill); cursor: zoom-in; scroll-snap-align: start; scroll-margin-left: var(--gutter); }
-  .ph:not(:first-child) { width: 46%; }
-  .ph-count { position: absolute; left: 8px; bottom: 8px; background: rgb(0 0 0 / 0.6); color: #fff; font-size: 12.5px; font-weight: 600;
-    padding: 4px 9px; border-radius: 10px; }
-  .ph-credit { font-size: 11.5px; color: var(--muted); margin: 5px 0 0; }
   .viewer { position: fixed; inset: 0; z-index: 20; background: #000; color: #fff; }
   .viewer-strip { position: absolute; inset: 0; display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none;
     touch-action: pan-x; transition: opacity 0.15s; }
@@ -2699,31 +2434,18 @@
   .viewer-nav.prev { left: 12px; }
   .viewer-nav.next { right: 12px; }
   .viewer-nav:disabled { opacity: 0; pointer-events: none; }
-  @media (hover: none) { .viewer-nav { display: none; } }
+  @media (hover: none) {
+ .viewer-nav { display: none; } 
+  }
   .viewer-credit { position: absolute; left: 0; right: 0; bottom: 0; margin: 0; padding: 14px 18px calc(14px + env(safe-area-inset-bottom));
     font-size: 12.5px; background: linear-gradient(transparent, rgb(0 0 0 / 0.6)); }
   .viewer-credit a { color: rgb(255 255 255 / 0.85); text-decoration: none; }
-  .swipe-row { position: relative; overflow: hidden; }
-  .chip-heart { width: 15px; height: 15px; fill: var(--fam); stroke: none; }
-  .chip.on .chip-heart { fill: #fff; }
-  .chip.edit.on-edit { background: var(--accent-btn); color: #fff; }
   .compass svg { width: 24px; height: 24px; transition: transform 0.1s; }
   .compass .north { fill: var(--closed); }
-  .share {
-    position: absolute; top: 14px; right: 54px; width: 32px; height: 32px; border-radius: 50%;
-    border: 0; background: var(--fill); cursor: pointer; display: grid; place-items: center; color: var(--muted);
-  }
   .close ~ h1 { margin-right: 44px; }
-  .act-label { display: flex; flex-direction: column; align-items: center; line-height: 1.15; }
-  .photo { margin: 16px 0 0; }
-  .about { margin-top: 18px; }
   h1 { font-size: 24px; line-height: 1.2; font-weight: 700; letter-spacing: -0.02em; margin: 2px 44px 2px 0; text-wrap: balance; }
   .kind { margin: 0; color: var(--muted); font-size: 15px; }
   .kind::first-letter { text-transform: uppercase; }
-  .status { margin: 6px 0 0; font-size: 15.5px; font-weight: 600; }
-  .status.is-open { color: var(--open); }
-  .status.is-closed { color: var(--closed); }
-  .muted { color: var(--muted); font-weight: 400; }
 
   .promise-link { color: inherit; font-weight: 600; text-decoration: underline; }
   /* ——— Devantures (Panoramax) ——— */
@@ -2737,13 +2459,9 @@
   .st-icon svg { width: 16px; height: 16px; stroke-width: 2; }
   .st-src { position: absolute; right: 4px; top: 4px; font-size: 9.5px; font-weight: 600; color: #fff; background: rgb(0 0 0 / 0.45); padding: 1px 5px; border-radius: 6px; }
   @keyframes appear-thumb { from { opacity: 0; transform: scale(0.92); } }
-  @media (min-width: 768px) { .street-thumb { left: 432px; bottom: 24px !important; width: 160px; height: 104px; } }
-  .facade-card { display: block; width: 100%; padding: 0; border: 0; margin: 0; border-radius: 14px; overflow: hidden; cursor: zoom-in; position: relative; background: none; }
-  .facade-card :global(.facade) { aspect-ratio: 16 / 10; }
-  .ph-tag { position: absolute; left: 10px; top: 10px; background: rgb(0 0 0 / 0.55); color: #fff; font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 8px; }
-  .n-thumb { display: block; width: 44px; height: 44px; border-radius: 10px; overflow: hidden; }
-  .n-thumb :global(.facade) { aspect-ratio: 1; height: 100%; }
-  .n-thumb :global(.facade img) { top: -170cqw; }
+  @media (min-width: 768px) {
+ .street-thumb { left: 432px; bottom: 24px !important; width: 160px; height: 104px; } 
+  }
   :global(.pin-photo) { display: block; padding: 0; border: 3px solid #fff; border-radius: 50%; overflow: hidden; background: var(--fill); cursor: pointer;
     box-shadow: 0 2px 8px rgb(0 0 0 / 0.3); }
   :global(.pin-photo.s64) { width: 64px; height: 64px; }
@@ -2752,28 +2470,9 @@
   :global(.pin-photo .facade img) { top: -170cqw; }
   .pano { position: absolute; inset: 0; overflow-x: auto; overflow-y: hidden; display: flex; align-items: center; scrollbar-width: none; }
   .pano img { height: min(100vh, 50vw * 1); max-width: none; display: block; }
-  @media (max-aspect-ratio: 1/1) { .pano img { height: 60vh; } }
-
-  /* ——— Filtre « ouvert à… » ——— */
-  .open-pills { display: flex; gap: 8px; margin: 10px 0 2px; align-items: center; overflow-x: auto; scrollbar-width: none; }
-  .opill { display: inline-flex; align-items: center; gap: 4px; height: 34px; padding: 0 12px; border-radius: 17px; border: 1px solid var(--line);
-    background: var(--card); color: var(--ink); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
-  .opill.on { background: var(--accent-btn); border-color: var(--accent-btn); color: #fff; }
-  .opill-x { width: 34px; height: 34px; border-radius: 50%; border: 0; background: var(--fill); color: var(--muted); display: grid; place-items: center; cursor: pointer; }
-  .moment { margin: 8px 0 4px; padding: 10px; background: var(--fill); border-radius: 14px; display: grid; gap: 8px; }
-  .moment-quick { display: flex; gap: 6px; flex-wrap: wrap; }
-  .moment-sel { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .unknown-row { display: block; width: 100%; text-align: left; border: 0; border-top: 1px solid var(--line); background: none; padding: 14px 0 4px;
-    font: inherit; font-size: 15px; font-weight: 600; color: var(--accent); cursor: pointer; }
-
-  /* ——— Fiche lieu, façon Plans ——— */
-  .share.left { left: 14px; right: auto; }
-  .phead { text-align: center; margin: 0 44px; }
-  .glance { margin: 8px 0 0; text-align: center; font-size: 15px; display: flex; flex-wrap: wrap; justify-content: center; gap: 0 6px; }
-  .fresh { margin: 3px 0 0; text-align: center; font-size: 13px; color: var(--open); display: flex; justify-content: center; align-items: center; gap: 4px; }
-  .fresh.old { color: var(--muted); }
-  /* Boutons d'action : même largeur, pictogramme au-dessus du texte ; un seul bouton prend toute la largeur */
-  .actions { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 8px; margin: 14px 0 0; }
+  @media (max-aspect-ratio: 1/1) {
+ .pano img { height: 60vh; } 
+  }
   .action {
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 56px; padding: 6px 4px;
     border-radius: 14px; border: 0; cursor: pointer; text-decoration: none; font-size: 13.5px; font-weight: 600; line-height: 1.1;
@@ -2782,71 +2481,11 @@
   .action:active { filter: brightness(0.94); }
   .action :global(svg) { width: 21px; height: 21px; flex: none; }
   .action.primary { background: var(--accent-btn); color: #fff; }
-  /* Bandeau : libellé discret au-dessus, valeur en gras, séparés par un trait */
-  .strip { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); margin: 14px 0 0; }
-  /* Sections du bas */
-  .psec { margin-top: 22px; }
-  .link.ext { font-weight: 600; text-decoration: none; display: inline-block; padding: 6px 0; }
-  .good { list-style: none; margin: 0; padding: 12px 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; background: var(--fill); border-radius: 14px; font-size: 14.5px; }
-  .details { margin: 0; background: var(--fill); border-radius: 14px; padding: 0 14px; }
-  .sc-note { margin: 14px 0 0; font-size: 14.5px; color: var(--muted); }
-  .end-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 22px; }
-  .end-btn { display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 46px; border: 0; border-radius: 14px; background: var(--fill);
-    color: var(--accent); font: inherit; font-size: 14.5px; font-weight: 600; text-decoration: none; cursor: pointer; padding: 0 8px; text-align: center; }
-  .contrib { margin: 14px 0 52px; font-size: 13px; line-height: 1.45; color: var(--muted); }
-  /* Barre flottante en bas à droite de la fiche */
-  .fab-bar { position: sticky; bottom: 0; height: 0; display: flex; justify-content: flex-end; z-index: 2; pointer-events: none; }
-  .fab, .pmenu { pointer-events: auto; }
-  .fab { position: absolute; bottom: 4px; right: -6px; display: flex; gap: 2px; padding: 4px; border-radius: 26px; background: var(--card);
-    box-shadow: 0 2px 12px rgb(0 0 0 / 0.18), 0 0 0 0.5px rgb(0 0 0 / 0.08); }
-  .pmenu { position: absolute; bottom: 62px; right: -6px; min-width: 220px; background: var(--card); border-radius: 14px; overflow: hidden;
-    box-shadow: 0 6px 24px rgb(0 0 0 / 0.2), 0 0 0 0.5px rgb(0 0 0 / 0.08); }
-  .r-icon.fav-icon { color: var(--fav); background: color-mix(in srgb, var(--fav) 12%, transparent); }
 
   .rows { list-style: none; margin: 16px 0 0; padding: 0; border-top: 1px solid var(--line); }
   .row { display: grid; grid-template-columns: 24px 1fr; gap: 16px; align-items: center; min-height: 52px; border-bottom: 1px solid var(--line); font-size: 15.5px; }
   .row > svg { width: 22px; height: 22px; color: var(--accent); }
-  .row-btn { display: flex; justify-content: space-between; align-items: center; border: 0; background: none; padding: 14px 0; cursor: pointer; text-align: left; }
-  .chev { width: 20px; height: 20px; color: var(--muted); transition: transform 200ms; }
-  .chev.flip { transform: rotate(180deg); }
-  .selectable { user-select: all; }
-  .week-row { border-bottom: 1px solid var(--line); padding: 2px 0 12px 40px; }
-  .week { border-collapse: collapse; font-size: 15px; font-variant-numeric: tabular-nums; }
-
-  .nearby { list-style: none; margin: 12px calc(-1 * var(--gutter)) 0; padding: 0; }
-  .n-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--fam); box-shadow: 0 0 0 2px var(--card), 0 0 0 3px var(--line); justify-self: center; }
-  .n-dist { color: var(--muted); font-size: 14px; font-variant-numeric: tabular-nums; }
-
-  /* ——— Résultat d'itinéraire ——— */
-  .summary { display: grid; gap: 2px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
-  .big { margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
-  .sub { margin: 0; color: var(--muted); font-size: 15px; }
-
-
-  /* Prochains passages d'une station */
-  .deps { margin: 18px 0 4px; }
-  .dep-dir { font-size: 15px; line-height: 1.25; min-width: 0; }
-  .dep-times { font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; display: flex; align-items: center; gap: 2px; }
   @keyframes pulse { 50% { opacity: 0.35; } }
-  .row-link { color: var(--accent, #2A5BD7); text-decoration: none; padding: 14px 0; overflow-wrap: anywhere; }
-  .row-link:hover { text-decoration: underline; }
-
-
-  /* ——— Retours des tests : raccourcis, métro, sorties, import, promesse ——— */
-  .shortcuts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 6px 12px 8px; }
-  .sc-icon { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: var(--accent-btn); color: #fff; }
-  .list-foot { display: grid; justify-items: start; gap: 2px; padding: 10px 16px 6px 48px; border-top: 1px solid var(--line); margin-top: 6px; }
-  .results .list-foot .link { font-size: 14.5px; }
-  .privacy-line { font-size: 12.5px; color: var(--muted); padding-top: 6px; }
-  .chip.edit { padding: 0 12px; color: var(--muted); }
-  .chip.edit svg { width: 17px; height: 17px; }
-  .n-dep { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 6px; font-size: 13.5px; margin-top: 3px; }
-  .n-dir { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .n-time { font-weight: 600; color: var(--open); font-variant-numeric: tabular-nums; }
-  .exits { margin: 18px 0 4px; }
-  .exit-tag { margin-left: auto; font-size: 12px; color: var(--muted); padding-left: 8px; white-space: nowrap; }
-  .why { display: block; font-size: 13px; color: var(--muted); margin-top: 2px; line-height: 1.35; }
-  .sc-row { grid-template-columns: 24px auto auto auto 1fr; gap: 12px; }
   .howto { margin: 14px 0 16px; padding-left: 20px; display: grid; gap: 10px; font-size: 15px; line-height: 1.45; }
   .howto a { color: var(--accent); }
   .import-btn { display: flex; justify-content: center; align-items: center; min-height: 48px; border-radius: 14px; cursor: pointer; font-weight: 600; }
@@ -2873,18 +2512,14 @@
 
   /* ——— Grand écran : panneaux à gauche ——— */
   @media (min-width: 768px) {
-    /* Grand écran : raccourcis à droite de la recherche, sur une ou deux lignes, sans défilement. */
-    .top { padding: 16px 16px 0; display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px; right: 76px; }
-    .top.dir { flex-direction: column; flex-wrap: nowrap; right: auto; }
-    .search, .dir-card { width: 400px; flex: none; }
-    .chips { flex: 1; min-width: 0; flex-wrap: wrap; overflow: visible; margin: 0; padding: 6px 0 0; -webkit-mask-image: none; mask-image: none; }
     .locate { bottom: 40px; right: 16px; }
     .modes-ctl { bottom: 100px; right: 16px; }
+  
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .chev { animation: none; transition: none; }
     .locate.busy svg { animation: none; }
+  
   }
 
   :global(.maplibregl-ctrl-attrib) { font-family: var(--ui); font-size: 11px; }
@@ -2892,6 +2527,7 @@
     :global(.maplibregl-ctrl-attrib) { background: rgb(28 31 36 / 0.8) !important; color: var(--muted); }
     :global(.maplibregl-ctrl-attrib a) { color: var(--muted) !important; }
     :global(.maplibregl-ctrl-attrib-button) { filter: invert(1); }
+  
   }
   /* Flèche classique sur la carte, main fermée seulement pendant qu'on la fait glisser. */
   :global(.maplibregl-canvas-container.maplibregl-interactive) { cursor: default; }
