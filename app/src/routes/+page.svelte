@@ -10,6 +10,12 @@
   import { empty, addRouteLayers, addPlaceLayers, routeTags as tagsFor } from '#lib/maplayers.js';
   import RouteSheet from '#lib/ui/RouteSheet.svelte';
   import NavView from '#lib/ui/NavView.svelte';
+  import StreetThumb from '#lib/ui/StreetThumb.svelte';
+  import PromiseBanner from '#lib/ui/PromiseBanner.svelte';
+  import ChipsEditor from '#lib/ui/ChipsEditor.svelte';
+  import ImportSheet from '#lib/ui/ImportSheet.svelte';
+  import TransferSheet from '#lib/ui/TransferSheet.svelte';
+  import ListPicker from '#lib/ui/ListPicker.svelte';
   import PhotoViewer from '#lib/ui/PhotoViewer.svelte';
   import TopBar from '#lib/ui/TopBar.svelte';
   import ResultList from '#lib/ui/ResultList.svelte';
@@ -1937,18 +1943,22 @@
     get activeQuery() { return activeQuery; },
     get address() { return address; },
     get allExits() { return allExits; }, set allExits(v) { allExits = v; },
+    get applyIncoming() { return applyIncoming; },
     get applyOpenFilter() { return applyOpenFilter; },
     get areaText() { return areaText; },
     get assigning() { return assigning; }, set assigning(v) { assigning = v; },
     get backupAge() { return backupAge; },
     get backupPassword() { return backupPassword; }, set backupPassword(v) { backupPassword = v; },
     get catHit() { return catHit; },
+    get catOf() { return catOf; },
     get category() { return category; }, set category(v) { category = v; },
     get chipList() { return chipList; },
+    get chipPrefs() { return chipPrefs; }, set chipPrefs(v) { chipPrefs = v; },
     get clearCategory() { return clearCategory; },
     get clearSearch() { return clearSearch; },
     get closeDirections() { return closeDirections; },
     get closePlace() { return closePlace; },
+    get closePromise() { return closePromise; },
     get copyAddress() { return copyAddress; },
     get createList() { return createList; },
     get deleteList() { return deleteList; },
@@ -1971,10 +1981,14 @@
     get freshness() { return freshness; },
     get from() { return from; }, set from(v) { from = v; },
     get hubPanel() { return hubPanel; }, set hubPanel(v) { hubPanel = v; },
+    get importFile() { return importFile; },
     get importOpen() { return importOpen; }, set importOpen(v) { importOpen = v; },
+    get importing() { return importing; }, set importing(v) { importing = v; },
     get inFav() { return inFav; },
+    get incoming() { return incoming; }, set incoming(v) { incoming = v; },
     get info() { return info; }, set info(v) { info = v; },
     get infoStrip() { return infoStrip; },
+    get innerH() { return innerH; }, set innerH(v) { innerH = v; },
     get isAddress() { return isAddress; },
     get isFav() { return isFav; },
     get isPinned() { return isPinned; },
@@ -1990,6 +2004,7 @@
     get momentFrom() { return momentFrom; },
     get momentPicker() { return momentPicker; }, set momentPicker(v) { momentPicker = v; },
     get moreText() { return moreText; }, set moreText(v) { moreText = v; },
+    get moveChip() { return moveChip; },
     get nav() { return nav; }, set nav(v) { nav = v; },
     get nearby() { return nearby; }, set nearby(v) { nearby = v; },
     get nearbyDone() { return nearbyDone; }, set nearbyDone(v) { nearbyDone = v; },
@@ -2013,7 +2028,9 @@
     get pickerHours() { return pickerHours; },
     get pickerTime() { return pickerTime; },
     get pinnedPlaces() { return pinnedPlaces; },
+    get pins() { return pins; }, set pins(v) { pins = v; },
     get place() { return place; }, set place(v) { place = v; },
+    get placeKey() { return placeKey; },
     get placeMenu() { return placeMenu; }, set placeMenu(v) { placeMenu = v; },
     get placeSheetH() { return placeSheetH; }, set placeSheetH(v) { placeSheetH = v; },
     get placeShortcut() { return placeShortcut; },
@@ -2024,7 +2041,9 @@
     get refreshSaved() { return refreshSaved; },
     get removeFromList() { return removeFromList; },
     get removeStop() { return removeStop; },
+    get renameChip() { return renameChip; },
     get renameList() { return renameList; },
+    get resetChips() { return resetChips; },
     get restoreNeedsPw() { return restoreNeedsPw; }, set restoreNeedsPw(v) { restoreNeedsPw = v; },
     get restorePassword() { return restorePassword; }, set restorePassword(v) { restorePassword = v; },
     get results() { return results; }, set results(v) { results = v; },
@@ -2034,6 +2053,7 @@
     get searchError() { return searchError; }, set searchError(v) { searchError = v; },
     get searchH() { return searchH; }, set searchH(v) { searchH = v; },
     get searching() { return searching; }, set searching(v) { searching = v; },
+    get setMembership() { return setMembership; },
     get setOpenAt() { return setOpenAt; },
     get setShortcut() { return setShortcut; },
     get shareList() { return shareList; },
@@ -2042,6 +2062,7 @@
     get shortcuts() { return shortcuts; }, set shortcuts(v) { shortcuts = v; },
     get showList() { return showList; },
     get showModes() { return showModes; }, set showModes(v) { showModes = v; },
+    get showPromise() { return showPromise; }, set showPromise(v) { showPromise = v; },
     get showUnknown() { return showUnknown; }, set showUnknown(v) { showUnknown = v; },
     get showVia() { return showVia; }, set showVia(v) { showVia = v; },
     get startDirections() { return startDirections; },
@@ -2052,6 +2073,7 @@
     get swiped() { return swiped; }, set swiped(v) { swiped = v; },
     get title() { return title; },
     get to() { return to; }, set to(v) { to = v; },
+    get toggleChip() { return toggleChip; },
     get togglePin() { return togglePin; },
     get toggleZoom() { return toggleZoom; },
     get topH() { return topH; }, set topH(v) { topH = v; },
@@ -2127,113 +2149,19 @@
     <NavView {nav} {navBanner} {navRemaining} {to} {navFollow} bind:navList bind:voice {endNav}
       recenter={() => { navFollow = true; updateNav(); }} />
   {/if}
-  {#if place && !directions && !nav && info?.facade && viewer == null && (placeSheetH == null || placeSheetH < innerH * 0.6)}
-    <!-- Vue de la rue posée sur la carte, juste au-dessus de la fiche (comme Plans et Google Maps) ; plein écran au toucher -->
-    <button class="street-thumb" style:bottom={placeSheetH != null ? `${placeSheetH + 12}px` : null} onclick={() => (viewer = 'facade')}
-      aria-label="Voir la vue de la rue">
-      <Facade f={info.facade} alt={`Vue de la rue : ${title}`} />
-      <span class="st-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4.5 12a7.5 3.5 0 1 0 15 0M17 9.5l2.5 2.5 2.5-2.5" /><circle cx="12" cy="12" r="1.6" class="solid" /></svg></span>
-      <span class="st-src">Panoramax</span>
-    </button>
-  {/if}
+  <StreetThumb />
   <PhotoViewer />
   {#if toast}<p class="toast" role="status">{toast}{#if toastAction}<button onclick={undoToast}>{toastAction.label}</button>{/if}</p>{/if}
-  {#if showPromise && !place && !category && !directions && !importOpen && !editChips}
-    <div class="promise" role="note">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2.5" /><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" /></svg>
-      <p><strong>Une carte qui ne vous piste pas.</strong> Ni compte, ni publicité, rien sur vous n'est collecté. Vos favoris restent sur votre téléphone. <a href="confidentialite" class="promise-link">Qui voit quoi ?</a></p>
-      <button onclick={closePromise}>Compris</button>
-    </div>
-  {/if}
+  <PromiseBanner />
 
   {#if listPicker && place && !directions}
-    <section class="sheet" aria-label="Enregistrer dans" use:draggable={{ key: 'picker', onDismiss: () => (listPicker = false) }}>
-      <button class="grip" aria-label="Agrandir la fiche"></button>
-      <button class="close" onclick={() => (listPicker = false)} aria-label="Fermer">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" /></svg>
-      </button>
-      <h1>Enregistrer dans</h1>
-      <p class="kind">{place.name}</p>
-      <ul class="pick-lists">
-        {#each lists as l (l.id)}
-          {@const on = !!savedEntry?.lists.includes(l.id)}
-          <li><label>
-            <ListDot l={l} size={32} />
-            <span class="pl-name">{l.name}</span>
-            <span class="pl-count">{favorites.filter((f) => f.lists.includes(l.id)).length}</span>
-            <input type="checkbox" checked={on} onchange={(e) => setMembership(l.id, e.currentTarget.checked)} />
-          </label></li>
-        {/each}
-      </ul>
-      <form class="new-list" onsubmit={(e) => { e.preventDefault(); createList(newListName, (id) => setMembership(id, true)); newListName = ''; }}>
-        <input bind:value={newListName} placeholder="Nouvelle liste…" aria-label="Nom de la nouvelle liste" maxlength="40" />
-        <button class="link" disabled={!newListName.trim()}>Créer</button>
-      </form>
-      <label class="pin-toggle">
-        <input type="checkbox" checked={pins.includes(placeKey(place))} onchange={() => togglePin(place)} />
-        Épingler en haut de la recherche
-      </label>
-      <button class="go wide done" onclick={() => (listPicker = false)}>Terminé</button>
-    </section>
+    <ListPicker />
   {:else if incoming?.kind === 'transfer' && !directions}
-    <section class="sheet" aria-label="Récupérer vos lieux">
-      <h1>Récupérer vos lieux</h1>
-      <p class="kind">Depuis un autre appareil</p>
-      <ul class="rows">
-        <li class="row"><ListDot l={DEFAULT_LISTS[0]} size={24} /><span>{incoming.data.places.length} lieu{incoming.data.places.length > 1 ? 'x' : ''} dans {incoming.data.lists.length} liste{incoming.data.lists.length > 1 ? 's' : ''}</span></li>
-        {#if incoming.data.shortcuts.home || incoming.data.shortcuts.work}
-          <li class="row"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.5 12 5l8 6.5M6.5 10v9.5h11V10" /><path d="M10.2 19.5v-4.8h3.6v4.8" /></svg><span>{[incoming.data.shortcuts.home && 'Maison', incoming.data.shortcuts.work && 'Travail'].filter(Boolean).join(' et ')}</span></li>
-        {/if}
-      </ul>
-      <p class="credit">Ils s'ajoutent à ceux de cet appareil (rien n'est effacé).</p>
-      <button class="go wide done" onclick={() => { const n = applyIncoming(incoming.raw); incoming = null; say(`${n} lieu${n > 1 ? 'x' : ''} ajouté${n > 1 ? 's' : ''} à Mes lieux`); }}>Ajouter à cet appareil</button>
-      <button class="link more" onclick={() => (incoming = null)}>Ignorer</button>
-    </section>
+    <TransferSheet />
   {:else if importOpen && !directions}
-    <section class="sheet" aria-label="Importer vos lieux" use:draggable={{ key: 'import', onDismiss: () => (importOpen = false) }}>
-      <button class="grip" aria-label="Agrandir la fiche"></button>
-      <button class="close" onclick={() => (importOpen = false)} aria-label="Fermer">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" /></svg>
-      </button>
-      <h1>Vos lieux Google Maps</h1>
-      <p class="kind">Récupérez vos lieux enregistrés, votre maison et votre travail.</p>
-      <ol class="howto">
-        <li>Ouvrez <a href="https://takeout.google.com/" target="_blank" rel="noopener">takeout.google.com</a>, touchez « Tout désélectionner », puis cochez seulement <strong>Maps (vos adresses)</strong>.</li>
-        <li>Touchez « Étape suivante » puis « Créer une exportation ». Google vous envoie un lien par e-mail, souvent en quelques minutes.</li>
-        <li>Téléchargez le fichier .zip, puis choisissez-le ici.</li>
-      </ol>
-      <label class="action primary import-btn">
-        <input type="file" accept=".zip,.json,.csv,application/zip,application/json,text/csv" onchange={importFile} hidden />
-        {importing || 'Choisir le fichier'}
-      </label>
-      <p class="credit">Le fichier est lu sur votre téléphone : il n'est envoyé nulle part. Vos lieux restent sur cet appareil.</p>
-    </section>
+    <ImportSheet />
   {:else if editChips && !directions}
-    <section class="sheet" aria-label="Personnaliser les raccourcis" use:draggable={{ key: 'chips', onDismiss: () => (editChips = false) }}>
-      <button class="grip" aria-label="Agrandir la fiche"></button>
-      <button class="close" onclick={() => (editChips = false)} aria-label="Fermer">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" /></svg>
-      </button>
-      <h1>Raccourcis</h1>
-      <p class="kind">Choisissez ceux qui s'affichent, leur ordre et leur nom.</p>
-      <ul class="chip-edit">
-        {#each chipPrefs as pr, i (pr.key)}
-          {#if i === chipPrefs.findIndex((x) => x.hidden) && i > 0}<li class="ce-head">Autres raccourcis disponibles</li>{/if}
-          {@const c = catOf(pr.key)}
-          <li class:off={pr.hidden}>
-            <button class="ce-toggle" onclick={() => toggleChip(i)} role="switch" aria-checked={!pr.hidden} aria-label={`Afficher ${c.label}`}
-              style:--fam={famColor(c)}><span></span></button>
-            <input value={pr.label ?? ''} placeholder={c.label} aria-label={`Nom du raccourci ${c.label}`}
-              onchange={(e) => renameChip(i, e.currentTarget.value)} maxlength="20" />
-            <button class="icon-btn" onclick={() => moveChip(i, -1)} disabled={i === 0} aria-label={`Monter ${c.label}`}>
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 14 5-5 5 5" /></svg></button>
-            <button class="icon-btn" onclick={() => moveChip(i, 1)} disabled={i === chipPrefs.length - 1} aria-label={`Descendre ${c.label}`}>
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5" /></svg></button>
-          </li>
-        {/each}
-      </ul>
-      <button class="link more" onclick={resetChips}>Revenir aux raccourcis d'origine</button>
-    </section>
+    <ChipsEditor />
   {:else if directions && !editing && !nav}
     <RouteSheet {from} {to} {mode} {routes} {picked} {pickedStreet} {showVia} {legExits}
       {chooseMode} {pickStreet} {pickTransit} {startNav} {addStop} {computeRoutes} />
@@ -2305,6 +2233,7 @@
       color-scheme: dark;
     }
   
+  
   }
   :global(html, body) {
     margin: 0; height: 100%; overflow: hidden; background: var(--page);
@@ -2324,9 +2253,6 @@
   }
   input::placeholder { color: var(--muted); }
   input::-webkit-search-cancel-button { display: none; }
-  .icon-btn { border: 0; background: none; width: 46px; height: 46px; cursor: pointer; display: grid; place-items: center; color: var(--muted); }
-  .icon-btn svg { width: 20px; height: 20px; stroke-width: 2; }
-  .icon-btn:disabled { opacity: 0.35; cursor: default; }
 
 
   /* ——— Localisation et messages ——— */
@@ -2381,17 +2307,6 @@
   }
   :global(.me.has-heading .me-beam) { display: block; }
   :global(.me.navigating .me-beam), :global(.me.navigating .me-dot) { display: none; }
-
-  .link { border: 0; background: none; color: var(--accent); font: inherit; font-weight: 500; cursor: pointer; padding: 4px 0; }
-
-  /* ——— Fiches ——— */
-  .close {
-    position: absolute; top: 14px; right: 14px; width: 32px; height: 32px; border-radius: 50%;
-    border: 0; background: var(--fill); cursor: pointer; display: grid; place-items: center; color: var(--muted);
-  }
-  .close svg { width: 16px; height: 16px; stroke-width: 2.4; }
-  /* Zone de toucher d'au moins 44 px autour des petits boutons ronds */
-  .close::after { content: ''; position: absolute; inset: -6px; }
   /* ——— Choix de l'itinéraire ——— */
 
   /* ——— Guidage ——— */
@@ -2402,123 +2317,35 @@
     border-left: 13px solid transparent; border-right: 13px solid transparent; border-bottom: 30px solid var(--accent);
     filter: drop-shadow(0 0 2px #fff) drop-shadow(0 0 1px #fff) drop-shadow(0 2px 4px rgb(0 0 0 / 0.35));
   }
-  .pick-lists { list-style: none; margin: 0; padding: 0; }
-  .pick-lists label {   /* (pas le bouton « Créer » du champ de nouvelle liste : il écrasait le champ à 0 px) */ display: grid; grid-template-columns: 34px 1fr auto auto; gap: 12px; align-items: center; width: 100%;
-    min-height: 52px; border: 0; background: none; padding: 0; text-align: left; cursor: pointer; border-bottom: 1px solid var(--line); font-size: 16px; }
-  .pick-lists label { grid-template-columns: 32px 1fr auto 28px; }
-  .pick-lists input { width: 22px; height: 22px; accent-color: var(--accent-btn); }
-  .pl-count { color: var(--muted); font-size: 14px; font-variant-numeric: tabular-nums; }
-  .new-list { display: flex; gap: 8px; align-items: center; min-height: 50px; border-bottom: 1px solid var(--line); }
-  .new-list input { flex: 1; border: 0; background: none; font: inherit; font-size: 16px; color: var(--ink); padding: 10px 0; min-width: 0; }
-  .new-list .link:disabled { opacity: 0.4; }
-  .pin-toggle, .saved-toggle { display: flex; align-items: center; gap: 10px; font-size: 15px; padding: 14px 0 6px; cursor: pointer; }
-  .pin-toggle input, .saved-toggle input { width: 20px; height: 20px; accent-color: var(--accent-btn); }
+  .saved-toggle { display: flex; align-items: center; gap: 10px; font-size: 15px; padding: 14px 0 6px; cursor: pointer; }
+  .saved-toggle input { width: 20px; height: 20px; accent-color: var(--accent-btn); }
   .modes-pop .saved-toggle { grid-column: 1 / -1; font-size: 13px; font-weight: 600; padding: 4px 0 0; }
   .modes-pop { flex-wrap: wrap; }
-  .go.wide.done { width: 100%; margin: 14px 0 4px; height: 46px; background: var(--accent-btn); }
-  .viewer { position: fixed; inset: 0; z-index: 20; background: #000; color: #fff; }
-  .viewer-strip { position: absolute; inset: 0; display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none;
-    touch-action: pan-x; transition: opacity 0.15s; }
-  .viewer-strip.zoomed { overflow: hidden; touch-action: none; }
-  .viewer-slide img { transition: transform 0.12s ease-out; will-change: transform; user-select: none; -webkit-user-drag: none; }
-  .viewer-strip::-webkit-scrollbar { display: none; }
-  .viewer-slide { flex: none; width: 100%; height: 100%; display: grid; place-items: center; scroll-snap-align: center; }
-  .viewer-slide img { max-width: 100%; max-height: 100%; object-fit: contain; }
-  .viewer-top { position: absolute; left: 0; right: 0; top: 0; display: flex; justify-content: space-between; align-items: center;
-    padding: calc(10px + env(safe-area-inset-top)) 12px 10px 18px; font-size: 15px; font-weight: 600;
-    background: linear-gradient(rgb(0 0 0 / 0.55), transparent); }
-  .viewer-close, .viewer-nav { width: 44px; height: 44px; border-radius: 50%; border: 0; background: rgb(255 255 255 / 0.16); color: #fff;
-    display: grid; place-items: center; cursor: pointer; }
-  .viewer-close svg, .viewer-nav svg { width: 22px; height: 22px; stroke-width: 2.2; }
-  .viewer-nav { position: absolute; top: 50%; transform: translateY(-50%); }
-  .viewer-nav.prev { left: 12px; }
-  .viewer-nav.next { right: 12px; }
-  .viewer-nav:disabled { opacity: 0; pointer-events: none; }
-  @media (hover: none) {
- .viewer-nav { display: none; } 
-  }
-  .viewer-credit { position: absolute; left: 0; right: 0; bottom: 0; margin: 0; padding: 14px 18px calc(14px + env(safe-area-inset-bottom));
-    font-size: 12.5px; background: linear-gradient(transparent, rgb(0 0 0 / 0.6)); }
-  .viewer-credit a { color: rgb(255 255 255 / 0.85); text-decoration: none; }
   .compass svg { width: 24px; height: 24px; transition: transform 0.1s; }
   .compass .north { fill: var(--closed); }
-  .close ~ h1 { margin-right: 44px; }
-  h1 { font-size: 24px; line-height: 1.2; font-weight: 700; letter-spacing: -0.02em; margin: 2px 44px 2px 0; text-wrap: balance; }
-  .kind { margin: 0; color: var(--muted); font-size: 15px; }
-  .kind::first-letter { text-transform: uppercase; }
-
-  .promise-link { color: inherit; font-weight: 600; text-decoration: underline; }
   /* ——— Devantures (Panoramax) ——— */
   :global(.facade) { display: block; position: relative; overflow: hidden; container-type: inline-size; aspect-ratio: 4 / 3; background: var(--fill); }
   :global(.facade img) { position: absolute; width: 800cqw; height: 400cqw; max-width: none; left: calc(50cqw - var(--fx) * 800cqw); top: -155cqw; }
-  .street-thumb { position: absolute; z-index: 2; left: 12px; bottom: 50%; width: 112px; height: 76px; padding: 0; border: 2.5px solid #fff;
-    border-radius: 14px; overflow: hidden; box-shadow: var(--shadow-float); background: var(--fill); cursor: zoom-in; animation: appear-thumb 200ms ease-out; }
-  .street-thumb :global(.facade) { aspect-ratio: auto; width: 100%; height: 100%; }
-  .street-thumb :global(.facade img) { top: -170cqw; }
-  .st-icon { position: absolute; left: 5px; bottom: 5px; width: 22px; height: 22px; border-radius: 50%; background: rgb(0 0 0 / 0.55); display: grid; place-items: center; color: #fff; }
-  .st-icon svg { width: 16px; height: 16px; stroke-width: 2; }
-  .st-src { position: absolute; right: 4px; top: 4px; font-size: 9.5px; font-weight: 600; color: #fff; background: rgb(0 0 0 / 0.45); padding: 1px 5px; border-radius: 6px; }
   @keyframes appear-thumb { from { opacity: 0; transform: scale(0.92); } }
-  @media (min-width: 768px) {
- .street-thumb { left: 432px; bottom: 24px !important; width: 160px; height: 104px; } 
-  }
   :global(.pin-photo) { display: block; padding: 0; border: 3px solid #fff; border-radius: 50%; overflow: hidden; background: var(--fill); cursor: pointer;
     box-shadow: 0 2px 8px rgb(0 0 0 / 0.3); }
   :global(.pin-photo.s64) { width: 64px; height: 64px; }
   :global(.pin-photo.s40) { width: 40px; height: 40px; }
   :global(.pin-photo .facade) { width: 100%; height: 100%; aspect-ratio: 1; }
   :global(.pin-photo .facade img) { top: -170cqw; }
-  .pano { position: absolute; inset: 0; overflow-x: auto; overflow-y: hidden; display: flex; align-items: center; scrollbar-width: none; }
-  .pano img { height: min(100vh, 50vw * 1); max-width: none; display: block; }
-  @media (max-aspect-ratio: 1/1) {
- .pano img { height: 60vh; } 
-  }
-  .action {
-    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 56px; padding: 6px 4px;
-    border-radius: 14px; border: 0; cursor: pointer; text-decoration: none; font-size: 13.5px; font-weight: 600; line-height: 1.1;
-    background: var(--fill); color: var(--accent); box-sizing: border-box; min-width: 0;
-  }
-  .action:active { filter: brightness(0.94); }
-  .action :global(svg) { width: 21px; height: 21px; flex: none; }
-  .action.primary { background: var(--accent-btn); color: #fff; }
-
-  .rows { list-style: none; margin: 16px 0 0; padding: 0; border-top: 1px solid var(--line); }
-  .row { display: grid; grid-template-columns: 24px 1fr; gap: 16px; align-items: center; min-height: 52px; border-bottom: 1px solid var(--line); font-size: 15.5px; }
-  .row > svg { width: 22px; height: 22px; color: var(--accent); }
   @keyframes pulse { 50% { opacity: 0.35; } }
-  .howto { margin: 14px 0 16px; padding-left: 20px; display: grid; gap: 10px; font-size: 15px; line-height: 1.45; }
-  .howto a { color: var(--accent); }
-  .import-btn { display: flex; justify-content: center; align-items: center; min-height: 48px; border-radius: 14px; cursor: pointer; font-weight: 600; }
-  .chip-edit { list-style: none; margin: 12px 0 8px; padding: 0; }
-  .chip-edit li.ce-head { display: block; min-height: 0; padding: 18px 0 6px; font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
-  .chip-edit li { display: grid; grid-template-columns: 44px 1fr 40px 40px; align-items: center; gap: 4px; border-bottom: 1px solid var(--line); min-height: 52px; }
-  .chip-edit input { border: 0; background: none; font: inherit; font-size: 16px; color: var(--ink); padding: 10px 0; min-width: 0; }
-  .chip-edit input::placeholder { color: var(--ink); }
-  .chip-edit li.off input, .chip-edit li.off input::placeholder { color: var(--faint); }
-  .chip-edit .icon-btn { width: 40px; height: 40px; }
-  .chip-edit .icon-btn:disabled { opacity: 0.25; }
-  .ce-toggle { width: 38px; height: 24px; border-radius: 12px; border: 0; background: var(--fam); position: relative; cursor: pointer; padding: 0; }
-  .ce-toggle span { position: absolute; top: 3px; left: 17px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: left 0.15s; }
-  li.off .ce-toggle { background: var(--line); }
-  li.off .ce-toggle span { left: 3px; }
-  .promise {
-    position: absolute; z-index: 4; left: 12px; right: 12px; bottom: calc(112px + env(safe-area-inset-bottom)); max-width: 420px;
-    display: grid; grid-template-columns: 26px 1fr; gap: 6px 12px; align-items: start;
-    padding: 14px 16px; background: var(--card); border-radius: 18px; box-shadow: var(--shadow-float); font-size: 14.5px; line-height: 1.4;
-  }
-  .promise svg { width: 24px; height: 24px; color: var(--accent); margin-top: 1px; }
-  .promise p { margin: 0; }
-  .promise button { grid-column: 2; justify-self: end; border: 0; background: var(--accent-btn); color: #fff; font-weight: 600; border-radius: 16px; padding: 7px 16px; cursor: pointer; }
 
   /* ——— Grand écran : panneaux à gauche ——— */
   @media (min-width: 768px) {
     .locate { bottom: 40px; right: 16px; }
     .modes-ctl { bottom: 100px; right: 16px; }
   
+  
   }
 
   @media (prefers-reduced-motion: reduce) {
     .locate.busy svg { animation: none; }
+  
   
   }
 
@@ -2527,6 +2354,7 @@
     :global(.maplibregl-ctrl-attrib) { background: rgb(28 31 36 / 0.8) !important; color: var(--muted); }
     :global(.maplibregl-ctrl-attrib a) { color: var(--muted) !important; }
     :global(.maplibregl-ctrl-attrib-button) { filter: invert(1); }
+  
   
   }
   /* Flèche classique sur la carte, main fermée seulement pendant qu'on la fait glisser. */
