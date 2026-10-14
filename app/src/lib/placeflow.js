@@ -52,7 +52,7 @@ export function createPlace(app) {
     try { app.info = await details(p); } catch { app.info = {}; }
     if (app.place?.id !== p.id) return;
     // Lien partagé : on ne connaissait que l'identifiant du lieu, on récupère son nom.
-    if (!p.name && app.info.name) { app.place = { ...app.place, name: app.info.name, type: app.info.kind || app.place.type }; remember(app.place); app.showSelection(app.place); }
+    if (!p.name && app.info.name) { app.place = { ...app.place, name: app.info.name, type: app.info.kind || app.info.type || app.place.type }; remember(app.place); app.showSelection(app.place); }
     if (app.info.wikidata || app.info.wikipedia) {
       const w = await wikiInfo(app.info).catch(() => null);
       if (app.place?.id === p.id) app.wiki = w;

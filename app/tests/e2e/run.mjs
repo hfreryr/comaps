@@ -83,6 +83,21 @@ const tests = {
     }
     assert(!bad.length, bad.join(' | '));
   },
+  async 'lien partagé vers un lieu : fiche complète ; lieu inexistant : message « introuvable »'() {
+    // Panthéon : way 16407465 dans nos tuiles. Le lien porte le vrai numéro OSM (pas le numéro codé des tuiles).
+    let { p, ctx, errors } = await page({}, '#carte=18/48.846219/2.346008&lieu=way/16407465');
+    await p.waitForSelector('.sheet h1', { timeout: 15000 }); await p.waitForTimeout(2000);
+    let txt = await p.$eval('.sheet', (e) => e.innerText);
+    assert(/Panthéon/.test(txt), `nom absent : ${txt.slice(0, 120)}`);
+    assert(!/hors de la zone|introuvable/.test(txt), 'message d\'erreur affiché pour un lieu existant');
+    assert(!errors.length, errors.join(' | '));
+    await ctx.close();
+    ({ p, ctx } = await page({}, '#carte=18/48.846219/2.346008&lieu=node/1'));
+    await p.waitForSelector('.sheet', { timeout: 15000 }); await p.waitForTimeout(2500);
+    txt = await p.$eval('.sheet', (e) => e.innerText);
+    assert(/introuvable/.test(txt) && !/hors de la zone/.test(txt), `message attendu « introuvable » : ${txt.slice(0, 200)}`);
+    await ctx.close();
+  },
   async 'adresse via Géoplateforme'() {
     const { p, ctx } = await page();
     await p.fill('#search', '57 rue de rennes'); await p.waitForSelector('.results li.opt', { timeout: 30000 });
