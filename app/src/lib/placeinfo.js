@@ -4,6 +4,11 @@
 // Confidentialité : la photo et l'extrait sont demandés à Wikimedia (fondation à but non lucratif,
 // sans publicité) au moment où l'on ouvre la fiche d'un lieu qui a une page Wikipédia ou Wikidata.
 // Rien d'autre n'est envoyé que le nom de la page demandée.
+import { APP_AGENT } from './config.js';
+
+// En-tête demandé par Wikimedia pour identifier l'app (politique « User-Agent »). Commons l'accepte en CORS ;
+// la page Special:EntityData de Wikidata le refuse (pas dans ses en-têtes autorisés) : elle est appelée sans.
+const WM = { headers: { 'Api-User-Agent': APP_AGENT } };
 
 
 /** Type de lieu en français, le plus précis possible d'après les étiquettes OSM. */
@@ -115,7 +120,7 @@ export async function wikiInfo({ wikidata, wikipedia }, signal) {
   const m = /^fr:(.+)$/.exec(wikipedia || '');
   if (m) title = m[1];
   if (wikidata && /^Q\d+$/.test(wikidata)) {
-    const r = await fetch(`https://www.wikidata.org/wiki/Special:EntityData/${wikidata}.json`, { signal, ...WM }).catch(() => null);
+    const r = await fetch(`https://www.wikidata.org/wiki/Special:EntityData/${wikidata}.json`, { signal }).catch(() => null);
     const e = r?.ok ? (await r.json()).entities?.[wikidata] : null;
     title ||= e?.sitelinks?.frwiki?.title || null;
     file = e?.claims?.P18?.[0]?.mainsnak?.datavalue?.value || null;   // image choisie par la communauté Wikidata
