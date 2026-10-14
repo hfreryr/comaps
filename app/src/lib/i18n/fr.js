@@ -25,6 +25,8 @@ export default {
   'recherche.depart': 'Départ',
   'recherche.arrivee': 'Arrivée',
   // ——— Résultats de recherche ———
+  'resultats.preuve': '0 traceur · 0 cookie · code ouvert ·',
+  'resultats.verifier': 'Vérifier',
   'resultats.liste_aria': 'Résultats de la recherche',
   'resultats.ou_touchez_la_carte_pour_choisir_un': 'Ou touchez la carte pour choisir un point.',
   'resultats.votre_position': 'Votre position',
@@ -40,7 +42,6 @@ export default {
   'resultats.aucun_resultat_pour_essayez_un_nom': 'Aucun résultat pour « {recherche} ». Essayez un nom de lieu ou une adresse.',
   'resultats.recherche': 'Recherche…',
   'resultats.importer_vos_lieux_depuis_google': 'Importer vos lieux depuis Google Maps',
-  'resultats.ni_compte_ni_pistage_rien_sur_vous': 'Ni compte, ni pistage : rien sur vous n\'est collecté.',
 
   'resultats.ajouter': 'Ajouter',
   'resultats.pres_de_vous_2': 'Près de vous',
@@ -53,6 +54,9 @@ export default {
   'resultats.maison': 'maison',
   'resultats.travail': 'travail',
   // ——— Liste d'une catégorie et Mes lieux ———
+  'liste.apparence_de_la_liste': 'Pictogramme et couleur de la liste',
+  'liste.pictogramme': 'Pictogramme {nom}',
+  'liste.couleur': 'Couleur',
   'liste.agrandir_la_fiche': 'Agrandir la fiche',
   'liste.fermer_la_liste': 'Fermer la liste',
   'liste.listes': 'Listes',
@@ -179,6 +183,7 @@ export default {
   'fiche.sortie': 'Sortie {ref}',
   'fiche.lieux_recents_effaces': 'Lieux récents effacés',
   // ——— Itinéraire ———
+  'itin.a_station_sortie': 'À {station}, {sortie}',
   'itin.mode_de_deplacement': 'Mode de déplacement',
   'itin.calcul_en_cours': 'Calcul en cours',
   'itin.choisissez_un_point_de_depart_pour': 'Choisissez un point de départ pour calculer l\'itinéraire.',
@@ -386,6 +391,11 @@ export default {
   'ecran.connexion_retablie': 'Connexion rétablie',
   'ecran.reduire_la_fiche': 'Réduire la fiche',
   // ——— Page « Qui voit quoi » ———
+  'confidentialite.verifiez_vous_meme': 'Vérifiez vous-même',
+  'confidentialite.verif_traceurs': '0 traceur : aucun outil de mesure d\'audience ni de publicité. La page n\'a le droit de contacter que les services listés plus haut (règle imposée au navigateur, visible dans le code de la page).',
+  'confidentialite.verif_cookies': '0 cookie : l\'app n\'en dépose aucun. Vos lieux sont gardés dans le stockage de votre navigateur, que vous pouvez effacer à tout moment.',
+  'confidentialite.verif_code': 'Code ouvert : tout le code de l\'app est public et libre (AGPL 3.0), n\'importe qui peut le relire :',
+  'confidentialite.verif_tests': 'À chaque modification, des tests automatiques vérifient qu\'aucun cookie n\'est déposé et qu\'aucun service non listé n\'est contacté.',
   'confidentialite.qui_voit_quoi_untracked_maps': 'Qui voit quoi · Untracked Maps',
   'confidentialite.retour_a_la_carte': '‹ Retour à la carte',
   'confidentialite.qui_voit_quoi': 'Qui voit quoi',

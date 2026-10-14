@@ -99,7 +99,8 @@
       <li class="list-foot">
         <button class="link" onmousedown={(e) => { e.preventDefault(); app.importOpen = true; app.focused = false; document.activeElement?.blur(); }}>{tx('resultats.importer_vos_lieux_depuis_google')}</button>
         <button class="link" onmousedown={(e) => { e.preventDefault(); app.editChips = true; app.focused = false; document.activeElement?.blur(); }}>{tx('recherche.personnaliser_les_raccourcis')}</button>
-        <span class="privacy-line">{tx('resultats.ni_compte_ni_pistage_rien_sur_vous')}</span>
+        <!-- une preuve vérifiable plutôt qu'une promesse (test P3 : « aucune certitude que ça ne me suit pas ») -->
+        <a class="privacy-line" href="confidentialite#verifier" onmousedown={(e) => e.preventDefault()}>{tx('resultats.preuve')} <span class="privacy-check">{tx('resultats.verifier')}</span></a>
       </li>
     {/if}
   </ul>
@@ -132,5 +133,6 @@
   .results .pinned-li { padding: 4px 14px 2px; }
   .list-foot { display: grid; justify-items: start; gap: 2px; padding: 10px 16px 6px 48px; border-top: 1px solid var(--line); margin-top: 6px; }
   .results .list-foot .link { font-size: 14.5px; }
-  .privacy-line { font-size: 12.5px; color: var(--muted); padding-top: 6px; }
+  .privacy-line { font-size: 12.5px; color: var(--muted); padding-top: 6px; text-decoration: none; }
+  .privacy-check { color: var(--accent); font-weight: 600; }
 </style>

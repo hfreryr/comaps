@@ -525,6 +525,7 @@
 
   // <app> État et actions partagés avec les composants et modules de l'écran (getContext('app')). Bloc généré.
   const app = {
+    get setListStyle() { return setListStyle; },
     get BACKUP_KEY() { return BACKUP_KEY; }, get BIKE_COLOR() { return BIKE_COLOR; }, get FAVS_KEY() { return FAVS_KEY; },
     get LISTS_KEY() { return LISTS_KEY; }, get NAV() { return NAV; }, get PINS_KEY() { return PINS_KEY; },
     get RECENTS_KEY() { return RECENTS_KEY; }, get SHORTCUTS_KEY() { return SHORTCUTS_KEY; }, get SHORT_NAMES() { return SHORT_NAMES; },
@@ -660,7 +661,7 @@
   const { favData, addCustomLayers, drawRoute, line, shade, dimPlaces, setMapMode, fitOptions, boundsOf, fitTo, onMapClick, openPoint, openFeature, frame, placeMarker, labelColor, clearSelPhoto, clearPhotoPins, clearSelection, showSelection } = createMapDraw(app);
   const { saveFavorites, setShortcut, useShortcut } = createShortcuts(app);
   const { saveChips, moveChip, toggleChip, renameChip, resetChips, catOf } = createChips(app);
-  const { sameSpot, saveAll, keepOf, saveTap, setMembership, togglePin, removeFromList, createList, renameList, deleteList, refreshSaved, openSavedList, shareList, keepIncomingList, makeTransfer, shareTransfer, applyIncoming, makeBackup, doRestore } = createMyPlaces(app);
+  const { sameSpot, saveAll, keepOf, saveTap, setMembership, togglePin, removeFromList, createList, renameList, setListStyle, deleteList, refreshSaved, openSavedList, shareList, keepIncomingList, makeTransfer, shareTransfer, applyIncoming, makeBackup, doRestore } = createMyPlaces(app);
   const { remember, forgetRecents, openPlace, sharePlace, loadDepartures, closePlace } = createPlace(app);
   const { clearSearch, hitFilter, catIcon, applyHit, displayName, collectCategory, applyOpenFilter, setOpenAt, momentFrom, quickMoment, nearView, reloadCategoryHere, pickCategory, clearCategory, dist, openCategoryFromSearch, onKey, pickResult } = createSearch(app);
   const { say, isolate, closeTop, onPopState, onKeyDown, undoToast, showMe } = createScreen(app);

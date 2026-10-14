@@ -2,6 +2,7 @@
   import { tx } from '#lib/i18n/index.js';
   import { getContext } from 'svelte';
   import ListDot from '#lib/ui/ListDot.svelte';
+  import { LIST_ICONS, LIST_COLORS } from '#lib/myplaces.js';
   import PinnedRow from '#lib/ui/PinnedRow.svelte';
   import { draggable } from '#lib/sheet.js';
   import { fmtDistance, fmtWait } from '#lib/routing.js';
@@ -96,12 +97,29 @@
           {#if app.category.shared}
             <button class="go" onclick={app.keepIncomingList}>{tx('liste.ajouter_a_mes_lieux')}</button>
           {:else}
-            {#if app.nearby.length}<button class="link" onclick={() => { app.listEditing = !app.listEditing; app.swiped = null; }}>{app.listEditing ? tx('enregistrer.termine') : tx('liste.modifier')}</button>{/if}
+            <button class="link" onclick={() => { app.listEditing = !app.listEditing; app.swiped = null; }}>{app.listEditing ? tx('enregistrer.termine') : tx('liste.modifier')}</button>
             {#if app.nearby.length && !app.listEditing}<button class="link" onclick={() => app.shareList(l)}>{tx('liste.partager')}</button>{/if}
             <button class="link" onclick={() => app.renameList(l)}>{tx('liste.renommer')}</button>
             {#if !['fav', 'todo'].includes(l.id)}<button class="link danger" onclick={() => app.deleteList(l)}>{tx('liste.supprimer')}</button>{/if}
           {/if}
         </div>
+        {#if app.listEditing && !app.category.shared}
+          <!-- pictogramme et couleur de la liste -->
+          <div class="list-style" role="group" aria-label={tx('liste.apparence_de_la_liste')}>
+            <div class="ls-row">
+              {#each LIST_ICONS as ic}
+                <button class="ls-btn" class:on={l.icon === ic} aria-pressed={l.icon === ic} aria-label={tx('liste.pictogramme', { nom: ic })}
+                  onclick={() => app.setListStyle(l, { icon: ic })}><ListDot l={{ ...l, icon: ic }} size={30} /></button>
+              {/each}
+            </div>
+            <div class="ls-row">
+              {#each LIST_COLORS as col}
+                <button class="ls-color" class:on={l.color === col} aria-pressed={l.color === col} aria-label={tx('liste.couleur')}
+                  style:background={col} onclick={() => app.setListStyle(l, { color: col })}></button>
+              {/each}
+            </div>
+          </div>
+        {/if}
       {:else}
       <h1>{app.chipList.find((c) => c.key === app.category.key)?.label || app.category.label}</h1>
       {#if app.openAt && app.openCounts}
@@ -311,4 +329,10 @@
 
     .chev { animation: none; transition: none; }
   }
+  .list-style { display: grid; gap: 10px; margin: 10px 0 4px; }
+  .ls-row { display: flex; flex-wrap: wrap; gap: 6px; }
+  .ls-btn { padding: 2px; border: 2px solid transparent; border-radius: 50%; background: none; cursor: pointer; line-height: 0; }
+  .ls-btn.on { border-color: var(--accent); }
+  .ls-color { width: 28px; height: 28px; border-radius: 50%; border: 3px solid var(--card); box-shadow: 0 0 0 1px var(--line); cursor: pointer; }
+  .ls-color.on { box-shadow: 0 0 0 2px var(--accent); }
 </style>
