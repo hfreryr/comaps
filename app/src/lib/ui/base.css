@@ -1,0 +1,83 @@
+/* Styles partagés par la page et ses composants (fiches, itinéraires, transports).
+   Globaux, mais limités à des classes propres à l'app. Extraits de +page.svelte le 14/10/2026. */
+.app svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.app svg .solid { fill: currentColor; stroke: none; }
+@keyframes pulse { 50% { opacity: 0.35; } }
+
+.dots { display: inline-block; width: 22px; height: 6px; background: radial-gradient(circle, currentColor 2px, transparent 2.5px) 0 0 / 8px 6px repeat-x; opacity: 0.5; animation: pulse 1s infinite; }
+.sheet {
+  position: absolute; z-index: 3; left: 0; right: 0; bottom: 0; box-sizing: border-box;
+  max-height: 46vh; overflow-y: auto; overscroll-behavior: contain;
+  background: var(--card); border-radius: 26px 26px 0 0; box-shadow: var(--shadow-sheet);
+  padding: 6px var(--gutter) calc(20px + env(safe-area-inset-bottom));
+  animation: rise 280ms cubic-bezier(0.2, 0.9, 0.25, 1);
+}
+@keyframes rise { from { transform: translateY(60px); opacity: 0.4; } }
+/* Poignée : barre discrète, mais zone de toucher confortable (44 px) */
+.grip {
+  display: block; width: 72px; height: 22px; margin: -6px auto 4px; padding: 0; border: 0; background: none; cursor: pointer;
+  position: relative;
+}
+.grip::before { content: ''; position: absolute; left: 18px; right: 18px; top: 8px; height: 5px; border-radius: 3px; background: var(--grip); }
+.grip[hidden] { visibility: hidden; display: block; }
+.go { display: inline-flex; align-items: center; gap: 5px; border: 0; border-radius: 12px; background: #1E9E4A; color: #fff;
+  font-size: 15px; font-weight: 600; padding: 0 14px; height: 40px; cursor: pointer; }
+.go svg { width: 14px; height: 14px; }
+.go.wide { width: 100%; justify-content: center; margin: 4px 0 6px; }
+.traffic-note { margin-top: 8px; }
+.empty { color: var(--muted); font-size: 15.5px; line-height: 1.45; margin: 4px 0 8px; }
+.retry { border: 0; background: var(--fill); color: var(--accent); font-weight: 600; padding: 10px 16px; border-radius: 12px; cursor: pointer; }
+.steps { list-style: none; margin: 0; padding: 0; counter-reset: step; }
+.steps li {
+  display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: baseline;
+  padding: 12px 0; border-bottom: 1px solid var(--line); font-size: 15.5px; line-height: 1.35;
+}
+.step-dist { color: var(--muted); font-size: 14px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.steps .arrive { font-weight: 600; border-bottom: 0; }
+.steps li.stop { font-weight: 600; }
+.traffic-note { font-size: 12.5px; color: var(--muted); margin: 6px 0 0; line-height: 1.4; }
+.opt-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.chain { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; min-width: 0; }
+.sep { color: var(--faint); font-size: 15px; }
+.walk-chip { display: grid; place-items: center; color: var(--muted); }
+.walk-chip svg { width: 18px; height: 18px; }
+.badge {
+  display: inline-grid; place-items: center; min-width: 26px; height: 24px; padding: 0 7px; border-radius: 7px;
+  font-size: 13px; font-weight: 700; line-height: 1; white-space: nowrap;
+}
+.badge.small { height: 20px; min-width: 22px; font-size: 12px; padding: 0 6px; margin-right: 4px; }
+.live { color: var(--open); font-size: 10px; vertical-align: 2px; }
+.badge.round { border-radius: 50%; width: 26px; min-width: 26px; height: 26px; padding: 0; }
+.stop-chip { width: 10px; height: 10px; border-radius: 2px; border: 2.5px solid var(--muted); background: var(--card); }
+.leg-rail.stop { background: none; border: 2.5px solid var(--muted); border-radius: 3px; width: 8px; height: 8px; align-self: start; margin-top: 6px; }
+.legs { list-style: none; margin: 0; padding: 4px 20px 14px; background: var(--soft-accent); }
+.leg { display: grid; grid-template-columns: 44px 16px 1fr; gap: 10px; min-height: 52px; }
+.leg-time { font-size: 13.5px; font-weight: 600; font-variant-numeric: tabular-nums; padding-top: 1px; }
+.leg-rail { width: 6px; border-radius: 3px; justify-self: center; margin-top: 4px; }
+.leg-rail.walk { width: 4px; background: repeating-linear-gradient(var(--walk-rail) 0 4px, transparent 4px 8px); }
+.leg-rail.end { width: 12px; height: 12px; border-radius: 50%; background: var(--end); margin-top: 3px; }
+.leg-body { display: grid; gap: 3px; padding-bottom: 12px; min-width: 0; }
+.leg-place { font-size: 15px; font-weight: 600; }
+.leg-meta { font-size: 13.5px; color: var(--muted); display: flex; align-items: center; flex-wrap: wrap; }
+.credit { font-size: 12.5px; color: var(--muted); margin: 12px 0 0; }
+.credit a { color: inherit; }
+.badge.small.round { width: 20px; min-width: 20px; height: 20px; }
+.exit-sq { display: inline-block; width: 12px; height: 12px; border-radius: 3px; background: #2E8B57; flex: none; margin-right: 6px; vertical-align: -1px; }
+.leg-exit, .leg-tip { font-size: 13.5px; color: var(--ink); margin-top: 4px; display: flex; align-items: flex-start; line-height: 1.35; }
+.leg-exit .exit-sq { margin-top: 3px; }
+.car-ic { flex: none; width: 14px; height: 10px; margin: 4px 6px 0 0; border: 2px solid var(--ink); border-radius: 3px; box-sizing: border-box;
+  background: linear-gradient(90deg, transparent 30%, var(--ink) 30% 40%, transparent 40% 60%, var(--ink) 60% 70%, transparent 70%); }
+
+@media (min-width: 768px) {
+  .sheet {
+    left: 16px; right: auto; bottom: auto; top: calc(var(--top-h, 112px) + 16px); width: 400px;
+    max-height: calc(100vh - var(--top-h, 112px) - 32px);
+    border-radius: 20px; padding: 18px 22px 22px; box-shadow: var(--shadow-float); animation-name: appear;
+  }
+  @keyframes appear { from { transform: translateY(-6px); opacity: 0; } }
+  .grip { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sheet { animation: none; transition: none; }
+  .dots { animation: none; }
+}

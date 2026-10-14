@@ -3,6 +3,10 @@
   import * as maplibregl from 'maplibre-gl';
   import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
   import 'maplibre-gl/dist/maplibre-gl.css';
+  import '#lib/ui/base.css';
+  import ModeIcon from '#lib/ui/ModeIcon.svelte';
+  import { badge, streetOpts } from '#lib/routeview.js';
+  import RouteSheet from '#lib/ui/RouteSheet.svelte';
   import { searchCategory, details, typeLabel, fromTags, PARIS } from '#lib/places.js';
   import { search, reverse, reverseAddress } from '#lib/geocode.js';
   import { dataDate } from '#lib/placestore.js';
@@ -21,12 +25,6 @@
   import { ALL_CATEGORIES, CATEGORY_WORDS, FILLER, CHIPS_KEY, loadChipPrefs, categoryFor as catFor } from '#lib/categories.js';
   import { prepare, progress, arrowAngle, isRoundabout, navDistance, spokenDistance } from '#lib/nav.js';
 
-  const MODES = [
-    { id: 'walk', label: 'À pied' },
-    { id: 'bike', label: 'Vélo' },
-    { id: 'transit', label: 'Transports' },
-    { id: 'car', label: 'Voiture' }
-  ];
   const WALK_COLOR = '#2A5BD7';
   const BIKE_COLOR = WALK_COLOR;   // une seule couleur pour « mon itinéraire », comme Plans
 
@@ -1726,14 +1724,6 @@
     showSteps = false;
     drawRoute();
   }
-  const streetOpts = (r) => (r ? [r, ...(r.alts || [])] : []);
-  // « 3 min de plus » ; à durée affichée égale : la différence de distance (sinon « 1 min de plus » sous deux « 22 min »)
-  function altTag(r, best) {
-    const dm = Math.round(r.duration / 60) - Math.round(best.duration / 60);
-    if (dm > 0) return `${dm} min de plus`;
-    const dd = r.distance - best.distance;
-    return dd > 50 ? `Même durée · ${fmtDistance(dd)} de plus` : 'Autre itinéraire, même durée';
-  }
   // Choisir un autre itinéraire : son résumé remonte en tête de fiche.
   const sheetToTop = () => document.querySelector('.route-sheet')?.scrollTo({ top: 0, behavior: 'smooth' });
   function pickStreet(i) {
@@ -1963,22 +1953,10 @@
     return { eta: fmtTime(new Date(now + left * 1000)), min: fmtDuration(left), km: fmtDistance(Math.max(0, nav.total - nav.s)) };
   });
 
-  const arrival = (seconds) => fmtTime(new Date(Date.now() + seconds * 1000));
-  const inMinutes = (d) => {
-    const m = Math.round((d - Date.now()) / 60000);
-    return m <= 0 ? 'maintenant' : m < 60 ? `dans ${m} min` : `à ${fmtTime(d)}`;
-  };
-  const PREFIX = { SUBWAY: 'M', METRO: 'M', TRAM: 'T', BUS: 'Bus', REGIONAL_RAIL: 'RER', SUBURBAN: 'RER' };
-  const badge = (leg) => `${PREFIX[leg.mode] ? PREFIX[leg.mode] + ' ' : ''}${leg.line}`.trim();
 
   const host = (url) => { try { return new URL(href(url)).hostname.replace(/^www\./, ''); } catch { return url; } };
   const href = (url) => (/^https?:\/\//.test(url) ? url : `https://${url}`);
   const famColor = (c) => c.color || FAMILIES[c.family].color;
-  // « prenez la sortie 2 · Rue de Rennes » ; sans numéro : « prenez la sortie rue de Rennes » ; nom générique (« Entrée / Sortie ») : « prenez la sortie »
-  const exitPhrase = (e) => {
-    if (e.ref) return `prenez la ${exitLabel(e).replace(/^Sortie/, 'sortie')}`;
-    return e.name && !/^(entr[ée]e|sortie|acc[èe]s)\b/i.test(e.name) ? `prenez la sortie ${e.name}` : '';
-  };
 
   // À la descente du métro ou du RER : sortie conseillée (la plus proche de l'étape suivante, d'après OSM)
   // et place dans la rame (données RATP / IDFM). Pour une correspondance : place pour changer au plus vite.
@@ -2028,33 +2006,9 @@
   });
 </script>
 
-{#snippet legChain(it)}
-  <span class="chain">
-    {#each it.legs as leg, j}
-      {#if j > 0}<span class="sep" aria-hidden="true">›</span>{/if}
-      {#if leg.mode === 'STOP'}
-        <span class="stop-chip" aria-label={`Arrêt : ${leg.from}`}></span>
-      {:else if leg.mode === 'WALK'}
-        <span class="walk-chip" aria-label={`Marche ${fmtDuration(leg.duration)}`}>{@render modeIcon('walk')}</span>
-      {:else}
-        <span class="badge" style:background={leg.color} style:color={leg.textColor}
-          aria-label={`${MODE_NAMES[leg.mode] || 'Ligne'} ${leg.line}`}>{badge(leg)}</span>
-      {/if}
-    {/each}
-  </span>
-{/snippet}
 
-{#snippet modeIcon(id)}
-  {#if id === 'walk'}
-    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="13" cy="4.5" r="1.9" class="solid" /><path d="m9.5 21 2.2-7 2.6 2.6V21M7.5 12.5 10 8.4l3.4.4 1.9 3 2.7 1.2M11.7 14l-.9-4.7" /></svg>
-  {:else if id === 'car'}
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 16.5V12l1.8-4.6A2 2 0 0 1 8.7 6h6.6a2 2 0 0 1 1.9 1.4L19 12v4.5" /><path d="M3.5 12.5h17v4.5h-17zM6 17v2.2M18 17v2.2" /><circle cx="7.5" cy="14.7" r=".9" class="solid" /><circle cx="16.5" cy="14.7" r=".9" class="solid" /></svg>
-  {:else if id === 'bike'}
-    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5.8" cy="16" r="3.6" /><circle cx="18.2" cy="16" r="3.6" /><path d="m5.8 16 4-7.2h5.8L18.2 16M9.8 8.8l3.6 7.2H5.8M13.6 5.6h2.6" /></svg>
-  {:else}
-    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5.5" y="3" width="13" height="13.5" rx="3.5" /><path d="M5.5 10h13M8 20.5l2-3.6M16 20.5l-2-3.6" /><circle cx="9" cy="13.4" r=".9" class="solid" /><circle cx="15" cy="13.4" r=".9" class="solid" /></svg>
-  {/if}
-{/snippet}
+
+
 
 {#snippet listDot(l, size = 34)}
   <span class="list-dot" style:--lc={l.color} style:width={`${size}px`} style:height={`${size}px`} aria-hidden="true">
@@ -2450,7 +2404,7 @@
         <span class="nav-icon" aria-hidden="true">
           {#if navBanner.arrived || navBanner.icon === 'arrive' || navBanner.icon === 'stop'}
             <svg viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z" class="solid" /><circle cx="12" cy="9.5" r="2.6" class="hole" /></svg>
-          {:else if navBanner.icon === 'walk'}{@render modeIcon('walk')}
+          {:else if navBanner.icon === 'walk'}<ModeIcon id="walk" />
           {:else if navBanner.icon === 'board' || navBanner.icon === 'alight'}
             <span class="badge" class:round={navBanner.line?.mode === 'SUBWAY' || navBanner.line?.mode === 'METRO'} style:background={navBanner.line?.color} style:color={navBanner.line?.textColor}>{navBanner.line ? badge(navBanner.line) : ''}</span>
           {:else if isRoundabout(navBanner.icon)}
@@ -2638,165 +2592,8 @@
       <button class="link more" onclick={resetChips}>Revenir aux raccourcis d'origine</button>
     </section>
   {:else if directions && !editing && !nav}
-    <section class="sheet route-sheet" aria-label="Itinéraire" use:draggable={{ key: `${from?.lat},${to?.lat},${mode}`, start: 'peek' }}>
-      <button class="grip" aria-label="Agrandir la fiche"></button>
-      <div class="mode-tabs" role="tablist" aria-label="Mode de déplacement">
-        {#each MODES as m}
-          {@const r = routes[m.id]}
-          <button class="mode-tab" class:on={mode === m.id} role="tab" aria-selected={mode === m.id} onclick={() => chooseMode(m.id)} aria-label={m.label}>
-            {@render modeIcon(m.id)}
-            <span class="mode-time">
-              {#if !r}{m.label}
-              {:else if r.status === 'loading'}<span class="dots" aria-label="Calcul en cours"></span>
-              {:else if r.status === 'ok'}{fmtDuration(m.id === 'transit' ? (r.data[m.id === mode ? picked : 0] || r.data[0]).duration
-                : (streetOpts(r.data)[m.id === mode ? pickedStreet : 0] || r.data).duration)}
-              {:else}–{/if}
-            </span>
-          </button>
-        {/each}
-      </div>
-      {#if !from}
-        <p class="empty" data-peek-end>Choisissez un point de départ pour calculer l'itinéraire.</p>
-      {:else if !current || current.status === 'loading'}
-        <p class="empty" data-peek-end>Calcul de l'itinéraire…</p>
-      {:else if current.status === 'none' && mode === 'transit' && routes.walk?.status === 'ok'}
-        <div data-peek-end>
-          <p class="empty">Pas de transport utile sur ce trajet : à pied, c'est {fmtDuration(routes.walk.data.duration)}.</p>
-          <button class="retry" onclick={() => chooseMode('walk')}>Voir le trajet à pied</button>
-        </div>
-      {:else if current.status === 'none'}
-        <p class="empty" data-peek-end>Aucun itinéraire {mode === 'transit' ? 'en transports en commun' : mode === 'bike' ? 'à vélo' : mode === 'car' ? 'en voiture' : 'à pied'} trouvé entre ces deux points.</p>
-      {:else if current.status === 'error'}
-        <div data-peek-end>
-          <p class="empty">Le service d'itinéraire ne répond pas. Réessayez dans un instant.</p>
-          <button class="retry" onclick={computeRoutes}>Réessayer</button>
-        </div>
-      {:else if mode !== 'transit'}
-        {@const opts = streetOpts(current.data)}
-        {@const sel = opts[pickedStreet] || opts[0]}
-        <div class="sum" data-peek-end>
-          <div class="sum-text">
-            <span class="sum-dur">{fmtDuration(sel.duration)}</span>
-            <span class="sum-sub">Arrivée {arrival(sel.duration)} · {fmtDistance(sel.distance)}</span>
-            <span class="sum-tag" class:best={pickedStreet === 0}>{pickedStreet === 0 ? (opts.length > 1 ? 'Le plus rapide' : '') : altTag(sel, opts[0])}</span>
-          </div>
-          <div class="sum-actions">
-            <button class="go" onclick={() => startNav(sel)}>
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4 19 20l-7-4-7 4z" class="solid" /></svg>Aller
-            </button>
-            {#if !showVia}<button class="soft-btn" onclick={addStop}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12M6 12h12" /></svg>Arrêt</button>{/if}
-          </div>
-        </div>
-        {#if opts.length > 1}
-          <h3 class="sub-h">Autres itinéraires <small>(aussi sur la carte)</small></h3>
-          <ul class="alt-list">
-            {#each opts as r, i}
-              {#if i !== pickedStreet}
-                <li><button onclick={() => pickStreet(i)}>
-                  <span class="alt-dur">{fmtDuration(r.duration)}</span>
-                  <span class="alt-sub">Arrivée {arrival(r.duration)} · {fmtDistance(r.distance)} · {i === 0 ? 'le plus rapide' : altTag(r, opts[0]).toLowerCase()}</span>
-                </button></li>
-              {/if}
-            {/each}
-          </ul>
-        {/if}
-        {#if mode === 'bike'}
-          <p class="traffic-note">Itinéraire adapté aux vélos : pistes cyclables et rues calmes en priorité.</p>
-        {/if}
-        {#if mode === 'car'}
-          <p class="traffic-note">{sel.traffic ? `Estimation avec le ${sel.traffic}` : 'Estimation sur route fluide'}, d'après les capteurs de la Ville de Paris. Pas de trafic en temps réel : nous ne suivons pas les téléphones.</p>
-        {/if}
-        <h3 class="sub-h">Étapes</h3>
-        <ol class="steps">
-          {#each sel.steps as st}
-            <li class:stop={st.stop}><span>{st.text}</span>{#if st.distance >= 10}<span class="step-dist">{fmtDistance(st.distance)}</span>{/if}</li>
-          {/each}
-          <li class="arrive"><span>Arrivée : {to.label}</span></li>
-        </ol>
-      {:else}
-        {@const it = current.data[picked] || current.data[0]}
-        <div class="sum transit" data-peek-end>
-          <div class="sum-text">
-            <span class="opt-top">
-              {@render legChain(it)}
-              <span class="sum-dur small">{fmtDuration(it.duration)}</span>
-            </span>
-            <span class="sum-sub"><strong>{fmtTime(it.board.start)}</strong> à {it.board.from}{#if it.board.realTime}{' '}<span class="live" title="Horaire en temps réel">●</span>{' '}{:else} · {/if}{inMinutes(it.board.start)}</span>
-            <span class="sum-sub">{#if it.next.length}Puis {it.next.map(fmtTime).join(' · ')} · {/if}Arrivée {fmtTime(it.end)}</span>
-          </div>
-          <div class="sum-actions">
-            <button class="go" onclick={() => startNav(it)}>
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4 19 20l-7-4-7 4z" class="solid" /></svg>Aller
-            </button>
-            {#if !showVia}<button class="soft-btn" onclick={addStop}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12M6 12h12" /></svg>Arrêt</button>{/if}
-          </div>
-        </div>
-        <h3 class="sub-h">Étapes</h3>
-        <ol class="legs">
-          {#each it.legs as leg, li}
-            {#if leg.mode === 'STOP'}
-              <li class="leg stop">
-                <span class="leg-time">{fmtTime(leg.start)}</span>
-                <span class="leg-rail stop" aria-hidden="true"></span>
-                <span class="leg-body">
-                  <span class="leg-place">Arrêt : {leg.from}</span>
-                  <span class="leg-meta">Reprise à {fmtTime(leg.end)}{leg.duration > 90 ? ` · ${fmtDuration(leg.duration)} sur place` : ''}</span>
-                </span>
-              </li>
-            {:else if leg.mode === 'WALK'}
-              <li class="leg walk">
-                <span class="leg-time">{fmtTime(leg.start)}</span>
-                <span class="leg-rail walk" aria-hidden="true"></span>
-                <span class="leg-body">
-                  <span class="leg-place">{leg.from}</span>
-                  <span class="leg-meta">Marcher {fmtDuration(leg.duration)}{leg.distance ? ` · ${fmtDistance(leg.distance)}` : ''}</span>
-                </span>
-              </li>
-            {:else}
-              <li class="leg">
-                <span class="leg-time">{fmtTime(leg.start)}</span>
-                <span class="leg-rail" style:background={leg.color} aria-hidden="true"></span>
-                <span class="leg-body">
-                  <span class="leg-place">{leg.from}</span>
-                  <span class="leg-meta">
-                    <span class="badge small" style:background={leg.color} style:color={leg.textColor}>{badge(leg)}</span>
-                    {MODE_NAMES[leg.mode] || ''} direction {leg.headsign}
-                  </span>
-                  <span class="leg-meta">{leg.stops ? `${leg.stops + 1} arrêts · ` : ''}{fmtDuration(leg.duration)}{leg.realTime ? ' · temps réel' : ''}</span>
-                  {#each [legExits[`${picked}|${li}|${leg.to}`]] as tip}
-                  {#if tip?.place}
-                    <span class="leg-tip"><span class="car-ic" aria-hidden="true"></span>Montez {placeLabel(tip.place)}{tip.transfer ? ` pour la correspondance${tip.transfer.line ? ` avec la ligne ${tip.transfer.line}` : ''}` : ''}</span>
-                  {/if}
-                  {#if tip?.exit && exitPhrase(tip.exit)}
-                    <span class="leg-exit"><span class="exit-sq" aria-hidden="true"></span>À {leg.to}, {exitPhrase(tip.exit)}</span>
-                  {/if}
-                  {/each}
-                </span>
-              </li>
-            {/if}
-          {/each}
-          <li class="leg end">
-            <span class="leg-time">{fmtTime(it.end)}</span>
-            <span class="leg-rail end" aria-hidden="true"></span>
-            <span class="leg-body"><span class="leg-place">{to.label}</span></span>
-          </li>
-        </ol>
-        {#if current.data.length > 1}
-          <h3 class="sub-h">Autres itinéraires</h3>
-          <ul class="alt-list">
-            {#each current.data as o, i}
-              {#if i !== picked}
-                <li><button onclick={() => pickTransit(i)}>
-                  <span class="opt-top">{@render legChain(o)}<span class="alt-dur">{fmtDuration(o.duration)}</span></span>
-                  <span class="alt-sub">{fmtTime(o.board.start)} à {o.board.from} · arrivée {fmtTime(o.end)}</span>
-                </button></li>
-              {/if}
-            {/each}
-          </ul>
-        {/if}
-        <p class="credit">Horaires : <a href="https://transitous.org/sources/" target="_blank" rel="noopener">Transitous et réseaux de transport</a> · Place dans la rame : RATP / Île-de-France Mobilités</p>
-      {/if}
-    </section>
+    <RouteSheet {from} {to} {mode} {routes} {picked} {pickedStreet} {showVia} {legExits}
+      {chooseMode} {pickStreet} {pickTransit} {startNav} {addStop} {computeRoutes} />
   {:else if place && !directions}
     <section class="sheet" aria-label={place.name} use:draggable={{ key: place.id, onDismiss: closePlace }}>
       <button class="grip" aria-label="Agrandir la fiche"></button>
@@ -2828,7 +2625,7 @@
       <div class="actions" class:solo={!info?.phone && !info?.website}>
         <button class="action primary" onclick={startDirections}>
           {#if walkEta && /min/.test(walkEta)}
-            {@render modeIcon('walk')}
+            <ModeIcon id="walk" />
             <span>{walkEta.replace(' à pied', '').replace('≈ ', '')}</span>
           {:else}
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8 21.2 12 12 21.2 2.8 12z" class="solid" /><path d="M9.5 14.5v-2.2a1.5 1.5 0 0 1 1.5-1.5h4M13 8.8l2 2-2 2" class="on-solid" /></svg>
@@ -3234,11 +3031,7 @@
   .field-mark.via { width: 7px; height: 7px; border-radius: 2px; border: 2.5px solid var(--muted); background: var(--card); }
   .rm-stop { width: 36px; height: 36px; color: var(--muted); }
   .rm-stop svg { width: 18px; height: 18px; }
-  .steps li.stop { font-weight: 600; }
-  .stop-chip { width: 10px; height: 10px; border-radius: 2px; border: 2.5px solid var(--muted); background: var(--card); }
-  .leg-rail.stop { background: none; border: 2.5px solid var(--muted); border-radius: 3px; width: 8px; height: 8px; align-self: start; margin-top: 6px; }
 
-  .dots { display: inline-block; width: 22px; height: 6px; background: radial-gradient(circle, currentColor 2px, transparent 2.5px) 0 0 / 8px 6px repeat-x; opacity: 0.5; animation: pulse 1s infinite; }
 
   /* ——— Localisation et messages ——— */
   .locate {
@@ -3299,21 +3092,6 @@
   .link { border: 0; background: none; color: var(--accent); font: inherit; font-weight: 500; cursor: pointer; padding: 4px 0; }
 
   /* ——— Fiches ——— */
-  .sheet {
-    position: absolute; z-index: 3; left: 0; right: 0; bottom: 0; box-sizing: border-box;
-    max-height: 46vh; overflow-y: auto; overscroll-behavior: contain;
-    background: var(--card); border-radius: 26px 26px 0 0; box-shadow: var(--shadow-sheet);
-    padding: 6px var(--gutter) calc(20px + env(safe-area-inset-bottom));
-    animation: rise 280ms cubic-bezier(0.2, 0.9, 0.25, 1);
-  }
-  @keyframes rise { from { transform: translateY(60px); opacity: 0.4; } }
-  /* Poignée : barre discrète, mais zone de toucher confortable (44 px) */
-  .grip {
-    display: block; width: 72px; height: 22px; margin: -6px auto 4px; padding: 0; border: 0; background: none; cursor: pointer;
-    position: relative;
-  }
-  .grip::before { content: ''; position: absolute; left: 18px; right: 18px; top: 8px; height: 5px; border-radius: 3px; background: var(--grip); }
-  .grip[hidden] { visibility: hidden; display: block; }
   .close {
     position: absolute; top: 14px; right: 14px; width: 32px; height: 32px; border-radius: 50%;
     border: 0; background: var(--fill); cursor: pointer; display: grid; place-items: center; color: var(--muted);
@@ -3324,45 +3102,6 @@
   .results .list-foot .link { min-height: 40px; }
   .rm-stop { width: 44px; height: 44px; }
   /* ——— Choix de l'itinéraire ——— */
-  .go { display: inline-flex; align-items: center; gap: 5px; border: 0; border-radius: 12px; background: #1E9E4A; color: #fff;
-    font-size: 15px; font-weight: 600; padding: 0 14px; height: 40px; cursor: pointer; }
-  .go svg { width: 14px; height: 14px; }
-  .go.wide { width: 100%; justify-content: center; margin: 4px 0 6px; }
-  .traffic-note { margin-top: 8px; }
-  /* Onglets des modes, en tête de fiche (comme Google Maps) : icône + temps, trait sous le mode choisi */
-  .mode-tabs { display: flex; margin: 0 -16px; padding: 0 8px; border-bottom: 1px solid var(--line); }
-  .mode-tab {
-    flex: 1; min-width: 0; display: inline-flex; align-items: center; justify-content: center; gap: 4px; height: 42px; padding: 0 2px;
-    border: 0; background: none; cursor: pointer; color: var(--muted); font-size: var(--fs-meta); font-weight: 600;
-    font-variant-numeric: tabular-nums; white-space: nowrap; position: relative;
-  }
-  .mode-tab svg { width: 18px; height: 18px; flex: none; }
-  .mode-tab.on { color: var(--accent); }
-  .mode-tab.on::after { content: ''; position: absolute; left: 14%; right: 14%; bottom: -1px; height: 3px; border-radius: 3px 3px 0 0; background: var(--accent); }
-  .route-sheet .empty, .route-sheet [data-peek-end] > .empty { margin-top: 12px; }
-  /* Résumé de l'itinéraire choisi : ce que l'aperçu montre */
-  .sum { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; padding: 10px 0 2px; }
-  .sum-text { display: grid; gap: 1px; min-width: 0; }
-  .sum-dur { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.2; }
-  .sum-dur.small { font-size: 18px; white-space: nowrap; }
-  .sum-sub { font-size: var(--fs-meta); color: var(--muted); font-variant-numeric: tabular-nums; }
-  .sum-sub strong { color: var(--ink); font-weight: 600; }
-  .sum-tag { font-size: var(--fs-small); color: var(--muted); font-weight: 500; }
-  .sum-tag.best { color: var(--open); font-weight: 600; }
-  .sum-tag:empty { display: none; }
-  .sum-actions { display: flex; gap: 8px; }
-  .sum-actions .go { flex: 1; justify-content: center; }
-  .soft-btn { display: inline-flex; align-items: center; gap: 4px; height: 40px; padding: 0 14px; border: 0; border-radius: 12px;
-    background: var(--fill); color: var(--accent); font-size: var(--fs-body); font-weight: 600; cursor: pointer; }
-  .soft-btn svg { width: 16px; height: 16px; stroke-width: 2.2; }
-  .sub-h { font-size: var(--fs-meta); font-weight: 700; color: var(--muted); text-transform: none; margin: 16px 0 6px; }
-  .sub-h small { font-weight: 500; }
-  .alt-list { list-style: none; margin: 0 -16px; padding: 0; }
-  .alt-list li + li { border-top: 1px solid var(--line); }
-  .alt-list button { display: grid; gap: 2px; width: 100%; padding: 9px 16px; border: 0; background: none; text-align: left; cursor: pointer; }
-  .alt-list button:active { background: var(--fill); }
-  .alt-dur { font-size: var(--fs-body); font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .alt-sub { font-size: var(--fs-small); color: var(--muted); font-variant-numeric: tabular-nums; }
 
   /* ——— Guidage ——— */
   .navigating .modes-ctl, .navigating .locate { display: none; }
@@ -3374,7 +3113,7 @@
   .nav-top.arrived { background: #1E7A3E; }
   .nav-main { display: grid; grid-template-columns: 52px 1fr; gap: 12px; align-items: center; }
   .nav-icon { width: 52px; height: 52px; display: grid; place-items: center; }
-  .nav-icon svg { width: 46px; height: 46px; stroke-width: 2.6; transition: transform 0.2s; }
+  .nav-icon :global(svg) { width: 46px; height: 46px; stroke-width: 2.6; transition: transform 0.2s; }
   .nav-icon .solid { fill: #fff; }
   .nav-icon .hole { fill: #1D3A86; stroke: none; }
   .nav-icon .badge { font-size: 15px; }
@@ -3595,7 +3334,7 @@
   }
   .action span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
   .action:active { filter: brightness(0.94); }
-  .action svg { width: 21px; height: 21px; flex: none; }
+  .action :global(svg) { width: 21px; height: 21px; flex: none; }
   .action.primary { background: var(--accent-btn); color: #fff; }
   .actions.solo .action { flex-direction: row; min-height: 48px; font-size: 15.5px; gap: 8px; }
   .action.primary .solid { fill: currentColor; }
@@ -3671,32 +3410,10 @@
   .n-dist { color: var(--muted); font-size: 14px; font-variant-numeric: tabular-nums; }
 
   /* ——— Résultat d'itinéraire ——— */
-  .empty { color: var(--muted); font-size: 15.5px; line-height: 1.45; margin: 4px 0 8px; }
-  .retry { border: 0; background: var(--fill); color: var(--accent); font-weight: 600; padding: 10px 16px; border-radius: 12px; cursor: pointer; }
   .summary { display: grid; gap: 2px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
   .big { margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
   .sub { margin: 0; color: var(--muted); font-size: 15px; }
-  .steps { list-style: none; margin: 0; padding: 0; counter-reset: step; }
-  .steps li {
-    display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: baseline;
-    padding: 12px 0; border-bottom: 1px solid var(--line); font-size: 15.5px; line-height: 1.35;
-  }
-  .step-dist { color: var(--muted); font-size: 14px; font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .steps .arrive { font-weight: 600; border-bottom: 0; }
 
-  .traffic-note { font-size: 12.5px; color: var(--muted); margin: 6px 0 0; line-height: 1.4; }
-  .opt-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-  .chain { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; min-width: 0; }
-  .sep { color: var(--faint); font-size: 15px; }
-  .walk-chip { display: grid; place-items: center; color: var(--muted); }
-  .walk-chip svg { width: 18px; height: 18px; }
-  .badge {
-    display: inline-grid; place-items: center; min-width: 26px; height: 24px; padding: 0 7px; border-radius: 7px;
-    font-size: 13px; font-weight: 700; line-height: 1; white-space: nowrap;
-  }
-  .badge.small { height: 20px; min-width: 22px; font-size: 12px; padding: 0 6px; margin-right: 4px; }
-  .live { color: var(--open); font-size: 10px; vertical-align: 2px; }
-  .badge.round { border-radius: 50%; width: 26px; min-width: 26px; height: 26px; padding: 0; }
 
   /* Prochains passages d'une station */
   .deps { margin: 18px 0 4px; }
@@ -3712,17 +3429,6 @@
   .row-link { color: var(--accent, #2A5BD7); text-decoration: none; padding: 14px 0; overflow-wrap: anywhere; }
   .row-link:hover { text-decoration: underline; }
 
-  .legs { list-style: none; margin: 0; padding: 4px 20px 14px; background: var(--soft-accent); }
-  .leg { display: grid; grid-template-columns: 44px 16px 1fr; gap: 10px; min-height: 52px; }
-  .leg-time { font-size: 13.5px; font-weight: 600; font-variant-numeric: tabular-nums; padding-top: 1px; }
-  .leg-rail { width: 6px; border-radius: 3px; justify-self: center; margin-top: 4px; }
-  .leg-rail.walk { width: 4px; background: repeating-linear-gradient(var(--walk-rail) 0 4px, transparent 4px 8px); }
-  .leg-rail.end { width: 12px; height: 12px; border-radius: 50%; background: var(--end); margin-top: 3px; }
-  .leg-body { display: grid; gap: 3px; padding-bottom: 12px; min-width: 0; }
-  .leg-place { font-size: 15px; font-weight: 600; }
-  .leg-meta { font-size: 13.5px; color: var(--muted); display: flex; align-items: center; flex-wrap: wrap; }
-  .credit { font-size: 12.5px; color: var(--muted); margin: 12px 0 0; }
-  .credit a { color: inherit; }
 
   /* ——— Retours des tests : raccourcis, métro, sorties, import, promesse ——— */
   .shortcuts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 6px 12px 8px; }
@@ -3738,15 +3444,9 @@
   .privacy-line { font-size: 12.5px; color: var(--muted); padding-top: 6px; }
   .chip.edit { padding: 0 12px; color: var(--muted); }
   .chip.edit svg { width: 17px; height: 17px; }
-  .badge.small.round { width: 20px; min-width: 20px; height: 20px; }
   .n-dep { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 6px; font-size: 13.5px; margin-top: 3px; }
   .n-dir { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .n-time { font-weight: 600; color: var(--open); font-variant-numeric: tabular-nums; }
-  .exit-sq { display: inline-block; width: 12px; height: 12px; border-radius: 3px; background: #2E8B57; flex: none; margin-right: 6px; vertical-align: -1px; }
-  .leg-exit, .leg-tip { font-size: 13.5px; color: var(--ink); margin-top: 4px; display: flex; align-items: flex-start; line-height: 1.35; }
-  .leg-exit .exit-sq { margin-top: 3px; }
-  .car-ic { flex: none; width: 14px; height: 10px; margin: 4px 6px 0 0; border: 2px solid var(--ink); border-radius: 3px; box-sizing: border-box;
-    background: linear-gradient(90deg, transparent 30%, var(--ink) 30% 40%, transparent 40% 60%, var(--ink) 60% 70%, transparent 70%); }
   .exits { margin: 18px 0 4px; }
   .exits h2 { font-size: 15px; font-weight: 700; margin: 0 0 6px; }
   .exits ul { list-style: none; margin: 0; padding: 0; }
@@ -3788,21 +3488,13 @@
     .top.dir { flex-direction: column; flex-wrap: nowrap; right: auto; }
     .search, .dir-card { width: 400px; flex: none; }
     .chips { flex: 1; min-width: 0; flex-wrap: wrap; overflow: visible; margin: 0; padding: 6px 0 0; -webkit-mask-image: none; mask-image: none; }
-    .sheet {
-      left: 16px; right: auto; bottom: auto; top: calc(var(--top-h, 112px) + 16px); width: 400px;
-      max-height: calc(100vh - var(--top-h, 112px) - 32px);
-      border-radius: 20px; padding: 18px 22px 22px; box-shadow: var(--shadow-float); animation-name: appear;
-    }
-
-    @keyframes appear { from { transform: translateY(-6px); opacity: 0; } }
-    .grip { display: none; }
     .locate { bottom: 40px; right: 16px; }
     .modes-ctl { bottom: 100px; right: 16px; }
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .sheet, .chev { animation: none; transition: none; }
-    .locate.busy svg, .dots, .dep-times .live { animation: none; }
+    .chev { animation: none; transition: none; }
+    .locate.busy svg, .dep-times .live { animation: none; }
   }
 
   :global(.maplibregl-ctrl-attrib) { font-family: var(--ui); font-size: 11px; }

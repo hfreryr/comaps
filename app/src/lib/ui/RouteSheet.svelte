@@ -1,0 +1,213 @@
+<!-- Fiche itinéraire : modes en onglets, résumé de l'itinéraire choisi (ce que montre l'aperçu),
+     puis étapes et autres itinéraires en tirant la fiche. Modèle : Google Maps et Plans (voir docs/espace-ecran.md). -->
+<script>
+  import { draggable } from '#lib/sheet.js';
+  import { MODE_NAMES, fmtDuration, fmtTime, fmtDistance } from '#lib/routing.js';
+  import { placeLabel } from '#lib/rame.js';
+  import { MODES, arrival, inMinutes, badge, streetOpts, altTag, exitPhrase } from '#lib/routeview.js';
+  import ModeIcon from './ModeIcon.svelte';
+  import LegChain from './LegChain.svelte';
+
+  let { from, to, mode, routes, picked, pickedStreet, showVia, legExits,
+    chooseMode, pickStreet, pickTransit, startNav, addStop, computeRoutes } = $props();
+  const current = $derived(routes[mode]);
+</script>
+
+<section class="sheet route-sheet" aria-label="Itinéraire" use:draggable={{ key: `${from?.lat},${to?.lat},${mode}`, start: 'peek' }}>
+  <button class="grip" aria-label="Agrandir la fiche"></button>
+  <div class="mode-tabs" role="tablist" aria-label="Mode de déplacement">
+    {#each MODES as m}
+      {@const r = routes[m.id]}
+      <button class="mode-tab" class:on={mode === m.id} role="tab" aria-selected={mode === m.id} onclick={() => chooseMode(m.id)} aria-label={m.label}>
+        <ModeIcon id={m.id} />
+        <span class="mode-time">
+          {#if !r}{m.label}
+          {:else if r.status === 'loading'}<span class="dots" aria-label="Calcul en cours"></span>
+          {:else if r.status === 'ok'}{fmtDuration(m.id === 'transit' ? (r.data[m.id === mode ? picked : 0] || r.data[0]).duration
+            : (streetOpts(r.data)[m.id === mode ? pickedStreet : 0] || r.data).duration)}
+          {:else}–{/if}
+        </span>
+      </button>
+    {/each}
+  </div>
+  {#if !from}
+    <p class="empty" data-peek-end>Choisissez un point de départ pour calculer l'itinéraire.</p>
+  {:else if !current || current.status === 'loading'}
+    <p class="empty" data-peek-end>Calcul de l'itinéraire…</p>
+  {:else if current.status === 'none' && mode === 'transit' && routes.walk?.status === 'ok'}
+    <div data-peek-end>
+      <p class="empty">Pas de transport utile sur ce trajet : à pied, c'est {fmtDuration(routes.walk.data.duration)}.</p>
+      <button class="retry" onclick={() => chooseMode('walk')}>Voir le trajet à pied</button>
+    </div>
+  {:else if current.status === 'none'}
+    <p class="empty" data-peek-end>Aucun itinéraire {mode === 'transit' ? 'en transports en commun' : mode === 'bike' ? 'à vélo' : mode === 'car' ? 'en voiture' : 'à pied'} trouvé entre ces deux points.</p>
+  {:else if current.status === 'error'}
+    <div data-peek-end>
+      <p class="empty">Le service d'itinéraire ne répond pas. Réessayez dans un instant.</p>
+      <button class="retry" onclick={computeRoutes}>Réessayer</button>
+    </div>
+  {:else if mode !== 'transit'}
+    {@const opts = streetOpts(current.data)}
+    {@const sel = opts[pickedStreet] || opts[0]}
+    <div class="sum" data-peek-end>
+      <div class="sum-text">
+        <span class="sum-dur">{fmtDuration(sel.duration)}</span>
+        <span class="sum-sub">Arrivée {arrival(sel.duration)} · {fmtDistance(sel.distance)}</span>
+        <span class="sum-tag" class:best={pickedStreet === 0}>{pickedStreet === 0 ? (opts.length > 1 ? 'Le plus rapide' : '') : altTag(sel, opts[0])}</span>
+      </div>
+      <div class="sum-actions">
+        <button class="go" onclick={() => startNav(sel)}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4 19 20l-7-4-7 4z" class="solid" /></svg>Aller
+        </button>
+        {#if !showVia}<button class="soft-btn" onclick={addStop}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12M6 12h12" /></svg>Arrêt</button>{/if}
+      </div>
+    </div>
+    {#if opts.length > 1}
+      <h3 class="sub-h">Autres itinéraires <small>(aussi sur la carte)</small></h3>
+      <ul class="alt-list">
+        {#each opts as r, i}
+          {#if i !== pickedStreet}
+            <li><button onclick={() => pickStreet(i)}>
+              <span class="alt-dur">{fmtDuration(r.duration)}</span>
+              <span class="alt-sub">Arrivée {arrival(r.duration)} · {fmtDistance(r.distance)} · {i === 0 ? 'le plus rapide' : altTag(r, opts[0]).toLowerCase()}</span>
+            </button></li>
+          {/if}
+        {/each}
+      </ul>
+    {/if}
+    {#if mode === 'bike'}
+      <p class="traffic-note">Itinéraire adapté aux vélos : pistes cyclables et rues calmes en priorité.</p>
+    {/if}
+    {#if mode === 'car'}
+      <p class="traffic-note">{sel.traffic ? `Estimation avec le ${sel.traffic}` : 'Estimation sur route fluide'}, d'après les capteurs de la Ville de Paris. Pas de trafic en temps réel : nous ne suivons pas les téléphones.</p>
+    {/if}
+    <h3 class="sub-h">Étapes</h3>
+    <ol class="steps">
+      {#each sel.steps as st}
+        <li class:stop={st.stop}><span>{st.text}</span>{#if st.distance >= 10}<span class="step-dist">{fmtDistance(st.distance)}</span>{/if}</li>
+      {/each}
+      <li class="arrive"><span>Arrivée : {to.label}</span></li>
+    </ol>
+  {:else}
+    {@const it = current.data[picked] || current.data[0]}
+    <div class="sum transit" data-peek-end>
+      <div class="sum-text">
+        <span class="opt-top">
+          <LegChain it={it} />
+          <span class="sum-dur small">{fmtDuration(it.duration)}</span>
+        </span>
+        <span class="sum-sub"><strong>{fmtTime(it.board.start)}</strong> à {it.board.from}{#if it.board.realTime}{' '}<span class="live" title="Horaire en temps réel">●</span>{' '}{:else} · {/if}{inMinutes(it.board.start)}</span>
+        <span class="sum-sub">{#if it.next.length}Puis {it.next.map(fmtTime).join(' · ')}{' · '}{/if}Arrivée {fmtTime(it.end)}</span>
+      </div>
+      <div class="sum-actions">
+        <button class="go" onclick={() => startNav(it)}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4 19 20l-7-4-7 4z" class="solid" /></svg>Aller
+        </button>
+        {#if !showVia}<button class="soft-btn" onclick={addStop}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12M6 12h12" /></svg>Arrêt</button>{/if}
+      </div>
+    </div>
+    <h3 class="sub-h">Étapes</h3>
+    <ol class="legs">
+      {#each it.legs as leg, li}
+        {#if leg.mode === 'STOP'}
+          <li class="leg stop">
+            <span class="leg-time">{fmtTime(leg.start)}</span>
+            <span class="leg-rail stop" aria-hidden="true"></span>
+            <span class="leg-body">
+              <span class="leg-place">Arrêt : {leg.from}</span>
+              <span class="leg-meta">Reprise à {fmtTime(leg.end)}{leg.duration > 90 ? ` · ${fmtDuration(leg.duration)} sur place` : ''}</span>
+            </span>
+          </li>
+        {:else if leg.mode === 'WALK'}
+          <li class="leg walk">
+            <span class="leg-time">{fmtTime(leg.start)}</span>
+            <span class="leg-rail walk" aria-hidden="true"></span>
+            <span class="leg-body">
+              <span class="leg-place">{leg.from}</span>
+              <span class="leg-meta">Marcher {fmtDuration(leg.duration)}{leg.distance ? ` · ${fmtDistance(leg.distance)}` : ''}</span>
+            </span>
+          </li>
+        {:else}
+          <li class="leg">
+            <span class="leg-time">{fmtTime(leg.start)}</span>
+            <span class="leg-rail" style:background={leg.color} aria-hidden="true"></span>
+            <span class="leg-body">
+              <span class="leg-place">{leg.from}</span>
+              <span class="leg-meta">
+                <span class="badge small" style:background={leg.color} style:color={leg.textColor}>{badge(leg)}</span>
+                {MODE_NAMES[leg.mode] || ''} direction {leg.headsign}
+              </span>
+              <span class="leg-meta">{leg.stops ? `${leg.stops + 1} arrêts · ` : ''}{fmtDuration(leg.duration)}{leg.realTime ? ' · temps réel' : ''}</span>
+              {#each [legExits[`${picked}|${li}|${leg.to}`]] as tip}
+              {#if tip?.place}
+                <span class="leg-tip"><span class="car-ic" aria-hidden="true"></span>Montez {placeLabel(tip.place)}{tip.transfer ? ` pour la correspondance${tip.transfer.line ? ` avec la ligne ${tip.transfer.line}` : ''}` : ''}</span>
+              {/if}
+              {#if tip?.exit && exitPhrase(tip.exit)}
+                <span class="leg-exit"><span class="exit-sq" aria-hidden="true"></span>À {leg.to}, {exitPhrase(tip.exit)}</span>
+              {/if}
+              {/each}
+            </span>
+          </li>
+        {/if}
+      {/each}
+      <li class="leg end">
+        <span class="leg-time">{fmtTime(it.end)}</span>
+        <span class="leg-rail end" aria-hidden="true"></span>
+        <span class="leg-body"><span class="leg-place">{to.label}</span></span>
+      </li>
+    </ol>
+    {#if current.data.length > 1}
+      <h3 class="sub-h">Autres itinéraires</h3>
+      <ul class="alt-list">
+        {#each current.data as o, i}
+          {#if i !== picked}
+            <li><button onclick={() => pickTransit(i)}>
+              <span class="opt-top"><LegChain it={o} /><span class="alt-dur">{fmtDuration(o.duration)}</span></span>
+              <span class="alt-sub">{fmtTime(o.board.start)} à {o.board.from} · arrivée {fmtTime(o.end)}</span>
+            </button></li>
+          {/if}
+        {/each}
+      </ul>
+    {/if}
+    <p class="credit">Horaires : <a href="https://transitous.org/sources/" target="_blank" rel="noopener">Transitous et réseaux de transport</a> · Place dans la rame : RATP / Île-de-France Mobilités</p>
+  {/if}
+</section>
+
+<style>
+  /* Onglets des modes, en tête de fiche (comme Google Maps) : icône + temps, trait sous le mode choisi */
+  .mode-tabs { display: flex; margin: 0 -16px; padding: 0 8px; border-bottom: 1px solid var(--line); }
+  .mode-tab {
+    flex: 1; min-width: 0; display: inline-flex; align-items: center; justify-content: center; gap: 4px; height: 42px; padding: 0 2px;
+    border: 0; background: none; cursor: pointer; color: var(--muted); font-size: var(--fs-meta); font-weight: 600;
+    font-variant-numeric: tabular-nums; white-space: nowrap; position: relative;
+  }
+  .mode-tab :global(svg) { width: 18px; height: 18px; flex: none; }
+  .mode-tab.on { color: var(--accent); }
+  .mode-tab.on::after { content: ''; position: absolute; left: 14%; right: 14%; bottom: -1px; height: 3px; border-radius: 3px 3px 0 0; background: var(--accent); }
+  .route-sheet .empty, .route-sheet [data-peek-end] > .empty { margin-top: 12px; }
+  /* Résumé de l'itinéraire choisi : ce que l'aperçu montre */
+  .sum { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; padding: 10px 0 2px; }
+  .sum-text { display: grid; gap: 1px; min-width: 0; }
+  .sum-dur { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.2; }
+  .sum-dur.small { font-size: 18px; white-space: nowrap; }
+  .sum-sub { font-size: var(--fs-meta); color: var(--muted); font-variant-numeric: tabular-nums; }
+  .sum-sub strong { color: var(--ink); font-weight: 600; }
+  .sum-tag { font-size: var(--fs-small); color: var(--muted); font-weight: 500; }
+  .sum-tag.best { color: var(--open); font-weight: 600; }
+  .sum-tag:empty { display: none; }
+  .sum-actions { display: flex; gap: 8px; }
+  .sum-actions .go { flex: 1; justify-content: center; }
+  .soft-btn { display: inline-flex; align-items: center; gap: 4px; height: 40px; padding: 0 14px; border: 0; border-radius: 12px;
+    background: var(--fill); color: var(--accent); font-size: var(--fs-body); font-weight: 600; cursor: pointer; }
+  .soft-btn svg { width: 16px; height: 16px; stroke-width: 2.2; }
+  .sub-h { font-size: var(--fs-meta); font-weight: 700; color: var(--muted); text-transform: none; margin: 16px 0 6px; }
+  .sub-h small { font-weight: 500; }
+  .alt-list { list-style: none; margin: 0 -16px; padding: 0; }
+  .alt-list li + li { border-top: 1px solid var(--line); }
+  .alt-list button { display: grid; gap: 2px; width: 100%; padding: 9px 16px; border: 0; background: none; text-align: left; cursor: pointer; }
+  .alt-list button:active { background: var(--fill); }
+  .alt-dur { font-size: var(--fs-body); font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .alt-sub { font-size: var(--fs-small); color: var(--muted); font-variant-numeric: tabular-nums; }
+  /* étapes du trajet en transport : pleine largeur de la fiche, sans fond */
+  .route-sheet :global(.legs) { margin: 0 calc(-1 * var(--gutter)); padding: 4px var(--gutter) 6px; background: none; }
+</style>
