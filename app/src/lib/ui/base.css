@@ -63,8 +63,8 @@
 .credit a { color: inherit; }
 .badge.small.round { width: 20px; min-width: 20px; height: 20px; }
 .exit-sq { display: inline-block; width: 12px; height: 12px; border-radius: 3px; background: #2E8B57; flex: none; margin-right: 6px; vertical-align: -1px; }
-.leg-exit, .leg-tip { font-size: 13.5px; color: var(--ink); margin-top: 4px; display: flex; align-items: flex-start; line-height: 1.35; }
-.leg-exit .exit-sq { margin-top: 3px; }
+.leg-exit, .leg-tip, .sum-tip { font-size: 13.5px; color: var(--ink); margin-top: 4px; display: flex; align-items: flex-start; line-height: 1.35; }
+.leg-exit .exit-sq, .sum-tip .exit-sq { margin-top: 3px; }
 .car-ic { flex: none; width: 14px; height: 10px; margin: 4px 6px 0 0; border: 2px solid var(--ink); border-radius: 3px; box-sizing: border-box;
   background: linear-gradient(90deg, transparent 30%, var(--ink) 30% 40%, transparent 40% 60%, var(--ink) 60% 70%, transparent 70%); }
 

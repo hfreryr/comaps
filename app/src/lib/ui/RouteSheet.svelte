@@ -99,6 +99,11 @@
         </span>
         <span class="sum-sub"><strong>{fmtTime(it.board.start)}</strong> à {it.board.from}{#if it.board.realTime}{' '}<span class="live" title={tx('itin.horaire_en_temps_reel')}>●</span>{' '}{:else} · {/if}{inMinutes(it.board.start)}</span>
         <span class="sum-sub">{#if it.next.length}{tx('itin.puis', { horaires: it.next.map(fmtTime).join(' · '), suite: ' · ' })}{/if}{tx('itin.arrivee_4', { fmtTime: fmtTime(it.end) })}</span>
+        <!-- l'info la plus attendue (test P3) dès le résumé : où se placer dans la rame et quelle sortie prendre à l'arrivée -->
+        {#each [it.legs.map((leg, li) => ({ leg, tip: legExits[`${picked}|${li}|${leg.to}`] })).filter((x) => x.tip?.exit || x.tip?.place).at(-1)] as last}
+          {#if last?.tip?.place}<span class="sum-tip"><span class="car-ic" aria-hidden="true"></span>{tx('itin.montez', { placeLabel: placeLabel(last.tip.place), suite: '' })}</span>{/if}
+          {#if last?.tip?.exit && exitPhrase(last.tip.exit)}<span class="sum-tip"><span class="exit-sq" aria-hidden="true"></span>{tx('itin.a_station_sortie', { station: last.leg.to, sortie: exitPhrase(last.tip.exit) })}</span>{/if}
+        {/each}
       </div>
       <div class="sum-actions">
         <button class="go" onclick={() => startNav(it)}>
@@ -144,7 +149,7 @@
                 <span class="leg-tip"><span class="car-ic" aria-hidden="true"></span>{tx('itin.montez', { placeLabel: placeLabel(tip.place), suite: tip.transfer ? tx('itin.pour_la_correspondance', { ligne: tip.transfer.line ? tx('itin.avec_la_ligne', { line: tip.transfer.line }) : '' }) : '' })}</span>
               {/if}
               {#if tip?.exit && exitPhrase(tip.exit)}
-                <span class="leg-exit"><span class="exit-sq" aria-hidden="true"></span>À {leg.to}, {exitPhrase(tip.exit)}</span>
+                <span class="leg-exit"><span class="exit-sq" aria-hidden="true"></span>{tx('itin.a_station_sortie', { station: leg.to, sortie: exitPhrase(tip.exit) })}</span>
               {/if}
               {/each}
             </span>

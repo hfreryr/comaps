@@ -35,6 +35,13 @@
     <li>{tx('confidentialite.votre_position_sauf_pour_calculer_un')}</li>
     <li>{tx('confidentialite.historique_de_vos_recherches')}</li>
   </ul>
+  <h2 id="verifier">{tx('confidentialite.verifiez_vous_meme')}</h2>
+  <ul>
+    <li>{tx('confidentialite.verif_traceurs')}</li>
+    <li>{tx('confidentialite.verif_cookies')}</li>
+    <li>{tx('confidentialite.verif_code')} <a href="https://github.com/hfreryr/untracked" target="_blank" rel="noopener">{tx('confidentialite.github_com_hfreryr_untracked')}</a>.</li>
+    <li>{tx('confidentialite.verif_tests')}</li>
+  </ul>
   <h2>{tx('confidentialite.ce_que_nous_changerons_avant_tout')}</h2>
   <p>{tx('confidentialite.la_recherche_les_itineraires_et_les')} <strong>{tx('confidentialite.nos_propres_serveurs_sans_journaux')}</strong>{tx('confidentialite.cette_page_sera_mise_a_jour_a_chaque')}</p>
   <h2>{tx('confidentialite.securite')}</h2>

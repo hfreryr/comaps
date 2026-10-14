@@ -79,6 +79,19 @@ Interdits par les règles du projet : Overpass (limites d'usage incompatibles av
 - **Mes lieux** (`src/lib/myplaces.js`) : raccourci en tête qui n'affiche que vos lieux et ouvre la fiche de gestion. Lieux épinglés (Maison, Travail, puis vos lieux) en haut de la recherche ; listes « Favoris », « À tester » et listes personnelles ; « Enregistrer » en un geste (dans Favoris, puis « Changer ») ; chaque lieu garde l'icône de sa liste sur la carte (masquable dans le menu du type de carte) ; import Google qui conserve les listes ; partage d'une liste par un lien qui la contient.
 - **Sans serveur** : transfert vers un autre appareil par un lien ou un QR code (données après le « # », jamais envoyées au site) ; sauvegarde dans un fichier à ranger dans son propre cloud, chiffrée par mot de passe si on le souhaite (PBKDF2 + AES-GCM), avec rappel discret au-delà de 30 jours ; restauration par fusion. Bibliothèque QR : `qrcode-generator` (MIT).
 
+## Retours des tests P3 et P4, et du porteur (15/10/2026)
+Synthèse complète dans Notion (« Synthèse des séances »). Corrigé et testé (un test e2e par point) :
+- **Guidage** : le tronçon parcouru disparaît du tracé ; le point de départ (rond bleu) n'est plus affiché sous la flèche (`remaining()` dans `nav.js`).
+- **Aperçu d'itinéraire** : la fiche se réduit à une fine bande (poignée + durées), option `min` de `sheet.js`.
+- **Recherche de secours** : si Photon est en panne ou met plus de 4 s, la recherche par nom se fait dans nos données de lieux (`localsearch.js`).
+- **Zones** (« Paris 8e », un quartier) : la carte s'y cadre, sans fiche, les raccourcis restent disponibles.
+- **Listes** : « Enregistré dans … · Modifier » dans le menu ⋯ de la fiche ; pictogramme et couleur au choix (mode Modifier).
+- **Raccourcis** : chercher une catégorie absente des raccourcis propose « + Ajouter … à vos raccourcis ».
+- **Preuve de non-pistage** : « 0 traceur · 0 cookie · code ouvert · Vérifier » sous la recherche, section « Vérifiez vous-même » dans Qui voit quoi ; un test e2e vérifie l'affirmation (aucun cookie, aucun service hors de la liste).
+- **Résumé d'un trajet en transports** : place dans la rame et sortie à l'arrivée, sans faire défiler.
+- **Photos** : 1 200 px sur téléphone (au lieu de 2 400).
+- Écartés, avec justification dans la synthèse : notes et avis (aucune source ouverte compatible pour l'instant), affluence en direct (calculée par Google à partir du pistage de position), compteur « traceurs évités » (trompeur : nous n'en bloquons pas, nous n'en avons pas), menu « burger ».
+
 ## Fiche lieu (13/10/2026)
 
 Inspirée de Plans, avec une différence assumée : pas de notes (aucune source ouverte), mais la **date de vérification** (`check_date` d'OSM) en tête de fiche.

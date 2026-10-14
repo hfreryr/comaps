@@ -98,6 +98,22 @@ const tests = {
     assert(/introuvable/.test(txt) && !/hors de la zone/.test(txt), `message attendu « introuvable » : ${txt.slice(0, 200)}`);
     await ctx.close();
   },
+  async 'preuve affichée : 0 cookie, seuls les services de « Qui voit quoi » sont contactés'() {
+    // Ce que dit la ligne « 0 traceur · 0 cookie » sous la recherche : vérifié sur un parcours complet.
+    const { p, ctx, errors } = await page();
+    const hosts = new Set(); p.on('request', (r) => hosts.add(new URL(r.url()).host));
+    await p.fill('#search', 'Panthéon'); await p.waitForTimeout(5000); await pick(p).catch(() => {}); await p.waitForTimeout(4000);
+    await p.click('.close').catch(() => {}); await p.click('.chip:has-text("Restaurants")'); await p.waitForTimeout(5000);
+    await p.click('.nearby li button >> nth=0'); await p.waitForTimeout(3000);
+    await p.click('.action.primary'); await p.waitForTimeout(8000);
+    assert((await ctx.cookies()).length === 0, `cookies déposés : ${JSON.stringify(await ctx.cookies())}`);
+    assert((await p.evaluate(() => document.cookie)) === '', 'document.cookie non vide');
+    const allowed = /^(localhost(:\d+)?|tiles\.openfreemap\.org|photon\.komoot\.io|data\.geopf\.fr|valhalla1\.openstreetmap\.de|api\.transitous\.org|www\.wikidata\.org|fr\.wikipedia\.org|commons\.wikimedia\.org|upload\.wikimedia\.org|[a-z0-9.-]*panoramax[a-z0-9.-]*|[a-z0-9.-]*\.ign\.fr|[a-z0-9.-]*ovh[a-z0-9.-]*)$/;
+    const other = [...hosts].filter((h) => !allowed.test(h));
+    assert(!other.length, `services non listés contactés : ${other.join(', ')}`);
+    assert(!errors.length, errors.join(' | '));
+    await ctx.close();
+  },
   async 'Photon en panne : la recherche par nom passe par nos données'() {
     const { p, ctx, errors } = await page();
     await p.route('**/photon.komoot.io/**', (r) => r.abort());
@@ -192,6 +208,22 @@ const tests = {
     assert(await p.$eval('.route-sheet .mode-tabs', (e) => e.getBoundingClientRect().bottom <= 844), 'durées des modes cachées');
     await swipe(low.top + 8, low.top - 250);
     assert((await box()).height > low.height + 60, 'la fiche ne remonte pas');
+    assert(!errors.length, errors.join(' | '));
+    await ctx.close();
+  },
+  async 'liste : choisir son pictogramme et sa couleur'() {
+    const { p, ctx, errors } = await page();
+    await p.click('.chip:has-text("Restaurants")'); await p.waitForTimeout(6000);
+    await p.click('.nearby li button >> nth=0'); await p.waitForTimeout(3000);
+    await p.click('.fab button >> nth=0'); await p.waitForTimeout(500);
+    await p.click('.close'); await p.waitForTimeout(500);
+    await p.click('.chip:has-text("Mes lieux")'); await p.waitForTimeout(1200);
+    await p.click('.hub-lists > li > button:has-text("Favoris")'); await p.waitForTimeout(1200);
+    await p.click('.list-actions .link:has-text("Modifier")');
+    await p.waitForSelector('.list-style');
+    await p.click('.ls-btn >> nth=4'); await p.click('.ls-color >> nth=2'); await p.waitForTimeout(400);
+    const l = await p.evaluate(() => JSON.parse(localStorage.getItem(Object.keys(localStorage).find((k) => /list/i.test(k) && localStorage.getItem(k).includes('Favoris')))).find((x) => x.id === 'fav'));
+    assert(l.icon === 'cup' && l.color === '#2A5BD7', `style non enregistré : ${JSON.stringify(l)}`);
     assert(!errors.length, errors.join(' | '));
     await ctx.close();
   },
@@ -322,6 +354,8 @@ const tests = {
     // si une sortie est conseillée (métro ou RER), le trajet à pied qui suit a été recalculé depuis cette sortie
     if (await p.locator('.leg-exit').count()) assert((await p.locator('.leg-tip').count()) >= 1, 'sortie conseillée sans place dans la rame');
     if (await p.locator('.leg-exit').count()) assert(valhalla >= 4, `trajet à pied depuis la sortie non recalculé (${valhalla} appels Valhalla)`);
+    // la sortie et la place dans la rame figurent aussi dans le résumé, visible sans faire défiler
+    if (await p.locator('.leg-exit').count()) assert((await p.locator('.sum .sum-tip').count()) >= 1, 'sortie absente du résumé');
     await ctx.close();
   },
   async 'la liste se recharge quand on déplace la carte'() {

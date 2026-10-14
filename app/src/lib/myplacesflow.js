@@ -83,6 +83,12 @@ export function createMyPlaces(app) {
     app.lists = app.lists.map((x) => (x.id === l.id ? { ...x, name: n } : x));
     saveAll();
   }
+  /** Pictogramme et couleur d'une liste (test P4 : « je ne peux pas changer l'icône de la liste »). */
+  function setListStyle(l, style) {
+    app.lists = app.lists.map((x) => (x.id === l.id ? { ...x, ...style } : x));
+    saveAll();
+    refreshSaved();
+  }
   function deleteList(l) {
     const before = { lists: app.lists, favorites: app.favorites };
     app.lists = app.lists.filter((x) => x.id !== l.id);
@@ -203,5 +209,5 @@ export function createMyPlaces(app) {
     }
   }
 
-  return { sameSpot, saveAll, keepOf, saveTap, setMembership, togglePin, removeFromList, createList, renameList, deleteList, refreshSaved, openSavedList, shareList, keepIncomingList, makeTransfer, shareTransfer, applyIncoming, makeBackup, doRestore };
+  return { sameSpot, saveAll, keepOf, saveTap, setMembership, togglePin, removeFromList, createList, renameList, setListStyle, deleteList, refreshSaved, openSavedList, shareList, keepIncomingList, makeTransfer, shareTransfer, applyIncoming, makeBackup, doRestore };
 }
