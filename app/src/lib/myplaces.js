@@ -28,9 +28,31 @@ export async function pack(obj) {
   for (let i = 0; i < bytes.length; i += 8192) s += String.fromCharCode(...bytes.subarray(i, i + 8192));
   return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
+// Garde-fous contre un lien ou un fichier piégé : tailles bornées, champs vérifiés un par un.
+export const LIMITS = { link: 400_000, unpacked: 5_000_000, file: 10_000_000, places: 5000, lists: 200, text: 300 };
 export async function unpack(str) {
+  if (typeof str !== 'string' || str.length > LIMITS.link || !/^[\w-]+$/.test(str)) throw new Error('lien');
   const bytes = await pipe(unb64url(str), new DecompressionStream('deflate-raw'));
+  if (bytes.length > LIMITS.unpacked) throw new Error('lien');
   return JSON.parse(new TextDecoder().decode(bytes));
+}
+const txt = (v, max = LIMITS.text) => (typeof v === 'string' ? v.slice(0, max) : '');
+const num = (v, min, max) => (typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max ? v : null);
+const color = (v) => (typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v) ? v : null);
+const ICON = (v) => (typeof v === 'string' && /^[a-z]{2,12}$/.test(v) ? v : null);
+const listId = (v) => (typeof v === 'string' && /^[\w-]{1,40}$/.test(v) ? v : null);
+/** Un lieu reçu de l'extérieur, sous forme courte : null s'il est invalide. */
+function cleanShort(a) {
+  if (!Array.isArray(a)) return null;
+  const lat = num(a[1], -90, 90), lon = num(a[2], -180, 180);
+  if (lat == null || lon == null) return null;
+  const osm = typeof a[3] === 'string' && /^[nwr]\d{1,12}$/.test(a[3]) ? a[3] : '';
+  const lists = Array.isArray(a[4]) ? a[4].map(listId).filter(Boolean).slice(0, 50) : [];
+  return [txt(a[0]) || 'Lieu', lat, lon, osm, lists, txt(a[5]), txt(a[6], 80)];
+}
+function cleanLists(ls) {
+  if (!Array.isArray(ls)) return null;
+  return ls.slice(0, LIMITS.lists).map((l) => l && listId(l.id) && { id: l.id, name: txt(l.name, 60) || 'Liste', icon: ICON(l.icon) || 'star', color: color(l.color) || '#2A5BD7' }).filter(Boolean);
 }
 
 // Un lieu en tableau court : [nom, lat, lon, osm, listes, adresse, type]
@@ -45,7 +67,9 @@ const long = ([name, lat, lon, osm, lists, address, type]) => {
 export const packList = (list, places) => pack({ v: 1, l: { n: list.name, i: list.icon, c: list.color }, p: places.map((p) => short({ ...p, lists: [] })) });
 export async function unpackList(str) {
   const o = await unpack(str);
-  return { list: { name: o.l.n, icon: o.l.i, color: o.l.c }, places: o.p.map(long) };
+  if (!o?.l || !Array.isArray(o.p)) throw new Error('lien');
+  return { list: { name: txt(o.l.n, 60) || 'Liste partagée', icon: ICON(o.l.i) || 'star', color: color(o.l.c) || '#2A5BD7' },
+    places: o.p.slice(0, LIMITS.places).map(cleanShort).filter(Boolean).map(long) };
 }
 
 /** Tout « Mes lieux » (listes, lieux, Maison/Travail, épinglés, raccourcis). */
@@ -55,8 +79,14 @@ export function snapshot({ lists, places, shortcuts, pins, chips }) {
     pins: pins || [], chips: chips || [] };
 }
 export function restore(o) {
-  return { lists: o.lists || DEFAULT_LISTS, places: (o.p || []).map(long),
-    shortcuts: Object.fromEntries(Object.entries(o.s || {}).map(([k, v]) => [k, long(v)])), pins: o.pins || [], chips: o.chips || [] };
+  if (!o || typeof o !== 'object') throw new Error('format');
+  const s = o.s && typeof o.s === 'object' ? o.s : {};
+  return { lists: cleanLists(o.lists)?.length ? cleanLists(o.lists) : DEFAULT_LISTS,
+    places: (Array.isArray(o.p) ? o.p : []).slice(0, LIMITS.places).map(cleanShort).filter(Boolean).map(long),
+    shortcuts: Object.fromEntries(['home', 'work'].map((k) => [k, cleanShort(s[k])]).filter(([, v]) => v).map(([k, v]) => [k, long(v)])),
+    pins: Array.isArray(o.pins) ? o.pins.filter((x) => typeof x === 'string').slice(0, LIMITS.places) : [],
+    chips: Array.isArray(o.chips) ? o.chips.filter((c) => c && typeof c.key === 'string' && /^[\w-]{1,30}$/.test(c.key))
+      .map((c) => ({ key: c.key, ...(c.hidden ? { hidden: true } : {}), ...(typeof c.label === 'string' ? { label: c.label.slice(0, 20) } : {}) })).slice(0, 60) : [] };
 }
 
 // ——— Sauvegarde dans un fichier, protégée par un mot de passe si on le souhaite ———
@@ -76,6 +106,7 @@ export async function backupFile(data, password) {
 }
 /** @returns {Promise<{data?:object, needsPassword?:boolean}>} */
 export async function readBackup(file, password) {
+  if (file.size > LIMITS.file) throw new Error('taille');
   const o = JSON.parse(await file.text());
   if (o.format !== 'untracked-maps-sauvegarde') throw new Error('format');
   if (!o.chiffre) return { data: o };

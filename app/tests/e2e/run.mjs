@@ -16,6 +16,7 @@ for (let i = 0; i < 60; i++) {
 const proxy = process.env.HTTPS_PROXY ? { proxy: { server: process.env.HTTPS_PROXY, bypass: '<-loopback>,localhost,127.0.0.1' } } : {};
 const browser = await chromium.launch({ ...proxy, args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] });
 let failed = 0;
+const cspSeen = [];   // violations de la politique de sécurité, vérifiées après chaque test
 const assert = (cond, msg) => { if (!cond) throw new Error(msg); };
 
 async function page(opts = {}, hash = '') {
@@ -25,6 +26,8 @@ async function page(opts = {}, hash = '') {
   const p = await ctx.newPage();
   const errors = [];
   p.on('pageerror', (e) => errors.push(e.message));
+  // toute violation de la politique de sécurité (CSP) compte comme une erreur : un fournisseur oublié serait bloqué
+  p.on('console', (m) => { if (/Content Security Policy|Refused to (connect|load|execute)/i.test(m.text())) { errors.push(`CSP : ${m.text().slice(0, 160)}`); cspSeen.push(m.text().slice(0, 200)); } });
   await p.goto(`http://localhost:${PORT}/${hash}`, { waitUntil: 'networkidle' });
   await p.waitForTimeout(2500);
   return { p, ctx, errors };
@@ -193,7 +196,8 @@ const tests = {
 
 // E2E_ONLY=mot : ne lancer que les tests dont le nom contient ce mot
 for (const [name, fn] of Object.entries(tests).filter(([n]) => !process.env.E2E_ONLY || n.includes(process.env.E2E_ONLY))) {
-  try { await fn(); console.log('✓', name); } catch (e) { failed++; console.log('✗', name, '—', e.message); }
+  const before = cspSeen.length;
+  try { await fn(); if (cspSeen.length > before) throw new Error(`bloqué par la politique de sécurité : ${cspSeen.slice(before).join(' | ')}`); console.log('✓', name); } catch (e) { failed++; console.log('✗', name, '—', e.message); }
 }
 await browser.close();
 try { process.kill(-preview.pid); } catch { preview.kill(); }

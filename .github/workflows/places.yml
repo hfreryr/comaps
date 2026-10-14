@@ -11,14 +11,20 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4.4.0 (désigné par empreinte : un outil tiers modifié ne passerait pas)
         with: { ref: main }
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
         with: { python-version: '3.12' }
-      - run: pip install osmium
-      - run: curl -sSfL -o paris.osm.pbf https://download.openstreetmap.fr/extracts/europe/france/ile_de_france/paris-latest.osm.pbf
+      - run: pip install osmium==4.3.1
+      - name: Extrait OSM de Paris (somme de contrôle vérifiée)
+        run: |
+          B=https://download.openstreetmap.fr/extracts/europe/france/ile_de_france
+          curl -sSfL -o paris.osm.pbf $B/paris.osm.pbf
+          curl -sSfL $B/paris.osm.pbf.md5 | awk '{print $1"  paris.osm.pbf"}' | md5sum -c -
       - run: curl -sSfL -o facades.json https://untrackedmaps.app/data/facades.json || echo '{}' > facades.json
       - run: python app/scripts/build_places.py paris.osm.pbf --out out/places --facades facades.json
+      - name: "Garde-fou : si l'extrait paraît tronqué ou vide, on ne publie pas"
+        run: python -c "import json,sys; i=json.load(open('out/places/index.json')); n=len(i['tiles']); print(n,'tuiles'); sys.exit(0 if n >= 50 else 1)"
       - name: Publier dans gh-pages/data/places
         run: |
           git fetch --depth=1 origin gh-pages

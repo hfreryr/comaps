@@ -19,6 +19,7 @@ jobs:
         with: { node-version: '22' }
       - run: npm ci
         env: { PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1' }
+      - run: npm audit --audit-level=high      # échoue si une dépendance a une faille grave connue
       - run: npm test
       - run: npm run build
   pipeline:
@@ -28,5 +29,7 @@ jobs:
         with: { persist-credentials: false }
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
         with: { python-version: '3.12' }
-      - run: pip install rapidfuzz pytest
+      - run: pip install rapidfuzz pytest pyyaml
+      - name: Fichiers des actions GitHub lisibles (un YAML invalide arrête le calcul de nuit sans prévenir)
+        run: python -c "import yaml,glob; [yaml.safe_load(open(f)) for f in glob.glob('.github/workflows/*.yml')]; print('ok')"
       - run: python -m pytest -q pipeline/tests

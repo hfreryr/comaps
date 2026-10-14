@@ -35,6 +35,13 @@
   </ul>
   <h2>Ce que nous changerons avant tout lancement public</h2>
   <p>La recherche, les itinéraires et les transports passeront par <strong>nos propres serveurs, sans journaux d’adresses IP</strong>. Cette page sera mise à jour à chaque changement de service.</p>
+  <h2>Sécurité</h2>
+  <ul>
+    <li>L’app est un site sans serveur ni compte : il n’existe chez nous aucune base de données à pirater.</li>
+    <li>Votre navigateur n’exécute que notre code et ne contacte que les services listés ci-dessus (politique de sécurité du contenu).</li>
+    <li>Les liens de partage, les sauvegardes et les imports sont vérifiés champ par champ avant d’être lus. Une sauvegarde peut être chiffrée par un mot de passe que nous ne connaissons pas.</li>
+    <li>Une faille ? Signalez-la sans la rendre publique : <a href="https://github.com/hfreryr/untracked/security" target="_blank" rel="noopener">page Sécurité du code source</a>.</li>
+  </ul>
   <p class="foot">Code source libre (AGPL-3.0) : <a href="https://github.com/hfreryr/untracked" target="_blank" rel="noopener">github.com/hfreryr/untracked</a>. Données © contributeurs OpenStreetMap (ODbL).</p>
 </main>
 
