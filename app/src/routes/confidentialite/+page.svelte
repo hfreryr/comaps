@@ -14,6 +14,7 @@
 
 <svelte:head><title>Qui voit quoi · Untracked Maps</title></svelte:head>
 
+<div class="scroller">
 <main>
   <a class="back" href="/">‹ Retour à la carte</a>
   <h1>Qui voit quoi</h1>
@@ -44,11 +45,15 @@
   </ul>
   <p class="foot">Code source libre (AGPL-3.0) : <a href="https://github.com/hfreryr/untracked" target="_blank" rel="noopener">github.com/hfreryr/untracked</a>. Données © contributeurs OpenStreetMap (ODbL).</p>
 </main>
+</div>
 
 <style>
   :global(body) { margin: 0; background: #fff; color: #1c1d1f; font: 16px/1.5 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
   @media (prefers-color-scheme: dark) { :global(body) { background: #1c1f24; color: #e8e9ec; } table { border-color: #3a3f47; } th, td { border-color: #3a3f47; } .back, a { color: #7ea2ff; } }
-  main { max-width: 760px; margin: 0 auto; padding: 24px 20px 48px; }
+  /* La carte bloque le défilement de la page entière (html, body { overflow: hidden }) et ce style reste chargé
+     quand on arrive ici depuis la carte : la page défile donc dans son propre conteneur. */
+  .scroller { position: fixed; inset: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+  main { max-width: 760px; margin: 0 auto; padding: 24px 20px calc(48px + env(safe-area-inset-bottom)); }
   h1 { font-size: 28px; letter-spacing: -0.02em; margin: 12px 0 8px; }
   h2 { font-size: 19px; margin: 28px 0 8px; }
   .lead { font-size: 18px; }
