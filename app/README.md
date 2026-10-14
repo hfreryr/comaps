@@ -60,6 +60,7 @@ Interdits par les règles du projet : Overpass (limites d'usage incompatibles av
   - **Écart avec le plan initial** : l'état n'a pas été déplacé dans un `state.svelte.js` ; il reste déclaré dans la page et passe par l'objet `app`. Même effet pour les composants (ils lisent l'état au lieu de tout recevoir), sans réécrire les ~160 déclarations d'état. On pourra le faire plus tard si besoin.
 
   Chaque étape a été vérifiée par comparaison de captures avant/après et par les tests e2e.
+- **Accessibilité** (14/10) : objectif WCAG 2.1 AA. Audit automatique axe-core sur 7 écrans, en clair et en sombre, dans `npm run e2e` (échec au moindre défaut). Corrigés le 14/10 : contraste du raccourci de catégorie actif (fond assombri), du bouton « Aller » et du vert « Ouvert » (`#18843d`), des liens de « Qui voit quoi » en mode sombre ; liste de résultats nommée ; rôles corrigés (lieux épinglés, carte). Pas encore fait : essai au clavier et avec VoiceOver.
 - **Textes** (fait le 14/10) : tous les textes affichés sont dans `src/lib/i18n/fr.js`, rangés par écran, et appelés par `tx('fiche.itineraire')` ou `tx('meslieux.lieu_restaure', { n: 3 })` (accords par une petite fonction et `pluriel`). `tests/unit/textes.test.js` refuse un texte écrit en dur, une clé manquante ou inutilisée, une valeur oubliée. Exceptions : vocabulaire de recherche (`intent.js`, mots-clés de `categories.js`) et profil de ville.
 
 ## Retours des premiers tests (12/10/2026)

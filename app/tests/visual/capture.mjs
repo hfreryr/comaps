@@ -22,9 +22,9 @@ const shot = async (p, name) => { const s = await p.$('section.sheet'); await (s
 for (const dark of [false, true]) {
   const t = dark ? 'd' : 'l';
   let { c, p } = await ctx(dark, { latitude: 48.8867, longitude: 2.3431 });
-  await p.fill('#search', 'Panthéon'); await p.waitForSelector('.results li[role=option] button', { timeout: 40000 });
+  await p.fill('#search', 'Panthéon'); await p.waitForSelector('.results li.opt button', { timeout: 40000 });
   await p.screenshot({ path: `${out}/${t}-recherche.png` });
-  await p.dispatchEvent('.results li[role=option] button >> nth=0', 'mousedown'); await p.waitForTimeout(3500);
+  await p.dispatchEvent('.results li.opt button >> nth=0', 'mousedown'); await p.waitForTimeout(3500);
   await shot(p, `${t}-fiche`);
   await p.click('.action.primary'); await p.waitForTimeout(12000);
   await shot(p, `${t}-transport`);
@@ -46,8 +46,8 @@ for (const dark of [false, true]) {
   await c.addInitScript(() => { localStorage.setItem('promesse-vue', '1'); });
   const p = await c.newPage();
   await p.goto('http://localhost:4183/', { waitUntil: 'networkidle' }); await p.waitForTimeout(3000);
-  await p.fill('#search', 'Panthéon'); await p.waitForSelector('.results li[role=option] button', { timeout: 40000 });
-  await p.dispatchEvent('.results li[role=option] button >> nth=0', 'mousedown'); await p.waitForTimeout(3500);
+  await p.fill('#search', 'Panthéon'); await p.waitForSelector('.results li.opt button', { timeout: 40000 });
+  await p.dispatchEvent('.results li.opt button >> nth=0', 'mousedown'); await p.waitForTimeout(3500);
   await p.screenshot({ path: `${out}/ordi-fiche.png` });
   await p.click('.action.primary'); await p.waitForTimeout(10000);
   await p.screenshot({ path: `${out}/ordi-itineraire.png` });

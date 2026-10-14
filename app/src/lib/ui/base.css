@@ -20,7 +20,7 @@
 }
 .grip::before { content: ''; position: absolute; left: 18px; right: 18px; top: 8px; height: 5px; border-radius: 3px; background: var(--grip); }
 .grip[hidden] { visibility: hidden; display: block; }
-.go { display: inline-flex; align-items: center; gap: 5px; border: 0; border-radius: 12px; background: #1E9E4A; color: #fff;
+.go { display: inline-flex; align-items: center; gap: 5px; border: 0; border-radius: 12px; background: #18843d; color: #fff;   /* vert « Aller » : contraste 4,8:1 avec le blanc (WCAG AA) */
   font-size: 15px; font-weight: 600; padding: 0 14px; height: 40px; cursor: pointer; }
 .go svg { width: 14px; height: 14px; }
 .go.wide { width: 100%; justify-content: center; margin: 4px 0 6px; }
@@ -92,7 +92,7 @@
   --card: #ffffff;
   --fill: #f3f3f5;
   --fav: #D63A7A;
-  --open: #1e8e3e;
+  --open: #18843d;   /* contraste 4,8:1 sur blanc */
   --closed: #c5221f;
   --shadow-float: 0 0 0 0.5px rgb(0 0 0 / 0.06), 0 2px 6px rgb(0 0 0 / 0.08), 0 8px 24px rgb(0 0 0 / 0.08);
   --shadow-chip: 0 0 0 0.5px rgb(0 0 0 / 0.07), 0 1px 4px rgb(0 0 0 / 0.12);

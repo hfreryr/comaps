@@ -116,7 +116,8 @@
     background: var(--card); box-shadow: var(--shadow-chip); font-size: 14px; font-weight: 500; cursor: pointer;
   }
   .chip-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--fam); }
-  .chip.on { background: var(--fam); color: #fff; }
+  /* fond assombri : texte blanc lisible quelle que soit la famille (contraste ≥ 4,5:1, WCAG AA) */
+  .chip.on { background: color-mix(in srgb, var(--fam) 76%, #000); color: #fff; }
   .chip.on .chip-dot { background: #fff; }
 
   /* ——— Panneau d'itinéraire ——— */

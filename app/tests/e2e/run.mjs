@@ -4,6 +4,8 @@
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+const AXE = readFileSync(createRequire(import.meta.url).resolve('axe-core/axe.min.js'), 'utf8');
 import { packList, pack, snapshot, DEFAULT_LISTS } from '../../src/lib/myplaces.js';
 
 const PORT = 4199;
@@ -33,7 +35,7 @@ async function page(opts = {}, hash = '') {
   await p.waitForTimeout(2500);
   return { p, ctx, errors };
 }
-const pick = (p) => p.dispatchEvent('.results li[role=option] button >> nth=0', 'mousedown');
+const pick = (p) => p.dispatchEvent('.results li.opt button >> nth=0', 'mousedown');
 
 const tests = {
   async 'fiche depuis les tuiles (sans Overpass)'() {
@@ -49,7 +51,7 @@ const tests = {
   async 'vue de la rue : vignette puis visionneuse plein écran'() {
     // lieu des tuiles locales avec une photo de devanture (Panoramax)
     const { p, ctx, errors } = await page();
-    await p.fill('#search', 'Etam rue de Rennes'); await p.waitForSelector('.results li[role=option] button', { timeout: 20000 }); await pick(p);
+    await p.fill('#search', 'Etam rue de Rennes'); await p.waitForSelector('.results li.opt button', { timeout: 20000 }); await pick(p);
     await p.waitForSelector('.street-thumb', { timeout: 20000 });
     await p.click('.street-thumb'); await p.waitForSelector('.viewer .pano', { timeout: 10000 });
     await p.click('.viewer-close'); await p.waitForTimeout(500);
@@ -57,17 +59,41 @@ const tests = {
     assert(!errors.length, errors.join(' | '));
     await ctx.close();
   },
+  async 'accessibilité (WCAG 2.1 AA, axe-core) : 7 écrans, clair et sombre'() {
+    // Audit automatique : ne voit qu'une partie des problèmes (pas le clavier ni VoiceOver), mais bloque les régressions.
+    const resto = async (p) => { await p.click('.chip:has-text("Restaurants")'); await p.waitForTimeout(6000); await p.click('.nearby li button >> nth=0'); await p.waitForTimeout(4000); };
+    const screens = {
+      accueil: async () => {},
+      recherche: async (p) => { await p.fill('#search', '57 rue de rennes'); await p.waitForSelector('.results li.opt', { timeout: 30000 }); },
+      catégorie: async (p) => { await p.click('.chip:has-text("Restaurants")'); await p.waitForTimeout(6000); },
+      fiche: resto,
+      itinéraire: async (p) => { await resto(p); await p.click('.action.primary'); await p.waitForTimeout(10000); },
+      'Mes lieux': async (p) => { await p.click('.chip:has-text("Mes lieux")'); await p.waitForTimeout(1500); },
+      'Qui voit quoi': async (p) => { await p.evaluate(() => { const a = document.createElement('a'); a.href = 'confidentialite'; document.body.appendChild(a); a.click(); a.remove(); }); await p.waitForSelector('main h1'); },
+    };
+    const bad = [];
+    for (const dark of [false, true]) for (const [name, go] of Object.entries(screens)) {
+      const { p, ctx } = await page({ bypassCSP: true, colorScheme: dark ? 'dark' : 'light' });
+      await go(p);
+      await p.addScriptTag({ content: AXE });
+      const v = await p.evaluate(async () => (await window.axe.run(document, { runOnly: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] })).violations
+        .map((x) => `${x.id} (${x.nodes.length}) : ${x.nodes[0].target.join(' ')}`));
+      bad.push(...v.map((x) => `${name}${dark ? ' (sombre)' : ''} — ${x}`));
+      await ctx.close();
+    }
+    assert(!bad.length, bad.join(' | '));
+  },
   async 'adresse via Géoplateforme'() {
     const { p, ctx } = await page();
-    await p.fill('#search', '57 rue de rennes'); await p.waitForSelector('.results li[role=option]', { timeout: 30000 });
-    const first = await p.$eval('.results li[role=option]', (e) => e.innerText);
+    await p.fill('#search', '57 rue de rennes'); await p.waitForSelector('.results li.opt', { timeout: 30000 });
+    const first = await p.$eval('.results li.opt', (e) => e.innerText);
     assert(/75006/.test(first), `première adresse hors Paris : ${first}`);
     await ctx.close();
   },
   async 'recherche « restaurant ce soir 8e »'() {
     const { p, ctx } = await page();
     await p.fill('#search', 'restaurant ce soir 8e'); await p.waitForTimeout(2500);
-    assert(/8e arrondissement/.test(await p.$eval('.results li[role=option]', (e) => e.innerText)), 'suggestion sans le 8e');
+    assert(/8e arrondissement/.test(await p.$eval('.results li.opt', (e) => e.innerText)), 'suggestion sans le 8e');
     await pick(p); await p.waitForTimeout(6000);
     const kind = await p.$eval('.sheet .kind', (e) => e.textContent);
     assert(/ouverts? (ce soir|maintenant)/.test(kind), `filtre non appliqué : ${kind}`);
@@ -84,7 +110,7 @@ const tests = {
   },
   async 'Mes lieux : favori, nouvelle liste, renommer, supprimer'() {
     const { p, ctx, errors } = await page();
-    await p.fill('#search', "Ed's rue Muller"); await p.waitForSelector('.results li[role=option] button', { timeout: 20000 }); await pick(p); await p.waitForTimeout(3000);
+    await p.fill('#search', "Ed's rue Muller"); await p.waitForSelector('.results li.opt button', { timeout: 20000 }); await pick(p); await p.waitForTimeout(3000);
     await p.click('.fab button >> nth=0');                       // cœur : ajouté aux Favoris
     await p.waitForSelector('.toast'); assert(/Favoris/.test(await p.textContent('.toast')), 'pas de confirmation du favori');
     await p.click('.close'); await p.waitForTimeout(500);
@@ -104,7 +130,7 @@ const tests = {
   },
   async 'Maison et raccourcis personnalisés'() {
     const { p, ctx, errors } = await page();
-    await p.fill('#search', "Ed's rue Muller"); await p.waitForSelector('.results li[role=option] button', { timeout: 20000 }); await pick(p); await p.waitForTimeout(3000);
+    await p.fill('#search', "Ed's rue Muller"); await p.waitForSelector('.results li.opt button', { timeout: 20000 }); await pick(p); await p.waitForTimeout(3000);
     await p.click('.fab button[aria-label="Plus d\'options"]');
     await p.click('.pmenu button:has-text("Définir comme Maison")'); await p.waitForTimeout(500);
     assert(/Maison enregistré/.test(await p.textContent('.toast')), 'Maison non enregistrée');
@@ -164,8 +190,8 @@ const tests = {
   },
   async 'station de métro : prochains passages et sorties'() {
     const { p, ctx } = await page();
-    await p.fill('#search', 'Odéon métro'); await p.waitForSelector('.results li[role=option] button', { timeout: 20000 });
-    await p.dispatchEvent('.results li[role=option]:has-text("Station") button >> nth=0', 'mousedown').catch(() => pick(p));
+    await p.fill('#search', 'Odéon métro'); await p.waitForSelector('.results li.opt button', { timeout: 20000 });
+    await p.dispatchEvent('.results li.opt:has-text("Station") button >> nth=0', 'mousedown').catch(() => pick(p));
     await p.waitForTimeout(6000);
     const txt = await p.$eval('section.sheet', (e) => e.innerText);
     assert(/Sorties/.test(txt), 'sorties absentes');
@@ -174,7 +200,7 @@ const tests = {
   },
   async 'guidage à pied : démarrer puis terminer'() {
     const { p, ctx, errors } = await page({ geolocation: { latitude: 48.853, longitude: 2.34 } });
-    await p.fill('#search', 'Panthéon'); await p.waitForSelector('.results li[role=option] button', { timeout: 20000 }); await pick(p); await p.waitForTimeout(2500);
+    await p.fill('#search', 'Panthéon'); await p.waitForSelector('.results li.opt button', { timeout: 20000 }); await pick(p); await p.waitForTimeout(2500);
     await p.click('.action.primary'); await p.waitForTimeout(6000);
     await p.click('.mode-tabs .mode-tab >> nth=0'); await p.waitForTimeout(3000);
     await p.click('.sum-actions .go'); await p.waitForSelector('.nav-top', { timeout: 8000 });
