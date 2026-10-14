@@ -40,6 +40,18 @@
   import qrcode from 'qrcode-generator';
   import { exitForQuay, placeForTransfer, placeLabel } from '#lib/rame.js';
   import { ALL_CATEGORIES, CATEGORY_WORDS, FILLER, CHIPS_KEY, loadChipPrefs, categoryFor as catFor } from '#lib/categories.js';
+  import { createImport } from '#lib/importflow.js';
+  import { createNav } from '#lib/navflow.js';
+  import { createDirections } from '#lib/directionsflow.js';
+  import { createLocation } from '#lib/location.js';
+  import { createScreen } from '#lib/screen.js';
+  import { createSearch } from '#lib/searchflow.js';
+  import { createPlace } from '#lib/placeflow.js';
+  import { createMyPlaces } from '#lib/myplacesflow.js';
+  import { createChips } from '#lib/chipsflow.js';
+  import { createShortcuts } from '#lib/shortcutsflow.js';
+  import { createMapDraw } from '#lib/mapdraw.js';
+  import { createZoom } from '#lib/zoom.js';
   import { prepare, progress, navDistance, spokenDistance } from '#lib/nav.js';
 
   const WALK_COLOR = '#2A5BD7';
@@ -79,45 +91,6 @@
   let dragY = $state(0);
   let gesture = null;
   let lastTap = 0;
-  const clampZoom = (z) => {
-    const w = innerWidth, h = innerHeight, mx = (w * (z.s - 1)) / 2, my = (h * (z.s - 1)) / 2;
-    return { s: z.s, x: Math.max(-mx, Math.min(mx, z.x)), y: Math.max(-my, Math.min(my, z.y)) };
-  };
-  function toggleZoom(cx, cy) {
-    if (zoom.s > 1) zoom = { s: 1, x: 0, y: 0 };
-    else zoom = clampZoom({ s: 2.5, x: (innerWidth / 2 - cx) * 1.5, y: (innerHeight / 2 - cy) * 1.5 });
-  }
-  function zoomStart(e) {
-    const t = e.touches;
-    if (t.length === 2) {
-      gesture = { kind: 'pinch', d: Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY), s: zoom.s, x: zoom.x, y: zoom.y };
-    } else if (t.length === 1) {
-      const now = Date.now();
-      if (now - lastTap < 280) { toggleZoom(t[0].clientX, t[0].clientY); lastTap = 0; gesture = null; return; }
-      lastTap = now;
-      gesture = { kind: zoom.s > 1 ? 'pan' : 'maybe-down', x0: t[0].clientX, y0: t[0].clientY, x: zoom.x, y: zoom.y };
-    }
-  }
-  function zoomMove(e) {
-    if (!gesture) return;
-    const t = e.touches;
-    if (gesture.kind === 'pinch' && t.length === 2) {
-      const d = Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
-      zoom = clampZoom({ s: Math.max(1, Math.min(5, gesture.s * (d / gesture.d))), x: gesture.x, y: gesture.y });
-    } else if (gesture.kind === 'pan' && t.length === 1) {
-      zoom = clampZoom({ s: zoom.s, x: gesture.x + t[0].clientX - gesture.x0, y: gesture.y + t[0].clientY - gesture.y0 });
-    } else if (gesture.kind === 'maybe-down' && t.length === 1) {
-      const dx = t[0].clientX - gesture.x0, dy = t[0].clientY - gesture.y0;
-      if (dy > 12 && dy > Math.abs(dx) * 1.3) gesture.kind = 'down';
-      else if (Math.abs(dx) > 12) gesture = null;       // glissement horizontal : photo suivante (défilement natif)
-    }
-    if (gesture?.kind === 'down') { dragY = Math.max(0, t[0].clientY - gesture.y0); }
-  }
-  function zoomEnd() {
-    if (gesture?.kind === 'down') { if (dragY > 110) viewer = null; dragY = 0; }
-    if (zoom.s < 1.05) zoom = { s: 1, x: 0, y: 0 };
-    gesture = null;
-  }
   $effect(() => {
     zoom = { s: 1, x: 0, y: 0 };
     dragY = 0;
@@ -381,163 +354,18 @@
   let pitch = $state(0);
 
   let dark = $state(false);
-  const favData = () => ({ type: 'FeatureCollection', features: favorites.map((f, i) => {
-    const l = listOf(f.lists?.[0]);
-    return { type: 'Feature', id: i, geometry: { type: 'Point', coordinates: [f.lon, f.lat] },
-      properties: { i, name: f.name, icon: listIcon(l), tc: labelColor(l.color) } };
-  }) });
 
-  function addCustomLayers() {
-    if (map.getSource('route')) return;
-    addRouteLayers(map, dark);
-    addPlaceLayers(map, dark, favData());
-    dimPlaces(dimmed);
-    isolate();
-    // Après un changement de style : on remet l'état en cours (trajet, catégorie, mode transports).
-    if (directions) drawRoute();
-    else if (place) showSelection(place);
-    if (category) applyHit(category);
-    if (mapMode === 'transit') for (const id of ['transit-case', 'transit-line', 'transit-label']) map.setLayoutProperty(id, 'visibility', 'visible');
-  }
 
 
   // ——— Carte ———
 
-  function drawRoute(fit = true) {
-    const src = map?.getSource('route');
-    if (!src) return;
-    const feats = [];
-    const r = current?.status === 'ok' ? current.data : null;
-    if (r && mode !== 'transit') {
-      const opts = streetOpts(r);
-      const sel = opts[pickedStreet] || r;
-      // variantes en gris dessous (touchables), le trajet choisi en couleur par-dessus
-      opts.forEach((o, i) => { if (o !== sel) feats.push({ ...line(o.coords, 'alt', '#A3ADBA', '#7F8A98'), properties: { kind: 'alt', color: '#A3ADBA', edge: '#7F8A98', i } }); });
-      feats.push(mode === 'bike' ? line(sel.coords, 'bike', BIKE_COLOR, '#1B3F9E') : line(sel.coords, mode, WALK_COLOR, '#1B3F9E'));
-    } else if (r && mode === 'transit' && r[picked]) {
-      for (const leg of r[picked].legs) {
-        if (leg.coords.length < 2) continue;
-        feats.push(leg.mode === 'WALK' ? line(leg.coords, 'transfer', '#6F7A88') : line(leg.coords, 'transit', leg.color, shade(leg.color)));
-      }
-    }
-    src.setData({ type: 'FeatureCollection', features: feats });
-    map.getSource('route-ends').setData(from && directions ? { type: 'FeatureCollection', features: [
-      { type: 'Feature', geometry: { type: 'Point', coordinates: [from.lon, from.lat] }, properties: { kind: 'from' } },
-      ...(showVia && via ? [{ type: 'Feature', geometry: { type: 'Point', coordinates: [via.lon, via.lat] }, properties: { kind: 'via' } }] : [])] } : empty());
-    const all = feats.flatMap((f) => f.geometry.coordinates);
-    // zoom d'arrivée (après cadrage) : sert à écarter les étiquettes à l'écran
-    const z = all.length && fit ? map.cameraForBounds(boundsOf(all), fitOptions())?.zoom ?? map.getZoom() : map.getZoom();
-    map.getSource('route-tags')?.setData(r && mode !== 'transit' && !nav ? tagsFor(r, pickedStreet, z ?? map.getZoom()) : empty());
-    if (feats.length && fit) fitTo(all);
-  }
-  const line = (coords, kind, color, edge = color) => ({ type: 'Feature', properties: { kind, color, edge }, geometry: { type: 'LineString', coordinates: coords } });
-  // Teinte plus foncée d'une couleur, pour le liseré d'un trait.
-  function shade(hex, k = 0.7) {
-    const n = parseInt(hex.slice(1, 7), 16);
-    return '#' + [n >> 16, (n >> 8) & 255, n & 255].map((v) => Math.round(v * k).toString(16).padStart(2, '0')).join('');
-  }
   // Pendant un itinéraire, les lieux de la carte s'effacent derrière le trajet.
   // Le lieu sélectionné est masqué à sa place (état « sel ») : c'est sa version agrandie qui s'affiche.
   let dimmed = false;
-  function dimPlaces(on) {
-    dimmed = on;
-    const v = on ? 0.35 : 1;
-    const op = ['case', ['boolean', ['feature-state', 'sel'], false], 0, v];
-    // les résultats de la liste (restaurants…) disparaissent pendant l'itinéraire et reviennent après
-    if (map.getLayer('cat-hit')) map.setLayoutProperty('cat-hit', 'visibility', on ? 'none' : 'visible');
-    for (const id of ['poi', 'poi-other', 'landmark', 'metro', 'fav']) {
-      if (!map.getLayer(id)) continue;
-      const keep = id === 'fav';   // nos propres repères ne s'estompent pas pendant un trajet
-      map.setPaintProperty(id, 'icon-opacity', keep ? ['case', ['boolean', ['feature-state', 'sel'], false], 0, 1] : op);
-      map.setPaintProperty(id, 'text-opacity', keep ? ['case', ['boolean', ['feature-state', 'sel'], false], 0, 1] : op);
-    }
-  }
-  function setMapMode(m) {
-    mapMode = m;
-    showModes = false;
-    for (const id of ['transit-case', 'transit-line', 'transit-label']) map.setLayoutProperty(id, 'visibility', m === 'transit' ? 'visible' : 'none');
-    if (m === 'transit' && map.getZoom() > 14.5) map.easeTo({ zoom: 13.5, duration: 600 });
-  }
 
-  // Marges de cadrage : ce que cachent réellement le haut d'écran et la fiche (mesurés), pas des valeurs fixes.
-  function fitOptions() {
-    const mobile = window.matchMedia('(max-width: 767px)').matches;
-    if (!mobile) return { padding: { top: 60, bottom: 60, left: 460, right: 60 }, maxZoom: 17 };
-    const vh = window.innerHeight;
-    const top = document.querySelector('.app > header.top')?.getBoundingClientRect().bottom ?? 120;
-    const sheet = document.querySelector('.app > section.sheet');
-    // la fiche peut être en train de s'ouvrir : on prend sa hauteur d'arrivée (style.height), sinon sa hauteur affichée
-    const sh = sheet ? parseFloat(sheet.style.height) || sheet.getBoundingClientRect().height : 0;
-    const bottom = Math.min(Math.round(vh * 0.6), Math.round(sh));
-    return { padding: { top: Math.round(top) + 24, bottom: bottom + 24, left: 36, right: 36 }, maxZoom: 17 };
-  }
-  const boundsOf = (coords) => coords.reduce((b, c) => b.extend(c), new maplibregl.LngLatBounds(coords[0], coords[0]));
-  function fitTo(coords) {
-    map.fitBounds(boundsOf(coords), { ...fitOptions(), duration: 700 });
-  }
 
-  function onMapClick(e) {
-    if (nav) return;
-    if (directions) {
-      const tag = !editing && map.queryRenderedFeatures(e.point, { layers: ['route-tag', 'route-tag-sel'] })[0];
-      if (tag) return pickStreet(tag.properties.i);
-      const alt = !editing && map.queryRenderedFeatures([[e.point.x - 8, e.point.y - 8], [e.point.x + 8, e.point.y + 8]], { layers: ['route-line'] })
-        .find((f) => f.properties.kind === 'alt');
-      if (alt) return pickStreet(alt.properties.i);
-      const which = editing || (Date.now() - lastEdit.at < 800 ? lastEdit.which : null);
-      if (which) pickOnMap(which, e.lngLat);
-      return;
-    }
-    // Un panneau ou un menu ouvert : le premier toucher à côté le referme, sans rien ouvrir d'autre.
-    if (showModes || editChips || importOpen) { showModes = false; editChips = false; importOpen = false; return; }
-    const fav = map.queryRenderedFeatures(e.point, { layers: ['fav'] })[0];
-    if (fav) {
-      const f = favorites[fav.properties.i], l = listOf(f.lists?.[0]);
-      return openPlace({ ...f, pin: { glyph: l.icon, color: l.color }, hide: [{ source: 'favs', id: fav.properties.i }] });
-    }
-    const hit = map.queryRenderedFeatures(e.point, { layers: ['cat-hit'] })[0];
-    if (hit && nearby[hit.properties.i]?.saved) return openPlace({ ...nearby[hit.properties.i].saved, pin: { glyph: listOf(nearby[hit.properties.i].saved.lists?.[0]).icon, color: listOf(nearby[hit.properties.i].saved.lists?.[0]).color } });
-    if (hit && nearby[hit.properties.i]) return openFeature(nearby[hit.properties.i].f, 'cat-hit');
-    const f = map.queryRenderedFeatures(e.point, { layers: ['poi-hit', 'poi', 'poi-other', 'landmark', 'metro'] })[0];
-    if (f) return openFeature(f);
-    // Toucher un endroit vide : fiche de l'adresse (si une fiche est ouverte, le toucher la ferme d'abord).
-    if (place) return closePlace();
-    openPoint(e.lngLat);
-  }
 
-  async function openPoint({ lng, lat }) {
-    const p = { id: `pt${lng},${lat}`, name: 'Point sélectionné', type: 'Adresse', address: '', lat, lon: lng };
-    clearSelection();
-    placeMarker(lng, lat);
-    place = p;
-    info = {};
-    deps = null;
-    wiki = null;          // (sinon la photo du lieu précédent restait affichée)
-    exits = null;
-    moreText = false;
-    showWeek = false;
-    const label = await reverseAddress(lat, lng).catch(() => null);
-    if (place === p || place?.id === p.id) { place = { ...p, name: label || 'Point sélectionné' }; remember(place); }
-  }
 
-  function openFeature(f, layerId = f.layer?.id) {
-    const [osmType, osmId] = (f.properties.osm || '').split('/');
-    const ref = f.properties.osm ? { osmType, osmId: Number(osmId) } : osmRef(f.id);
-    const [lon, lat] = f.geometry.coordinates;
-    const ci = category && !category.transit ? nearby.findIndex((n) => n.f === f || (n.f.id === f.id && f.id != null)) : -1;
-    const pin = ci >= 0 ? { glyph: catIcon(category), color: famColor(category) }
-      : pinFor({ subclass: f.properties.subclass, family: f.properties.family, layer: layerId });
-    const hide = [];
-    if (f.source && f.id != null) hide.push(f.sourceLayer ? { source: f.source, sourceLayer: f.sourceLayer, id: f.id } : { source: f.source, id: f.id });
-    if (ci >= 0) hide.push({ source: 'cat-hits', id: ci });
-    openPlace({
-      pin, hide,
-      id: String(f.id), ...ref, name: category && !category.transit ? displayName(f, category) : f.properties.name,
-      type: typeLabel('', f.properties.subclass) || typeLabel('', f.properties.class)
-        || { culture: 'Culture', sight: 'Lieu remarquable', nature: 'Parc ou jardin', health: 'Hôpital', train: 'Gare', shop: 'Grand magasin' }[f.properties.family],
-      address: '', lat, lon
-    });
-  }
 
   // ——— Recherche (barre principale ou champ de départ / d'arrivée) ———
   let timer;
@@ -566,53 +394,11 @@
     }, 250);
   });
 
-  function frame(lon, lat) {
-    const mobile = window.matchMedia('(max-width: 767px)').matches;
-    // Décale le lieu vers la zone visible (sans marge persistante, qui perturbe le rendu).
-    const offset = mobile ? [0, -Math.round((window.innerHeight * 0.46 - 120) / 2)] : [210, 0];
-    map.flyTo({ center: [lon, lat], zoom: Math.max(map.getZoom(), 16.5), offset, duration: 800 });
-  }
 
-  function placeMarker(lon, lat) {
-    if (!marker) {
-      const el = document.createElement('div');
-      el.className = 'pin';
-      marker = new maplibregl.Marker({ element: el, anchor: 'bottom' });
-    }
-    marker.setLngLat([lon, lat]).addTo(map);
-  }
 
-  // Couleur du nom à côté d'une pastille : plus foncée sur fond clair, plus claire en mode sombre.
-  function labelColor(hex) {
-    if (!dark) return darken(hex);
-    const n = parseInt(hex.slice(1, 7), 16);
-    return '#' + [n >> 16, (n >> 8) & 255, n & 255].map((v) => Math.round(v + (255 - v) * 0.45).toString(16).padStart(2, '0')).join('');
-  }
   // Sélection d'un lieu : sa propre pastille, agrandie, à la place de la petite (repère rouge pour une adresse).
   let selStates = [];
-  // (Les pastilles-photo sur la carte et les vignettes des listes ont été retirées le 13/10 : les vues de rue
-  //  ne rendent pas l'ambiance d'un lieu. La vue de la rue reste dans la fiche, pour reconnaître l'entrée.)
-  const clearSelPhoto = () => {};
-  const clearPhotoPins = () => {};
 
-  function clearSelection() {
-    clearSelPhoto();
-    for (const t of selStates) { try { map.setFeatureState(t, { sel: false }); } catch { /* tuile déchargée */ } }
-    selStates = [];
-    map?.getSource('selected')?.setData(empty());
-  }
-  function showSelection(p) {
-    clearSelection();
-    const pin = p.pin || pinFor({ subclass: p.subclass });
-    if (!pin || !map?.getSource('selected')) { placeMarker(p.lon, p.lat); return; }
-    marker?.remove();
-    const color = pin === 'metro' ? '#2B4793' : pin.color;
-    map.getSource('selected').setData({ type: 'FeatureCollection', features: [{ type: 'Feature',
-      geometry: { type: 'Point', coordinates: [p.lon, p.lat] },
-      properties: { icon: pinImageId(pin), name: p.name || '', tc: labelColor(color) } }] });
-    selStates = p.hide || [];
-    for (const t of selStates) { try { map.setFeatureState(t, { sel: true }); } catch { /* rien */ } }
-  }
 
   function loadList(key, max) {
     try { return JSON.parse(localStorage.getItem(key) || '[]').slice(0, max); } catch { return []; }
@@ -621,320 +407,19 @@
   function loadObj(key) {
     try { return JSON.parse(localStorage.getItem(key) || '{}') || {}; } catch { return {}; }
   }
-  function saveFavorites() {
-    try { localStorage.setItem(FAVS_KEY, JSON.stringify(favorites)); } catch { /* navigation privée */ }
-  }
-  function setShortcut(which, p) {
-    shortcuts = { ...shortcuts, [which]: p ? { id: p.id, name: p.name, type: p.type, address: p.address || '', lat: p.lat, lon: p.lon, osmType: p.osmType, osmId: p.osmId, subclass: p.subclass, pin: p.pin } : undefined };
-    try { localStorage.setItem(SHORTCUTS_KEY, JSON.stringify(shortcuts)); } catch { /* rien */ }
-  }
-  // Toucher « Maison » : itinéraire direct. S'il n'est pas encore défini, on le demande.
-  function useShortcut(which) {
-    const p = shortcuts[which];
-    if (!p) {
-      assigning = which;
-      query = '';
-      say(which === 'home' ? 'Tapez l\'adresse de votre maison' : 'Tapez l\'adresse de votre travail');
-      setTimeout(() => document.getElementById('search')?.focus(), 50);
-      return;
-    }
-    if (editing) { pickResult({ ...p }); return; }
-    focused = false;
-    document.activeElement?.blur();
-    clearCategory();
-    openPlace({ ...p, name: p.name || SHORT_NAMES[which] });
-    startDirections();
-  }
 
-  // ——— Import des lieux enregistrés dans Google Maps ———
-  async function importFile(e) {
-    const file = e.currentTarget.files?.[0];
-    e.currentTarget.value = '';
-    if (!file) return;
-    importing = 'Lecture du fichier…';
-    try {
-      const { places, home, work } = await readGoogleExport(file);
-      let added = 0, missed = 0;
-      // chaque liste Google retrouve son équivalent : Favoris, À tester (« À visiter »), ou une liste à son nom
-      const listFor = (name) => {
-        if (!name || /favori|favorite/i.test(name)) return 'fav';
-        if (/want to go|visiter|envie/i.test(name)) return 'todo';
-        const l = createList(name);
-        if (l && /suivi|starred/i.test(name) && l.icon !== 'star') { lists = lists.map((x) => (x.id === l.id ? { ...x, icon: 'star', color: '#C7972B' } : x)); }
-        return l?.id || 'fav';
-      };
-      const todo = places;
-      const kept = [];
-      for (const [i, p] of todo.entries()) {
-        let { lat, lon } = p;
-        if (!lat || !lon) {
-          // L'export n'a pas toujours la position : on cherche le lieu par son nom, comme dans la barre de recherche.
-          importing = `Recherche des lieux sans position… ${i + 1} / ${todo.length}`;
-          const r = (await search(p.address || p.name, PARIS).catch(() => []))[0];
-          if (!r) { missed++; continue; }
-          ({ lat, lon } = r);
-        }
-        kept.push({ id: `g${lat},${lon}`, name: p.name || p.address, type: 'Importé de Google Maps', address: p.address || '', lat, lon, lists: [listFor(p.listName)] });
-      }
-      const m = mergeInto({ lists, places: favorites }, { lists: [], places: kept }, sameSpot);
-      favorites = m.places;
-      added = m.added;
-      saveAll();
-      refreshSaved();
-      let extra = '';
-      for (const [k, v] of [['home', home], ['work', work]]) {
-        if (!v || shortcuts[k]) continue;
-        let { lat, lon } = v;
-        if (!lat || !lon) { const r = (await search(v.address || v.name, PARIS).catch(() => []))[0]; if (!r) continue; ({ lat, lon } = r); }
-        setShortcut(k, { id: `${k}${lat}`, name: v.address || v.name, type: SHORT_NAMES[k], address: v.address || '', lat, lon });
-        extra += ` · ${SHORT_NAMES[k]} défini`;
-      }
-      importing = '';
-      importOpen = false;
-      if (!added && !extra) say(places.length ? 'Ces lieux sont déjà dans vos favoris.' : 'Aucun lieu trouvé dans ce fichier. Choisissez l\'archive Takeout de Google Maps.');
-      else say(`${added} lieu${added > 1 ? 'x' : ''} importé${added > 1 ? 's' : ''}${extra}${missed ? ` · ${missed} introuvable${missed > 1 ? 's' : ''}` : ''}`);
-    } catch {
-      importing = '';
-      say('Ce fichier n\'a pas pu être lu. Choisissez l\'archive .zip envoyée par Google.');
-    }
-  }
 
-  // ——— Onglets personnalisés ———
-  function saveChips() {
-    try { localStorage.setItem(CHIPS_KEY, JSON.stringify(chipPrefs)); } catch { /* rien */ }
-  }
-  function moveChip(i, d) {
-    const j = i + d;
-    if (j < 0 || j >= chipPrefs.length) return;
-    const next = [...chipPrefs];
-    [next[i], next[j]] = [next[j], next[i]];
-    chipPrefs = next;
-    saveChips();
-  }
-  function toggleChip(i) {
-    const p = { ...chipPrefs[i], hidden: !chipPrefs[i].hidden };
-    const rest = chipPrefs.filter((_, k) => k !== i);
-    // affiché → rejoint la fin des raccourcis affichés ; masqué → rejoint le haut des disponibles
-    const firstHidden = rest.findIndex((x) => x.hidden);
-    const at = firstHidden < 0 ? rest.length : firstHidden;
-    chipPrefs = [...rest.slice(0, at), p, ...rest.slice(at)];
-    saveChips();
-  }
-  function renameChip(i, label) {
-    chipPrefs = chipPrefs.map((p, k) => (k === i ? { ...p, label } : p));
-    saveChips();
-  }
-  function resetChips() {
-    chipPrefs = ALL_CATEGORIES.map((c) => (c.on ? { key: c.key } : { key: c.key, hidden: true }));
-    saveChips();
-  }
-  const catOf = (key) => ALL_CATEGORIES.find((c) => c.key === key);
-  // Un même lieu : même identifiant OSM, ou même nom au même endroit (à ~20 m près).
-  function sameSpot(a, b) {
-    if (a.osmType && b.osmType) return a.osmType === b.osmType && String(a.osmId) === String(b.osmId);
-    return a.name === b.name && Math.abs(a.lat - b.lat) < 0.0002 && Math.abs(a.lon - b.lon) < 0.0003;
-  }
-  function saveAll() {
-    saveFavorites();
-    try {
-      localStorage.setItem(LISTS_KEY, JSON.stringify(lists));
-      localStorage.setItem(PINS_KEY, JSON.stringify(pins));
-    } catch { /* navigation privée */ }
-  }
-  const keepOf = (p) => ({ id: p.id, name: p.name, type: p.type, address: p.address || info?.address || '', lat: p.lat, lon: p.lon,
-    osmType: p.osmType, osmId: p.osmId, subclass: p.subclass, pin: p.pin });
-  // « Enregistrer » : un geste, dans Favoris ; le message propose de changer de liste. Déjà enregistré : choix des listes.
-  function saveTap() {
-    const p = place;
-    if (!p) return;
-    if (savedEntry) { listPicker = true; return; }
-    favorites = [{ ...keepOf(p), lists: ['fav'] }, ...favorites];
-    saveAll();
-    say(`Enregistré dans ${listOf('fav').name}`, { label: 'Changer', run: () => (listPicker = true) });
-  }
-  function setMembership(listId, on) {
-    const p = place;
-    if (!p) return;
-    const ex = favorites.find((f) => sameSpot(f, p));
-    if (on && !ex) favorites = [{ ...keepOf(p), lists: [listId] }, ...favorites];
-    else if (ex) {
-      const ls = on ? [...new Set([...ex.lists, listId])] : ex.lists.filter((x) => x !== listId);
-      if (!ls.length) {
-        const before = favorites, beforePins = pins;
-        favorites = favorites.filter((f) => f !== ex);
-        pins = pins.filter((k) => k !== placeKey(ex));
-        say('Retiré de Mes lieux', { label: 'Annuler', run: () => { favorites = before; pins = beforePins; saveAll(); } });
-      } else favorites = favorites.map((f) => (f === ex ? { ...f, lists: ls } : f));
-    }
-    saveAll();
-  }
-  function togglePin(p) {
-    const k = placeKey(p);
-    if (pins.includes(k)) pins = pins.filter((x) => x !== k);
-    else {
-      if (!favorites.some((f) => sameSpot(f, p))) favorites = [{ ...keepOf(p), lists: ['fav'] }, ...favorites];
-      pins = [...pins, k];
-    }
-    saveAll();
-  }
   let newListName = $state('');
   let listEditing = $state(false);   // « Modifier » : une poubelle sur chaque lieu de la liste
   let swiped = $state(null);         // lieu glissé vers la gauche (poubelle visible)
   let swipeStart = null;
-  function removeFromList(saved, listId) {
-    const before = favorites, beforePins = pins;
-    const ls = saved.lists.filter((x) => x !== listId);
-    if (ls.length) favorites = favorites.map((f) => (f === saved ? { ...f, lists: ls } : f));
-    else { favorites = favorites.filter((f) => f !== saved); pins = pins.filter((k) => k !== placeKey(saved)); }
-    swiped = null;
-    saveAll();
-    refreshSaved();
-    say(`« ${saved.name} » retiré de ${listOf(listId).name}`, { label: 'Annuler', run: () => { favorites = before; pins = beforePins; saveAll(); refreshSaved(); } });
-  }
-  function createList(name, then) {
-    const n = name.trim();
-    if (!n) return null;
-    const ex = lists.find((l) => l.name.toLowerCase() === n.toLowerCase());
-    if (ex) { then?.(ex.id); return ex; }
-    const l = { id: `l${Date.now().toString(36)}`, name: n, icon: 'star',   // (pictogramme sobre ; la couleur distingue les listes)
-      color: LIST_COLORS[lists.length % LIST_COLORS.length] };
-    lists = [...lists, l];
-    saveAll();
-    then?.(l.id);
-    return l;
-  }
-  function renameList(l) {
-    const n = prompt('Nouveau nom de la liste', l.name)?.trim();
-    if (!n) return;
-    lists = lists.map((x) => (x.id === l.id ? { ...x, name: n } : x));
-    saveAll();
-  }
-  function deleteList(l) {
-    const before = { lists, favorites };
-    lists = lists.filter((x) => x.id !== l.id);
-    favorites = favorites.map((f) => ({ ...f, lists: f.lists.filter((x) => x !== l.id) })).filter((f) => f.lists.length);
-    savedList = null;
-    saveAll();
-    refreshSaved();
-    say(`Liste « ${l.name} » supprimée`, { label: 'Annuler', run: () => { lists = before.lists; favorites = before.favorites; saveAll(); refreshSaved(); } });
-  }
-  // Mes lieux sur la carte et dans la liste, triés par distance
-  function refreshSaved() {
-    if (!category?.saved) return;
-    const o = me || (map ? { lat: map.getCenter().lat, lon: map.getCenter().lng } : PARIS);
-    const src = category.shared ? incoming.places : favorites.filter((f) => !savedList || f.lists.includes(savedList));
-    nearby = src.map((f, i) => {
-      const l = category.shared ? category : listOf(f.lists?.[0]);
-      return { f: { id: `s${i}`, properties: { name: f.name, subclass: f.subclass }, geometry: { coordinates: [f.lon, f.lat] } },
-        d: dist(o.lat, o.lon, f.lat, f.lon), saved: f, icon: `cat|${l.icon}|${l.color}`, tc: labelColor(l.color) };
-    }).sort((a, b) => a.d - b.d);
-    nearbyFromMe = !!me;
-    nearbyDone = true;
-  }
-  function openSavedList(id) {
-    savedList = id;
-    listEditing = false;
-    swiped = null;
-    refreshSaved();
-    const pts = nearby.slice(0, 8).map((n) => n.f.geometry.coordinates);
-    if (pts.length) fitTo(me ? [[me.lon, me.lat], ...pts] : pts);
-  }
-  async function shareList(l) {
-    const places = favorites.filter((f) => f.lists.includes(l.id));
-    const u = new URL(location.href);
-    u.hash = `liste=${await packList(l, places)}`;
-    const data = { title: l.name, text: `${l.name} · ${places.length} lieu${places.length > 1 ? 'x' : ''}`, url: u.toString() };
-    try {
-      if (navigator.share) await navigator.share(data);
-      else { await navigator.clipboard.writeText(data.url); say('Lien de la liste copié'); }
-    } catch { /* partage annulé */ }
-  }
-  // Ajouter une liste reçue par lien
-  function keepIncomingList() {
-    const { list, places } = incoming;
-    let name = list.name;
-    if (lists.some((l) => l.name.toLowerCase() === name.toLowerCase())) name = `${name} (partagée)`;
-    const l = { id: `l${Date.now().toString(36)}`, name, icon: list.icon || 'star', color: list.color || LIST_COLORS[2] };
-    const m = mergeInto({ lists, places: favorites }, { lists: [l], places: places.map((p) => ({ ...p, lists: [l.id] })) }, sameSpot);
-    lists = m.lists;
-    favorites = m.places;
-    saveAll();
-    incoming = null;
-    clearCategory();
-    say(`Liste « ${name} » ajoutée à Mes lieux`);
-  }
 
   // ——— Transfert vers un autre appareil (lien ou QR code) et sauvegarde dans un fichier ———
   let transfer = $state(null);       // { url, qr? }
-  async function makeTransfer() {
-    hubPanel = 'transfer';
-    transfer = null;
-    const data = await pack(snapshot({ lists, places: favorites, shortcuts, pins, chips: chipPrefs }));
-    const u = new URL(location.href);
-    u.hash = `transfert=${data}`;
-    const url = u.toString();
-    let qr = null;
-    if (url.length <= 1500) {             // au-delà, un QR code devient trop dense pour être lu sur un écran
-      const q = qrcode(0, 'L');
-      q.addData(url);
-      q.make();
-      qr = q.createSvgTag({ cellSize: 3, margin: 2, scalable: true });
-    }
-    transfer = { url, qr };
-  }
-  async function shareTransfer() {
-    try {
-      if (navigator.share) await navigator.share({ title: 'Mes lieux · Untracked Maps', url: transfer.url });
-      else { await navigator.clipboard.writeText(transfer.url); say('Lien copié'); }
-    } catch { /* annulé */ }
-  }
-  function applyIncoming(data) {
-    const r = restore(data);
-    const m = mergeInto({ lists, places: favorites }, r, sameSpot);
-    lists = m.lists;
-    favorites = m.places;
-    pins = [...new Set([...pins, ...r.pins])];
-    for (const k of ['home', 'work']) if (r.shortcuts[k] && !shortcuts[k]) setShortcut(k, r.shortcuts[k]);
-    if (r.chips?.length) { chipPrefs = r.chips; saveChips(); }
-    saveAll();
-    return m.added;
-  }
   let backupPassword = $state('');
-  async function makeBackup() {
-    const file = await backupFile(snapshot({ lists, places: favorites, shortcuts, pins, chips: chipPrefs }), backupPassword.trim());
-    backupPassword = '';
-    try {
-      if (navigator.canShare?.({ files: [file] })) await navigator.share({ files: [file], title: 'Sauvegarde de Mes lieux' });
-      else {
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(file);
-        a.download = file.name;
-        a.click();
-        setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-      }
-      lastBackup = Date.now();
-      try { localStorage.setItem(BACKUP_KEY, String(lastBackup)); } catch { /* rien */ }
-      hubPanel = null;
-      say('Sauvegarde créée : rangez-la dans votre iCloud, Proton Drive…');
-    } catch { /* partage annulé */ }
-  }
   let restoreFile = null;
   let restoreNeedsPw = $state(false);
   let restorePassword = $state('');
-  async function doRestore(file = restoreFile) {
-    if (!file) return;
-    restoreFile = file;
-    try {
-      const r = await readBackup(file, restorePassword);
-      if (r.needsPassword) { restoreNeedsPw = true; return; }
-      const added = applyIncoming(r.data);
-      restoreFile = null; restoreNeedsPw = false; restorePassword = ''; hubPanel = null;
-      refreshSaved();
-      say(added ? `${added} lieu${added > 1 ? 'x' : ''} restauré${added > 1 ? 's' : ''}` : 'Tout était déjà là');
-    } catch (e) {
-      say(restoreNeedsPw ? 'Mot de passe incorrect' : 'Ce fichier n\'est pas une sauvegarde d\'Untracked Maps');
-    }
-  }
   const backupAge = $derived(lastBackup ? Math.floor((Date.now() - lastBackup) / 86400000) : null);
 
   // Les favoris apparaissent aussi sur la carte (pastille rose à cœur).
@@ -943,57 +428,7 @@
     const data = favData();
     map?.getSource('favs')?.setData(data);
   });
-  function remember(p) {
-    if (!p?.name || p.name === 'Point sélectionné') return;
-    const keep = { id: p.id, name: p.name, type: p.type, address: p.address, lat: p.lat, lon: p.lon, osmType: p.osmType, osmId: p.osmId, subclass: p.subclass, pin: p.pin };
-    recents = [keep, ...recents.filter((r) => r.id !== p.id && r.name !== p.name)].slice(0, 8);
-    try { localStorage.setItem(RECENTS_KEY, JSON.stringify(recents)); } catch { /* navigation privée : tant pis */ }
-  }
-  function forgetRecents() {
-    const before = recents;
-    recents = [];
-    try { localStorage.removeItem(RECENTS_KEY); } catch { /* rien à effacer */ }
-    say('Lieux récents effacés', { label: 'Annuler', run: () => {
-      recents = before;
-      try { localStorage.setItem(RECENTS_KEY, JSON.stringify(recents)); } catch { /* rien */ }
-    } });
-  }
 
-  async function openPlace(p) {
-    viewChosen = true;
-    showModes = false;      // une seule chose ouverte à la fois
-    editChips = false;
-    importOpen = false;
-    if (p.name) remember(p);
-    place = p;
-    info = null;
-    wiki = null;
-    moreText = false;
-    deps = null;
-    showWeek = false;
-    focused = false;
-    document.activeElement?.blur();
-    showSelection(p);
-    frame(p.lon, p.lat);
-    exits = null;
-    allExits = false;
-    if (STATION_TYPES.includes(p.type)) {
-      loadDepartures(p);
-      if (p.type !== 'Entrée de métro') {
-        exits = { status: 'loading' };
-        stationExits(p.lat, p.lon).then((d) => { if (place?.id === p.id) exits = { status: 'ok', data: sortExits(d) }; })
-          .catch(() => { if (place?.id === p.id) exits = { status: 'error' }; });
-      }
-    }
-    try { info = await details(p); } catch { info = {}; }
-    if (place?.id !== p.id) return;
-    // Lien partagé : on ne connaissait que l'identifiant du lieu, on récupère son nom.
-    if (!p.name && info.name) { place = { ...place, name: info.name, type: info.kind || place.type }; remember(place); showSelection(place); }
-    if (info.wikidata || info.wikipedia) {
-      const w = await wikiInfo(info).catch(() => null);
-      if (place?.id === p.id) wiki = w;
-    }
-  }
 
   // Temps de marche estimé sur le téléphone (distance à vol d'oiseau × 1,3, à 4,8 km/h) : rien n'est envoyé.
   const walkEta = $derived.by(() => {
@@ -1004,28 +439,7 @@
     return min <= 45 ? `≈ ${min} min à pied` : `≈ ${fmtDistance(m)}`;   // (texte complet pour l’accessibilité)
   });
 
-  // Partager : lien qui rouvre directement la fiche du lieu (feuille de partage du téléphone, sinon copie).
-  async function sharePlace() {
-    const u = new URL(location.href);
-    u.hash = `carte=17/${place.lat.toFixed(5)}/${place.lon.toFixed(5)}` + (place.osmType ? `&lieu=${place.osmType}/${place.osmId}` : '&point=1');
-    const data = { title: place.name, text: place.name, url: u.toString() };
-    try {
-      if (navigator.share) await navigator.share(data);
-      else { await navigator.clipboard.writeText(data.url); say('Lien copié'); }
-    } catch { /* partage annulé */ }
-  }
 
-  // Prochains passages d'une station, rafraîchis toutes les 30 s tant que la fiche est ouverte.
-  async function loadDepartures(p) {
-    if (!deps) deps = { status: 'loading' };
-    try {
-      const data = await departures(p.name, p.lat, p.lon);
-      if (place?.id !== p.id) return;
-      deps = data?.lines.length ? { status: 'ok', data } : { status: 'none' };
-    } catch {
-      if (place?.id === p.id && deps?.status !== 'ok') deps = { status: 'error' };
-    }
-  }
   $effect(() => {
     if (!isStation || directions) return;
     const p = place;
@@ -1034,107 +448,11 @@
     return () => { clearInterval(t); clearInterval(tick1); };
   });
 
-  function closePlace() {
-    place = null;
-    placeMenu = false;
-    viewer = null;
-    info = null;
-    deps = null;
-    wiki = null;
-    exits = null;
-    marker?.remove();
-    clearSelection();
-    if (reloadLater) setTimeout(reloadCategoryHere, 0);
-  }
-
-  function clearSearch() {
-    query = '';
-    results = [];
-    closePlace();
-  }
 
 
-  const hitFilter = (c) => (c.transit ? ['==', ['get', 'subclass'], '__none__'] : ['match', ['get', c.by || 'subclass'], c.classes, true, false]);
-  const catIcon = (c) => c.icon || FAMILIES[c.family]?.icon || 'dot';
-  // Lieux mis en avant : filtre, pictogramme et couleur de la catégorie choisie.
-  // Les lieux de la liste sont aussi posés sur la carte (y compris ceux trouvés hors de la vue).
-  function applyHit(c) {
-    const src = map?.getSource('cat-hits');
-    if (!src) return;
-    if (!c || c.transit) return src.setData(empty());
-    src.setData({ type: 'FeatureCollection', features: nearby.map(({ f }, i) => ({
-      type: 'Feature', id: i, geometry: { type: 'Point', coordinates: f.geometry.coordinates },
-      properties: { i, name: displayName(f, c), icon: nearby[i].icon || `cat|${catIcon(c)}|${famColor(c)}`, tc: nearby[i].tc || labelColor(famColor(c)) } })) });
-  }
-  // Un lieu sans nom (toilettes, borne…) ou au nom de code (« G-040 ») prend le nom de sa catégorie.
-  const displayName = (f, c) => {
-    const n = f.properties.name;
-    return !n || (c?.unnamed && /^[A-Z0-9][A-Z0-9 _-]{0,9}$/.test(n)) ? c?.unnamed || n || 'Sans nom' : n;
-  };
+
   $effect(() => { nearby; category; applyHit(category); });
 
-  // Lieux d'une catégorie autour d'un point. `fit` : élargir la carte si les plus proches sont hors de la vue
-  // (seulement au premier choix de la catégorie, jamais quand on déplace la carte soi-même).
-  async function collectCategory(c, origin, fit) {
-      const req = ++catRequest;
-      const stale = () => req !== catRequest || category?.key !== c.key;
-      const o = origin || { lat: map.getCenter().lat, lon: map.getCenter().lng };
-      const seen = new Set();
-      const filter = c.transit
-        ? ['all', ['has', 'name'], ['==', ['get', 'class'], 'railway'], ['match', ['get', 'subclass'], ['subway', 'station', 'halt'], true, false]]
-        : c.unnamed ? hitFilter(c) : ['all', ['has', 'name'], hitFilter(c)];
-      // Une station a souvent plusieurs points (un par ligne) : on n'en garde qu'un par nom.
-      const keyOf = (f) => (c.transit ? f.properties.name : f.id);
-      const list = map.querySourceFeatures('omt', { sourceLayer: 'poi', filter })
-        .map((f) => ({ f, d: dist(o.lat, o.lon, f.geometry.coordinates[1], f.geometry.coordinates[0]) }))
-        .sort((a, b) => a.d - b.d)
-        .filter(({ f }) => !seen.has(keyOf(f)) && seen.add(keyOf(f)))
-        .slice(0, c.transit ? 8 : 80);
-      if (stale()) return;
-      if (c.transit) {
-        nearby = list.map((n) => ({ ...n, deps: { status: 'loading' } }));
-        nearbyDone = true;
-        // Prochains passages des stations les plus proches, directement dans la liste.
-        list.slice(0, 5).forEach((n, i) => {
-          const [lon, lat] = n.f.geometry.coordinates;
-          departures(n.f.properties.name, lat, lon)
-            .then((d) => d?.lines.length ? { status: 'ok', data: d } : { status: 'none' })
-            .catch(() => ({ status: 'error' }))
-            .then((deps) => { if (!stale() && nearby[i]?.f.id === n.f.id) nearby[i] = { ...nearby[i], deps }; });
-        });
-        for (let i = 5; i < nearby.length; i++) nearby[i] = { ...nearby[i], deps: null };
-        return;
-      }
-      // Compléter avec les lieux des tuiles préparées (tout ce qui est dans la zone, y compris hors de la vue
-      // et sans nom dans la carte) : catégories rares, et horaires de chacun.
-      const bb = map.getBounds();
-      const span = Math.max(bb.getEast() - bb.getWest(), 0.02);
-      const zone = { west: o.lon - span, east: o.lon + span, south: o.lat - span * 0.66, north: o.lat + span * 0.66 };
-      const extra = c.inc ? await searchCategory(c.inc, zone, c.q).catch(() => []) : [];
-      if (stale()) return;
-      const near = (a, b) => dist(a[1], a[0], b[1], b[0]) < 80;
-      const byName = new Map(extra.map((f) => [f.properties.name, f]));
-      for (const f of extra) {
-        const xy = f.geometry.coordinates;
-        if (list.some((n) => n.f.properties.name === f.properties.name && near(n.f.geometry.coordinates, xy))) continue;
-        list.push({ f, d: dist(o.lat, o.lon, xy[1], xy[0]) });
-      }
-      list.sort((a, b) => a.d - b.d);
-      list.splice(80);
-      // horaires : ceux de la tuile (par nom et position, les identifiants des tuiles de carte étant parfois différents)
-      const hoursOf = (f) => f.tags?.opening_hours
-        || [...(byName.get(f.properties.name) ? [byName.get(f.properties.name)] : [])].find((x) => near(x.geometry.coordinates, f.geometry.coordinates))?.tags?.opening_hours
-        || null;
-      // (les lieux de la carte sont des objets MapLibre : on recopie leurs champs, un « ... » perdrait la géométrie)
-      const withFacade = (f, facade) => ({ id: f.id, properties: f.properties, geometry: f.geometry, source: f.source, sourceLayer: f.sourceLayer, layer: f.layer, tags: f.tags, facade });
-      const twin = (f) => f.tags ? f : (byName.get(f.properties.name) && near(byName.get(f.properties.name).geometry.coordinates, f.geometry.coordinates) ? byName.get(f.properties.name) : null);
-      nearbyAll = list.map((n) => ({ ...n, h: hoursOf(n.f), f: n.f.facade || !twin(n.f)?.facade ? n.f : withFacade(n.f, twin(n.f).facade) }));
-      applyOpenFilter();
-      nearbyDone = true;
-      // Les plus proches sont hors de la vue (catégorie rare) : on élargit la carte pour les montrer.
-      const first = nearby.slice(0, 4).map((n) => n.f.geometry.coordinates);
-      if (fit && first.length && !first.some((xy) => map.getBounds().contains(xy))) fitTo([[o.lon, o.lat], ...first]);
-  }
 
   // Filtre « ouvert à… » : null (pas de filtre) | { now: true } | { at: Date }
   let openAt = $state(null);
@@ -1142,24 +460,6 @@
   let momentPicker = $state(false);
   let nearbyAll = [];                 // lieux trouvés avant filtre (avec leurs horaires bruts)
   let openCounts = $state(null);      // { open, unknown, closed }
-  function applyOpenFilter() {
-    const at = openAt?.at || null;
-    const items = nearbyAll.map((n) => {
-      const [lon, lat] = n.f.geometry.coordinates;
-      return { ...n, st: n.h ? (at ? statusAt(n.h, lat, lon, at) : hoursStatus(n.h, lat, lon)) : null };
-    });
-    if (!openAt) { openCounts = null; nearby = items.slice(0, 25); return; }
-    const open = items.filter((n) => n.st?.open === true);
-    const unknown = items.filter((n) => !n.st || n.st.open == null);
-    openCounts = { open: open.length, unknown: unknown.length, closed: items.length - open.length - unknown.length };
-    nearby = [...open.slice(0, 25), ...(showUnknown ? unknown.slice(0, 20) : [])];
-  }
-  function setOpenAt(v) {
-    openAt = v;
-    showUnknown = false;
-    momentPicker = false;
-    applyOpenFilter();
-  }
   // Choix du moment : jour et heure
   const pickerDays = $derived.by(() => {
     const out = [];
@@ -1170,20 +470,8 @@
     return out;
   });
   const pickerHours = Array.from({ length: 44 }, (_, k) => { const m = 6 * 60 + k * 30; return [Math.floor(m / 60) % 24, m % 60]; });
-  function momentFrom(dayOffset, h, m) {
-    const at = new Date(); at.setSeconds(0, 0);
-    at.setDate(at.getDate() + dayOffset + (h < 6 ? 1 : 0));   // 0 h – 2 h : la nuit qui suit
-    at.setHours(h, m);
-    return at;
-  }
   const pickerDay = $derived(openAt?.at ? Math.max(0, Math.round((new Date(openAt.at).setHours(0, 0, 0, 0) - new Date().setHours(0, 0, 0, 0)) / 864e5) - (openAt.at.getHours() < 6 ? 1 : 0)) : 0);
   const pickerTime = $derived(openAt?.at ? `${openAt.at.getHours()}:${openAt.at.getMinutes()}` : '20:0');
-  function quickMoment(kind) {
-    const now = new Date();
-    if (kind === 'soir') return setOpenAt(now.getHours() >= 20 ? { now: true } : { at: momentFrom(0, 20, 0) });
-    if (kind === 'midi') return setOpenAt({ at: momentFrom(now.getHours() >= 13 ? 1 : 0, 12, 30) });
-    if (kind === 'demain-soir') return setOpenAt({ at: momentFrom(1, 20, 0) });
-  }
 
   let userMoved = false;
   let reloadTimer = null;
@@ -1191,177 +479,18 @@
   // Recharger la catégorie ouverte pour la zone affichée (après un déplacement de la carte à la main).
   let reloadLater = false;
   let viewChosen = false;   // la personne a choisi ce qu'elle regarde (carte déplacée, lieu ou quartier cherché)
-  // Un point est-il près du centre de la vue ? (sinon, on cherche autour du centre de la carte)
-  function nearView(pt, share = 0.15) {
-    const ctr = map.getCenter(), bb = map.getBounds();
-    const span = dist(bb.getSouth(), bb.getWest(), bb.getNorth(), bb.getEast());
-    return dist(pt.lat, pt.lon, ctr.lat, ctr.lng) < span * share;
-  }
-  function reloadCategoryHere() {
-    const c = category;
-    if (!c || c.saved || directions || nav) return;
-    if (place) { reloadLater = true; return; }   // une fiche est ouverte : on recharge à sa fermeture
-    reloadLater = false;
-    // attendre que la carte ait chargé la nouvelle zone
-    if (!map.areTilesLoaded()) { map.once('idle', () => { if (category?.key === c.key && !place) reloadCategoryHere(); }); return; }
-    // votre position si elle est près du centre de la vue, sinon le centre de la carte
-    const origin = me && nearView(me) ? me : null;
-    nearbyFromMe = !!origin;
-    collectCategory(c, origin, false);
-  }
 
-  async function pickCategory(c) {
-    editChips = false;
-    importOpen = false;
-    if (category?.key === c.key) return clearCategory();
-    if (c.saved) {
-      category = c;
-      closePlace();
-      savedList = null;
-      hubPanel = null;
-      nearby = [];
-      refreshSaved();
-      return;
-    }
-    category = c;
-    closePlace();
-    nearby = [];
-    nearbyDone = false;
-    applyHit(c);
-    // « Le plus proche de vous » : depuis votre position si elle est connue (ou déjà autorisée), sinon depuis le centre de la carte.
-    let origin = me;
-    if (!origin) {
-      const perm = await navigator.permissions?.query({ name: 'geolocation' }).catch(() => null);
-      if (perm?.state === 'granted') origin = await getPosition().catch(() => null);
-    }
-    // On regarde un autre quartier (ex. après avoir cherché « 8e arrondissement ») : on cherche là,
-    // sans ramener la carte sur votre position.
-    if (origin && viewChosen && !nearView(origin)) origin = null;
-    if (category?.key !== c.key) return; // (l'état est une copie : on compare les clés)
-    nearbyFromMe = !!origin;
-    const collect = () => collectCategory(c, origin, true);
-    const target = origin ? [origin.lon, origin.lat] : null;
-    if (target || map.getZoom() < 15) {
-      map.flyTo({ center: target || map.getCenter(), zoom: Math.max(c.transit ? 15 : 15.5, map.getZoom()), duration: 700 });
-      // Si la carte est déjà au bon endroit, elle ne bouge pas : on n'attend pas indéfiniment.
-      let done = false;
-      const once = () => { if (!done) { done = true; collect(); } };
-      map.once('idle', once);
-      setTimeout(() => { if (!map.isMoving()) once(); }, 1200);
-    } else collect();
-  }
 
-  function clearCategory() {
-    clearPhotoPins();
-    category = null;
-    reloadLater = false;
-    openAt = null;
-    openCounts = null;
-    momentPicker = false;
-    nearbyAll = [];
-    savedList = null;
-    hubPanel = null;
-    nearby = [];
-    applyHit(null);
-  }
 
-  function dist(lat1, lon1, lat2, lon2) {
-    const x = (lon2 - lon1) * Math.cos(((lat1 + lat2) / 2) * Math.PI / 180);
-    return Math.hypot(x, lat2 - lat1) * 111320;
-  }
 
-  async function openCategoryFromSearch() {
-    const c = catHit;          // à lire avant de vider la recherche (catHit en dépend)
-    query = '';
-    focused = false;
-    document.activeElement?.blur();
-    if (c.when) { openAt = c.when; showUnknown = false; }
-    let center = null;
-    if (c.area?.arr) center = ARR_CENTERS[c.area.arr];
-    else if (c.area?.text) {
-      const r = (await search(`${c.area.text} Paris`).catch(() => []))[0];
-      if (r) center = [r.lon, r.lat];
-      else say(`« ${c.area.text} » introuvable : recherche autour de la carte`);
-    }
-    const { when, area, ...cat } = c;
-    if (category?.key === cat.key) category = null;   // (sinon pickCategory refermerait la catégorie)
-    if (!center) return pickCategory(cat);
-    viewChosen = true;
-    map.flyTo({ center, zoom: 15, duration: 800 });
-    map.once('moveend', () => (map.areTilesLoaded() ? pickCategory(cat) : map.once('idle', () => pickCategory(cat))));
-  }
 
-  function onKey(e) {
-    if (e.key === 'Enter' && catHit && active < 0) { e.preventDefault(); openCategoryFromSearch(); return; }
-    if (!showList || !results.length) return;
-    if (e.key === 'ArrowDown') { active = (active + 1) % results.length; e.preventDefault(); }
-    else if (e.key === 'ArrowUp') { active = (active - 1 + results.length) % results.length; e.preventDefault(); }
-    else if (e.key === 'Enter') pickResult(results[Math.max(active, 0)]);
-    else if (e.key === 'Escape') { focused = false; editing = null; }
-  }
 
-  function pickResult(r) {
-    if (editing) {
-      const pt = { label: r.name, lat: r.lat, lon: r.lon };
-      const which = editing;
-      setPoint(which, pt);
-      editing = null;
-      fieldQuery = '';
-      results = [];
-      if (which === 'to') placeMarker(pt.lon, pt.lat);
-      computeRoutes();
-      return;
-    }
-    clearCategory();
-    if (assigning) {
-      const which = assigning;
-      assigning = null;
-      setShortcut(which, r);
-      say(`${SHORT_NAMES[which]} : ${r.name}`);
-      query = '';
-    } else query = r.name;
-    openPlace(r);
-  }
 
   // Message bref ; avec une action (« Annuler ») pour revenir sur un geste qui efface quelque chose.
   let toastAction = $state(null);
   let toastTimer;
-  function say(msg, action = null) {
-    toast = msg;
-    toastAction = action;
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => { toast = ''; toastAction = null; }, action ? 6000 : 3500);
-  }
-  // Une catégorie choisie : on n'affiche plus qu'elle sur la carte (les autres lieux s'effacent).
-  function isolate() {
-    if (!map) return;
-    const only = category && !directions;
-    const vis = (id, on) => map.getLayer(id) && map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
-    for (const id of ['poi', 'poi-other', 'landmark', 'exit']) vis(id, !only);
-    vis('fav', !only && showSaved);
-    vis('metro', !only || !!category?.transit);
-  }
   $effect(() => { category; directions; showSaved; isolate(); });
 
-  // Fermer « ce qui est au-dessus » : Échap, ou le bouton Retour du téléphone.
-  function closeTop() {
-    if (viewer != null) viewer = null;
-    else if (placeMenu) placeMenu = false;
-    else if (listPicker) listPicker = false;
-    else if (hubPanel) hubPanel = null;
-    else if (savedList) { savedList = null; refreshSaved(); }
-    else if (navList) navList = false;
-    else if (nav) endNav();
-    else if (showModes) showModes = false;
-    else if (editing) editing = null;
-    else if (editChips || importOpen) { editChips = false; importOpen = false; }
-    else if (directions) closeDirections();
-    else if (place) closePlace();
-    else if (category) clearCategory();
-    else if (focused) { focused = false; document.activeElement?.blur(); }
-    else return false;
-    return true;
-  }
   // Retour : une entrée d'historique tant qu'un panneau est ouvert, pour que « Retour » le ferme
   // au lieu de quitter l'app.
   const anyOpen = $derived(!!(place || category || directions || editChips || importOpen || listPicker || viewer != null));
@@ -1373,39 +502,8 @@
   // Revenir en arrière dans l'historique ne doit pas ramener la carte là où elle était à l'ouverture du panneau :
   // on garde la vue actuelle dans l'adresse (avant que la carte ne relise l'adresse).
   let viewHash = '';
-  function onPopState() {
-    if (viewHash && location.hash !== viewHash) history.replaceState(history.state, '', location.pathname + location.search + viewHash);
-    if (skipPop) { skipPop = false; return; }
-    closeTop();
-    // encore un panneau dessous (une fiche ouverte depuis une liste) : Retour le fermera aussi
-    if (anyOpen) history.pushState({ ...(history.state || {}), ui: 1 }, '', location.href);
-  }
-  function onKeyDown(e) {
-    if (viewer != null && viewerEl && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
-      viewerEl.scrollBy({ left: (e.key === 'ArrowRight' ? 1 : -1) * viewerEl.clientWidth, behavior: 'smooth' });
-      return;
-    }
-    if (e.key === 'Escape' && closeTop()) e.preventDefault();
-  }
 
-  function undoToast() {
-    const a = toastAction;
-    toast = '';
-    toastAction = null;
-    a?.run();
-  }
 
-  // Point bleu de votre position, avec un faisceau qui montre la direction où vous regardez (boussole du téléphone).
-  function showMe(lat, lon) {
-    if (!meMarker) {
-      const el = document.createElement('div');
-      el.className = 'me';
-      el.innerHTML = '<span class="me-beam"></span><span class="me-dot"></span>';
-      meMarker = new maplibregl.Marker({ element: el, rotationAlignment: 'map' });
-      if (heading != null) { el.classList.add('has-heading'); meMarker.setRotation(heading); }
-    }
-    meMarker.setLngLat([lon, lat]).addTo(map);
-  }
 
   // ——— Direction (boussole) ———
   // Le cap vient de la boussole du téléphone ; à défaut, du sens de la marche (GPS) quand on avance.
@@ -1415,294 +513,21 @@
   let lastCompass = 0;
   let followMode = $state('none');   // 'none' | 'follow' (la carte vous suit) | 'heading' (la carte tourne avec vous)
   let posWatch = null;
-  function setHeading(h, fromCompass) {
-    if (h == null || Number.isNaN(h)) return;
-    if (!fromCompass && Date.now() - lastCompass < 3000) return;   // la boussole prime sur le GPS
-    if (fromCompass) lastCompass = Date.now();
-    // lissage (sans faire le tour par 360 → 0)
-    if (heading == null) heading = h;
-    else { const d = ((h - heading + 540) % 360) - 180; if (Math.abs(d) < 1.5) return; heading = (heading + d * 0.35 + 360) % 360; }
-    if (nav) return;   // pendant le guidage, la flèche suit le trajet
-    const el = meMarker?.getElement();
-    el?.classList.add('has-heading');
-    meMarker?.setRotation(heading);
-    if (followMode === 'heading' && !map.isMoving()) map.easeTo({ bearing: heading, duration: 250, easing: (t) => t });
-  }
-  function onOrientation(e) {
-    let h = null;
-    if (typeof e.webkitCompassHeading === 'number') h = e.webkitCompassHeading;          // iPhone
-    else if (e.absolute && typeof e.alpha === 'number') h = 360 - e.alpha;                  // Android
-    if (h == null) return;
-    h = (h + (screen.orientation?.angle || 0) + 360) % 360;                                // écran en paysage
-    setHeading(h, true);
-  }
-  // iPhone : l'accès à la boussole se demande lors d'un geste (le bouton de localisation)
-  async function startCompass() {
-    if (compassOn) return;
-    try {
-      if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-        if ((await DeviceOrientationEvent.requestPermission()) !== 'granted') return;
-      }
-    } catch { return; }
-    compassOn = true;
-    if ('ondeviceorientationabsolute' in window) window.addEventListener('deviceorientationabsolute', onOrientation);
-    else window.addEventListener('deviceorientation', onOrientation);
-  }
-  // Suivre la position tant que l'app est à l'écran (le point bouge avec vous)
-  function startWatch() {
-    if (posWatch != null || !navigator.geolocation || nav) return;
-    posWatch = navigator.geolocation.watchPosition(({ coords }) => {
-      if (nav) return;
-      me = { label: 'Votre position', lat: coords.latitude, lon: coords.longitude, isMe: true };
-      showMe(me.lat, me.lon);
-      if (coords.speed > 1 && coords.heading != null) setHeading(coords.heading, false);
-      if (followMode !== 'none' && !map.isMoving()) map.easeTo({ center: [me.lon, me.lat], duration: 600 });
-    }, () => {}, { enableHighAccuracy: true, maximumAge: 5000, timeout: 30000 });
-  }
-  function stopWatch() {
-    if (posWatch != null) navigator.geolocation.clearWatch(posWatch);
-    posWatch = null;
-  }
 
-  // La position reste sur l'appareil : elle n'est envoyée qu'aux moteurs d'itinéraire, au moment du calcul.
-  function getPosition() {
-    return new Promise((resolve, reject) => {
-      if (!navigator.geolocation) return reject(new Error('unsupported'));
-      navigator.geolocation.getCurrentPosition(
-        ({ coords }) => {
-          me = { label: 'Votre position', lat: coords.latitude, lon: coords.longitude, isMe: true };
-          showMe(me.lat, me.lon);
-          startWatch();
-          try { localStorage.setItem('position-ok', '1'); } catch { /* rien */ }
-          resolve(me);
-        },
-        (err) => {
-          // délai dépassé en haute précision (intérieur, GPS froid) : on retente avec la position approximative
-          if (err.code !== 3) return reject(err);
-          navigator.geolocation.getCurrentPosition(({ coords }) => {
-            me = { label: 'Votre position', lat: coords.latitude, lon: coords.longitude, isMe: true };
-            showMe(me.lat, me.lon);
-            startWatch();
-            resolve(me);
-          }, reject, { enableHighAccuracy: false, timeout: 15000, maximumAge: 300000 });
-        },
-        { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 }
-      );
-    });
-  }
 
-  // À l'ouverture, comme les cartes de référence : on se centre sur vous si vous l'acceptez.
-  // Refus ou erreur : la carte reste sur Paris, sans message d'erreur.
-  async function startupLocate() {
-    try {
-      const perm = await navigator.permissions?.query({ name: 'geolocation' }).catch(() => null);
-      if (perm?.state === 'denied') return;
-      // App installée sur l'écran d'accueil : iOS peut refuser (et mémoriser le refus) une demande faite sans
-      // geste de l'utilisateur. On attend donc qu'il touche le bouton de localisation la première fois.
-      const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
-      let ok = false;
-      try { ok = localStorage.getItem('position-ok') === '1'; } catch { /* rien */ }
-      if (standalone && !ok && perm?.state !== 'granted') {
-        if (!showPromise) say('Touchez la flèche pour vous localiser.');
-        return;
-      }
-      let firstTime = false;
-      try { firstTime = !localStorage.getItem('position-expliquee'); localStorage.setItem('position-expliquee', '1'); } catch { /* rien */ }
-      if (firstTime && perm?.state !== 'granted' && !showPromise) say('Votre position reste sur votre téléphone.');
-      const p = await getPosition();
-      // (pas si la personne a déjà choisi quoi regarder entre-temps : position arrivée tard)
-      if (!place && !category && !directions && !viewChosen) { followMode = 'follow'; map.flyTo({ center: [p.lon, p.lat], zoom: 15.5, duration: 900 }); }
-    } catch { /* on reste sur Paris */ }
-  }
 
-  // Un message qui dit la vraie cause (refus, page non sécurisée, signal introuvable, délai dépassé)
-  function locError(e) {
-    if (!window.isSecureContext) return 'Localisation impossible : la page n\'est pas sécurisée. Ouvrez https://untrackedmaps.app.';
-    if (e?.code === 1) {
-      const app = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
-      return app
-        ? 'L\'iPhone refuse la localisation à l\'app installée sur l\'écran d\'accueil (problème connu des versions récentes d\'iOS). En attendant, ouvrez untrackedmaps.app dans Safari : la localisation y fonctionne.'
-        : 'Localisation refusée. Autorisez-la dans les réglages du navigateur.';
-    }
-    if (e?.code === 3) return 'Position pas encore trouvée (délai dépassé). Réessayez, idéalement près d\'une fenêtre.';
-    if (e?.code === 2) return 'Position introuvable : vérifiez que le Service de localisation du téléphone est activé.';
-    return 'Localisation indisponible sur cet appareil.';
-  }
-  // Détail technique ajouté au message (pour diagnostiquer à distance une localisation qui ne marche pas)
-  const locDetail = (e) => ` [${matchMedia('(display-mode: standalone)').matches || navigator.standalone ? 'app' : 'navigateur'} · ${window.isSecureContext ? 'https' : 'non sécurisé'} · code ${e?.code ?? '?'}${e?.message ? ` · ${e.message}` : ''}]`;
 
-  // Bouton de localisation, comme Plans et Maps : 1er toucher → centré sur vous ; 2e → la carte tourne
-  // dans la direction où vous regardez ; 3e → retour au nord en haut.
-  async function locate() {
-    // iPhone (app sur l'écran d'accueil) : une seule demande d'autorisation par toucher. La position passe
-    // en premier ; la boussole n'est demandée qu'au 2e toucher (« la carte tourne avec vous »).
-    if (me && followMode === 'follow') {
-      startCompass();   // (doit partir du geste, avant toute attente)
-      followMode = 'heading';
-      map.easeTo({ center: [me.lon, me.lat], bearing: heading ?? map.getBearing(), duration: 500 });
-      if (heading == null && compassOn) say('Direction pas encore disponible : tournez-vous un peu ou marchez quelques pas.');
-      return;
-    }
-    if (me && followMode === 'heading') {
-      followMode = 'follow';
-      map.easeTo({ center: [me.lon, me.lat], bearing: 0, duration: 500 });
-      return;
-    }
-    locating = true;
-    try {
-      const p = await getPosition();
-      followMode = 'follow';
-      // là où aucune autorisation n'est demandée (Android, ordinateur), la boussole démarre tout de suite
-      if (typeof DeviceOrientationEvent === 'undefined' || typeof DeviceOrientationEvent.requestPermission !== 'function') startCompass();
-      map.flyTo({ center: [p.lon, p.lat], zoom: Math.max(16, map.getZoom()), duration: 800 });
-    } catch (e) {
-      say(locError(e) + locDetail(e), { label: 'Réessayer', run: locate });
-    } finally {
-      locating = false;
-    }
-  }
 
-  // Point choisi en touchant la carte : on retrouve l'adresse la plus proche.
-  async function pickOnMap(which, { lng, lat }) {
-    const pt = { label: 'Point sur la carte', lat, lon: lng };
-    setPoint(which, pt);
-    if (which === 'to') placeMarker(lng, lat);
-    editing = null;
-    lastEdit = { which: null, at: 0 };
-    fieldQuery = '';
-    results = [];
-    computeRoutes();
-    const label = await reverse(lat, lng).catch(() => null);
-    if (label) {
-      // (les objets d'état sont des copies : on compare les coordonnées)
-      const same = (q) => q && q.lat === lat && q.lon === lng;
-      if (same(pointOf(which))) setPoint(which, { ...pt, label });
-    }
-  }
 
-  // ——— Itinéraire ———
-  async function startDirections() {
-    directions = true;
-    dimPlaces(true);
-    to = { label: place.name, lat: place.lat, lon: place.lon };
-    clearSelection();
-    placeMarker(to.lon, to.lat);
-    via = null;
-    showVia = false;
-    routes = { walk: null, bike: null, transit: null };
-    picked = 0;
-    try {
-      from = me || (await getPosition());
-      const d = dist(from.lat, from.lon, to.lat, to.lon);
-      mode = d > 2500 ? 'transit' : 'walk';
-      computeRoutes();
-    } catch {
-      from = null;
-      editField('from');
-    }
-  }
 
-  function closeDirections() {
-    directions = false;
-    dimPlaces(false);
-    editing = null;
-    routeCtrl?.abort();
-    routes = { walk: null, bike: null, transit: null };
-    map.getSource('route')?.setData(empty());
-    map.getSource('route-ends')?.setData(empty());
-    map.getSource('route-tags')?.setData(empty());
-    if (place) { showSelection(place); frame(place.lon, place.lat); }
-  }
 
-  const pointOf = (which) => ({ from, via, to })[which];
-  function setPoint(which, pt) {
-    if (which === 'from') from = pt;
-    else if (which === 'via') via = pt;
-    else to = pt;
-  }
-  function addStop() {
-    showVia = true;
-    editField('via');
-  }
-  function removeStop() {
-    showVia = false;
-    via = null;
-    if (editing === 'via') editing = null;
-    computeRoutes();
-  }
 
-  async function editField(which) {
-    editing = which;
-    fieldQuery = '';
-    results = [];
-    await tick();
-    fieldEl?.focus();
-  }
 
-  function useMyPosition() {
-    editing = null;
-    getPosition().then((p) => { from = p; computeRoutes(); })
-      .catch((e) => say(`${locError(e)} En attendant, choisissez un point de départ.`));
-  }
 
-  function swap() {
-    [from, to] = [to, from];
-    if (to) placeMarker(to.lon, to.lat);
-    computeRoutes();
-  }
 
   let routeCtrl;
-  function computeRoutes() {
-    routeCtrl?.abort();
-    if (!from || !to || (showVia && !via)) return;
-    routeCtrl = new AbortController();
-    const signal = routeCtrl.signal;
-    picked = 0;
-    pickedStreet = 0;
-    routes = { walk: { status: 'loading' }, bike: { status: 'loading' }, transit: { status: 'loading' }, car: { status: 'loading' } };
-    const run = async (id, fn) => {
-      try {
-        const data = await fn();
-        if (signal.aborted) return;
-        routes[id] = (Array.isArray(data) && !data.length) ? { status: 'none' } : { status: 'ok', data };
-      } catch (e) {
-        if (e.name === 'AbortError') return;
-        routes[id] = { status: e.message === 'no-route' ? 'none' : 'error' };
-      }
-      if (id === mode) drawRoute();
-    };
-    const v = showVia ? via : null;
-    run('walk', () => streetRoute(from, to, 'walk', signal, v));
-    run('bike', () => streetRoute(from, to, 'bike', signal, v));
-    run('transit', () => (v ? transitWithStop(from, v, to, signal) : transitRoutes(from, to, signal)));
-    run('car', async () => {
-      const r = await streetRoute(from, to, 'car', signal, v);
-      const t = await trafficEstimate(from, to);
-      const withTraffic = (x) => ({ ...x, freeDuration: x.duration, duration: x.duration * t.factor, traffic: t.label });
-      return { ...withTraffic(r), alts: r.alts.map(withTraffic) };
-    });
-  }
 
-  function chooseMode(m) {
-    mode = m;
-    picked = 0;
-    pickedStreet = 0;
-    showSteps = false;
-    drawRoute();
-  }
-  // Choisir un autre itinéraire : son résumé remonte en tête de fiche.
-  const sheetToTop = () => document.querySelector('.route-sheet')?.scrollTo({ top: 0, behavior: 'smooth' });
-  function pickStreet(i) {
-    pickedStreet = i;
-    drawRoute(false);
-    sheetToTop();
-  }
 
-  function pickTransit(i) {
-    picked = i;
-    drawRoute();
-    sheetToTop();
-  }
 
   // ——— Guidage ———
   let navWatch = null;
@@ -1715,152 +540,13 @@
   const NAV = { walk: { far: 120, near: 25, off: 35, zoom: 17.6 }, bike: { far: 200, near: 40, off: 45, zoom: 17 },
                 car: { far: 500, near: 120, off: 50, zoom: 16.3 }, transit: { far: 0, near: 0, off: 9999, zoom: 16.5 } };
 
-  function speak(text) {
-    if (!voice || !text || !('speechSynthesis' in window)) return;
-    speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = 'fr-FR';
-    speechSynthesis.speak(u);
-  }
 
-  // Trajet en transport → étapes du guidage : marcher, monter, descendre (avec sortie et place dans la rame).
-  function transitSteps(it) {
-    const coords = [], steps = [];
-    it.legs.forEach((leg, i) => {
-      const idx = Math.max(0, coords.length - 1);
-      if (leg.mode === 'STOP') { steps.push({ text: `Arrêt : ${leg.from}`, type: 'stop', idx, t: +leg.start }); return; }
-      coords.push(...leg.coords);
-      if (leg.mode === 'WALK') {
-        const dest = leg.to === 'Arrivée' || i === it.legs.length - 1 ? to.label : leg.to;
-        steps.push({ text: `Marchez jusqu'à ${dest}`, sub: `${fmtDuration(leg.duration)}${leg.distance ? ` · ${fmtDistance(leg.distance)}` : ''}`, type: 'walk', idx, t: +leg.start });
-      } else {
-        const tip = legExits[`${picked}|${i}|${leg.to}`];
-        const name = `${MODE_NAMES[leg.mode] || 'Ligne'} ${leg.line}`.trim();
-        steps.push({ text: `Prenez le ${name} direction ${leg.headsign}`, sub: `À ${leg.from} · départ ${fmtTime(leg.start)}${tip?.place ? ` · montez ${placeLabel(tip.place)}` : ''}`,
-          type: 'board', idx, t: +leg.start, leg });
-        steps.push({ text: `Descendez à ${leg.to}`, sub: `${leg.stops ? `${leg.stops + 1} arrêts · ` : ''}arrivée ${fmtTime(leg.end)}${tip?.exit ? ` · ${exitLabel(tip.exit).replace(/^Sortie/, 'sortie')}` : ''}`,
-          type: 'alight', idx: Math.max(0, coords.length - 1), t: +leg.end - 60000, leg });
-      }
-    });
-    return { coords: coords.length > 1 ? coords : [[from.lon, from.lat], [to.lon, to.lat]], steps };
-  }
 
-  async function startNav(option) {
-    const kind = mode === 'transit' ? 'transit' : 'street';
-    let base;
-    if (kind === 'transit') {
-      const { coords, steps } = transitSteps(option);
-      base = { ...prepare(coords, steps, option.duration), end: +option.end };
-    } else {
-      base = prepare(option.raw, option.steps, option.duration);
-      map.getSource('route-tags')?.setData(empty());
-      // pendant le trajet, seul l'itinéraire choisi reste sur la carte
-      map.getSource('route')?.setData({ type: 'FeatureCollection', features: [line(option.coords, mode,
-        mode === 'bike' ? BIKE_COLOR : WALK_COLOR, mode === 'bike' ? '#1B3F9E' : '#1B3F9E')] });
-    }
-    nav = { ...base, kind, mode, option, s: 0, k: 0, off: 0, arrived: false, startedAt: Date.now() };
-    navFollow = true;
-    navList = false;
-    offCount = 0;
-    arriveCount = 0;
-    spoken = new Set();
-    // l'écran reste allumé pendant le trajet (si le téléphone le permet)
-    try { wakeLock = await navigator.wakeLock?.request('screen'); } catch { wakeLock = null; }
-    speak(kind === 'transit' ? nav.steps[0]?.text : nav.steps[0]?.speak || nav.steps[0]?.text);
-    clearInterval(navTick);
-    navTick = setInterval(() => { now = Date.now(); if (nav?.kind === 'transit') updateNav(); }, 5000);
-    stopWatch();
-    followMode = 'none';
-    if (navigator.geolocation) {
-      navWatch = navigator.geolocation.watchPosition(onFix, () => {}, { enableHighAccuracy: true, maximumAge: 2000, timeout: 20000 });
-    }
-    if (me) onFix({ coords: { latitude: me.lat, longitude: me.lon, heading: null, speed: null } });
-  }
 
   let lastFix = null;
-  function onFix(pos) {
-    if (!nav) return;
-    const { latitude: lat, longitude: lon, heading, speed } = pos.coords;
-    me = { label: 'Votre position', lat, lon, isMe: true };
-    lastFix = { lat, lon, heading: speed > 1 && heading != null && !Number.isNaN(heading) ? heading : null };
-    showMe(lat, lon);
-    updateNav();
-  }
 
-  function updateNav() {
-    if (!nav || !lastFix) return;
-    const cfg = NAV[nav.kind === 'transit' ? 'transit' : nav.mode];
-    const p = progress(nav, [lastFix.lon, lastFix.lat], nav.s);
-    let k = p.k;
-    if (nav.kind === 'transit') {
-      // sous terre, plus de position : on avance aussi avec l'horaire
-      const byTime = nav.steps.reduce((acc, st, i) => (st.t <= Date.now() ? i : acc), 0);
-      k = Math.max(k, byTime, nav.k);
-    } else k = Math.max(k, nav.k);
-    // arrivée confirmée par deux positions de suite (une position ancienne ou imprécise ne suffit pas)
-    const atEnd = nav.total - p.s < 20 && p.off < 40 || (nav.kind === 'transit' && Date.now() > nav.end && nav.total - p.s < 80);
-    arriveCount = atEnd ? arriveCount + 1 : 0;
-    const arrived = arriveCount >= 2;
-    const heading = lastFix.heading ?? p.heading;
-    const prevK = nav.k;
-    nav = { ...nav, s: Math.max(p.s, nav.s - 30), k, off: p.off, heading, arrived: nav.arrived || arrived };
-    meMarker?.setRotationAlignment('map');      // la flèche suit la carte (qui tourne avec vous)
-    meMarker?.setRotation(heading);
-    meMarker?.getElement().classList.add('navigating');
-    if (navFollow) {
-      map.easeTo({ center: [lastFix.lon, lastFix.lat], bearing: heading, pitch: 50, zoom: cfg.zoom,
-        offset: [0, Math.round(window.innerHeight * 0.18)], duration: 900 });
-    }
-    if (nav.arrived && !spoken.has('fin')) { spoken.add('fin'); speak(`Vous êtes arrivé. ${to.label}`); return; }
-    if (nav.kind === 'transit') {
-      if (k !== prevK) speak(nav.steps[k].text);
-      return;
-    }
-    // annonces : une de loin, une juste avant la manœuvre
-    const next = nav.steps[k + 1];
-    if (next) {
-      const d = next.s - nav.s;
-      if (d < cfg.near && !spoken.has(`${k + 1}n`)) { spoken.add(`${k + 1}n`); spoken.add(`${k + 1}f`); speak(next.speak || next.text); }
-      else if (d < cfg.far && d > cfg.near * 2 && !spoken.has(`${k + 1}f`)) { spoken.add(`${k + 1}f`); speak(spokenDistance(d) + (next.speak || next.text).replace(/^./, (c) => c.toLowerCase())); }
-    }
-    // écart au trajet : nouveau calcul depuis la position actuelle
-    offCount = p.off > cfg.off ? offCount + 1 : 0;
-    if (offCount >= 3 && !rerouting) reroute();
-  }
 
-  async function reroute() {
-    rerouting = true;
-    try {
-      const passedVia = !showVia || !via || nav.steps.findIndex((st) => st.type === 'stop') <= nav.k;
-      const r = await streetRoute({ lat: me.lat, lon: me.lon }, to, nav.mode, undefined, passedVia ? null : via);
-      if (!nav) return;
-      let route = r;
-      if (nav.mode === 'car') { const t = await trafficEstimate(me, to); route = { ...r, duration: r.duration * t.factor }; }
-      nav = { ...nav, ...prepare(route.raw, route.steps, route.duration), option: route, s: 0, k: 0, startedAt: Date.now() };
-      spoken = new Set();
-      offCount = 0;
-      say('Nouvel itinéraire');
-      speak('Nouvel itinéraire. ' + (route.steps[0]?.speak || ''));
-      map.getSource('route')?.setData({ type: 'FeatureCollection', features: [line(route.coords, nav.mode, nav.mode === 'bike' ? BIKE_COLOR : WALK_COLOR, nav.mode === 'bike' ? '#1B3F9E' : '#1B3F9E')] });
-    } catch { /* on réessaiera au prochain écart */ }
-    rerouting = false;
-  }
 
-  function endNav() {
-    if (navWatch != null) navigator.geolocation.clearWatch(navWatch);
-    navWatch = null;
-    clearInterval(navTick);
-    wakeLock?.release?.().catch?.(() => {});
-    wakeLock = null;
-    if ('speechSynthesis' in window) speechSynthesis.cancel();
-    nav = null;
-    navList = false;
-    meMarker?.setRotation(heading ?? 0);   // retour au faisceau de direction
-    meMarker?.getElement().classList.remove('navigating');
-    startWatch();
-    map.easeTo({ pitch: 0, bearing: 0, duration: 600 });
-    drawRoute();
-  }
   // l'écran peut se rallumer après un passage en arrière-plan : on redemande à le garder allumé
   $effect(() => {
     const again = async () => { if (nav && document.visibilityState === 'visible') { try { wakeLock = await navigator.wakeLock?.request('screen'); } catch { /* rien */ } } };
@@ -1938,48 +624,80 @@
 
   // <app> État et actions partagés avec les composants de l'écran (getContext('app')). Bloc généré : un nom par ligne.
   const app = {
+    get BACKUP_KEY() { return BACKUP_KEY; },
+    get BIKE_COLOR() { return BIKE_COLOR; },
+    get FAVS_KEY() { return FAVS_KEY; },
+    get LISTS_KEY() { return LISTS_KEY; },
+    get NAV() { return NAV; },
+    get PINS_KEY() { return PINS_KEY; },
+    get RECENTS_KEY() { return RECENTS_KEY; },
+    get SHORTCUTS_KEY() { return SHORTCUTS_KEY; },
     get SHORT_NAMES() { return SHORT_NAMES; },
+    get STATION_TYPES() { return STATION_TYPES; },
+    get WALK_COLOR() { return WALK_COLOR; },
     get active() { return active; }, set active(v) { active = v; },
     get activeQuery() { return activeQuery; },
     get address() { return address; },
     get allExits() { return allExits; }, set allExits(v) { allExits = v; },
+    get anyOpen() { return anyOpen; },
+    get applyHit() { return applyHit; },
     get applyIncoming() { return applyIncoming; },
     get applyOpenFilter() { return applyOpenFilter; },
     get areaText() { return areaText; },
+    get arriveCount() { return arriveCount; }, set arriveCount(v) { arriveCount = v; },
     get assigning() { return assigning; }, set assigning(v) { assigning = v; },
     get backupAge() { return backupAge; },
     get backupPassword() { return backupPassword; }, set backupPassword(v) { backupPassword = v; },
     get catHit() { return catHit; },
+    get catIcon() { return catIcon; },
     get catOf() { return catOf; },
+    get catRequest() { return catRequest; }, set catRequest(v) { catRequest = v; },
     get category() { return category; }, set category(v) { category = v; },
     get chipList() { return chipList; },
     get chipPrefs() { return chipPrefs; }, set chipPrefs(v) { chipPrefs = v; },
     get clearCategory() { return clearCategory; },
+    get clearPhotoPins() { return clearPhotoPins; },
     get clearSearch() { return clearSearch; },
+    get clearSelection() { return clearSelection; },
     get closeDirections() { return closeDirections; },
     get closePlace() { return closePlace; },
     get closePromise() { return closePromise; },
+    get compassOn() { return compassOn; }, set compassOn(v) { compassOn = v; },
+    get computeRoutes() { return computeRoutes; },
     get copyAddress() { return copyAddress; },
     get createList() { return createList; },
+    get current() { return current; },
+    get dark() { return dark; }, set dark(v) { dark = v; },
     get deleteList() { return deleteList; },
     get deps() { return deps; }, set deps(v) { deps = v; },
+    get dimPlaces() { return dimPlaces; },
+    get dimmed() { return dimmed; }, set dimmed(v) { dimmed = v; },
     get directions() { return directions; }, set directions(v) { directions = v; },
     get displayName() { return displayName; },
+    get dist() { return dist; },
     get doRestore() { return doRestore; },
     get dragY() { return dragY; }, set dragY(v) { dragY = v; },
+    get drawRoute() { return drawRoute; },
     get editChips() { return editChips; }, set editChips(v) { editChips = v; },
     get editField() { return editField; },
     get editing() { return editing; }, set editing(v) { editing = v; },
+    get endNav() { return endNav; },
     get exits() { return exits; }, set exits(v) { exits = v; },
     get famColor() { return famColor; },
     get favTap() { return favTap; },
     get favorites() { return favorites; }, set favorites(v) { favorites = v; },
     get fieldEl() { return fieldEl; }, set fieldEl(v) { fieldEl = v; },
     get fieldQuery() { return fieldQuery; }, set fieldQuery(v) { fieldQuery = v; },
+    get fitTo() { return fitTo; },
     get focused() { return focused; }, set focused(v) { focused = v; },
+    get followMode() { return followMode; }, set followMode(v) { followMode = v; },
     get forgetRecents() { return forgetRecents; },
+    get frame() { return frame; },
     get freshness() { return freshness; },
     get from() { return from; }, set from(v) { from = v; },
+    get gesture() { return gesture; }, set gesture(v) { gesture = v; },
+    get getPosition() { return getPosition; },
+    get heading() { return heading; }, set heading(v) { heading = v; },
     get hubPanel() { return hubPanel; }, set hubPanel(v) { hubPanel = v; },
     get importFile() { return importFile; },
     get importOpen() { return importOpen; }, set importOpen(v) { importOpen = v; },
@@ -1993,24 +711,47 @@
     get isFav() { return isFav; },
     get isPinned() { return isPinned; },
     get isStation() { return isStation; },
+    get isolate() { return isolate; },
     get keepIncomingList() { return keepIncomingList; },
+    get labelColor() { return labelColor; },
+    get lastBackup() { return lastBackup; }, set lastBackup(v) { lastBackup = v; },
+    get lastCompass() { return lastCompass; }, set lastCompass(v) { lastCompass = v; },
     get lastEdit() { return lastEdit; }, set lastEdit(v) { lastEdit = v; },
+    get lastFix() { return lastFix; }, set lastFix(v) { lastFix = v; },
+    get lastTap() { return lastTap; }, set lastTap(v) { lastTap = v; },
+    get legExits() { return legExits; }, set legExits(v) { legExits = v; },
+    get line() { return line; },
     get listEditing() { return listEditing; }, set listEditing(v) { listEditing = v; },
+    get listIcon() { return listIcon; },
     get listOf() { return listOf; },
     get listPicker() { return listPicker; }, set listPicker(v) { listPicker = v; },
     get lists() { return lists; }, set lists(v) { lists = v; },
+    get locError() { return locError; },
+    get locating() { return locating; }, set locating(v) { locating = v; },
     get makeBackup() { return makeBackup; },
     get makeTransfer() { return makeTransfer; },
+    get map() { return map; }, set map(v) { map = v; },
+    get mapMode() { return mapMode; }, set mapMode(v) { mapMode = v; },
+    get marker() { return marker; }, set marker(v) { marker = v; },
+    get me() { return me; }, set me(v) { me = v; },
+    get meMarker() { return meMarker; }, set meMarker(v) { meMarker = v; },
+    get mode() { return mode; }, set mode(v) { mode = v; },
     get momentFrom() { return momentFrom; },
     get momentPicker() { return momentPicker; }, set momentPicker(v) { momentPicker = v; },
     get moreText() { return moreText; }, set moreText(v) { moreText = v; },
     get moveChip() { return moveChip; },
     get nav() { return nav; }, set nav(v) { nav = v; },
+    get navFollow() { return navFollow; }, set navFollow(v) { navFollow = v; },
+    get navList() { return navList; }, set navList(v) { navList = v; },
+    get navTick() { return navTick; }, set navTick(v) { navTick = v; },
+    get navWatch() { return navWatch; }, set navWatch(v) { navWatch = v; },
     get nearby() { return nearby; }, set nearby(v) { nearby = v; },
+    get nearbyAll() { return nearbyAll; }, set nearbyAll(v) { nearbyAll = v; },
     get nearbyDone() { return nearbyDone; }, set nearbyDone(v) { nearbyDone = v; },
     get nearbyFromMe() { return nearbyFromMe; }, set nearbyFromMe(v) { nearbyFromMe = v; },
     get newListName() { return newListName; }, set newListName(v) { newListName = v; },
     get now() { return now; }, set now(v) { now = v; },
+    get offCount() { return offCount; }, set offCount(v) { offCount = v; },
     get onKey() { return onKey; },
     get openAt() { return openAt; }, set openAt(v) { openAt = v; },
     get openCategoryFromSearch() { return openCategoryFromSearch; },
@@ -2022,7 +763,11 @@
     get osmEditUrl() { return osmEditUrl; },
     get osmNoteUrl() { return osmNoteUrl; },
     get pickCategory() { return pickCategory; },
+    get pickOnMap() { return pickOnMap; },
     get pickResult() { return pickResult; },
+    get pickStreet() { return pickStreet; },
+    get picked() { return picked; }, set picked(v) { picked = v; },
+    get pickedStreet() { return pickedStreet; }, set pickedStreet(v) { pickedStreet = v; },
     get pickerDay() { return pickerDay; },
     get pickerDays() { return pickerDays; },
     get pickerHours() { return pickerHours; },
@@ -2031,48 +776,75 @@
     get pins() { return pins; }, set pins(v) { pins = v; },
     get place() { return place; }, set place(v) { place = v; },
     get placeKey() { return placeKey; },
+    get placeMarker() { return placeMarker; },
     get placeMenu() { return placeMenu; }, set placeMenu(v) { placeMenu = v; },
     get placeSheetH() { return placeSheetH; }, set placeSheetH(v) { placeSheetH = v; },
     get placeShortcut() { return placeShortcut; },
     get pointOf() { return pointOf; },
+    get posWatch() { return posWatch; }, set posWatch(v) { posWatch = v; },
     get query() { return query; }, set query(v) { query = v; },
     get quickMoment() { return quickMoment; },
     get recents() { return recents; }, set recents(v) { recents = v; },
     get refreshSaved() { return refreshSaved; },
+    get reloadCategoryHere() { return reloadCategoryHere; },
+    get reloadLater() { return reloadLater; }, set reloadLater(v) { reloadLater = v; },
+    get remember() { return remember; },
     get removeFromList() { return removeFromList; },
     get removeStop() { return removeStop; },
     get renameChip() { return renameChip; },
     get renameList() { return renameList; },
+    get rerouting() { return rerouting; }, set rerouting(v) { rerouting = v; },
     get resetChips() { return resetChips; },
+    get restoreFile() { return restoreFile; }, set restoreFile(v) { restoreFile = v; },
     get restoreNeedsPw() { return restoreNeedsPw; }, set restoreNeedsPw(v) { restoreNeedsPw = v; },
     get restorePassword() { return restorePassword; }, set restorePassword(v) { restorePassword = v; },
     get results() { return results; }, set results(v) { results = v; },
+    get routeCtrl() { return routeCtrl; }, set routeCtrl(v) { routeCtrl = v; },
+    get routes() { return routes; }, set routes(v) { routes = v; },
+    get sameSpot() { return sameSpot; },
+    get saveAll() { return saveAll; },
+    get saveChips() { return saveChips; },
+    get saveFavorites() { return saveFavorites; },
     get savedEntry() { return savedEntry; },
     get savedList() { return savedList; }, set savedList(v) { savedList = v; },
     get say() { return say; },
     get searchError() { return searchError; }, set searchError(v) { searchError = v; },
     get searchH() { return searchH; }, set searchH(v) { searchH = v; },
     get searching() { return searching; }, set searching(v) { searching = v; },
+    get selStates() { return selStates; }, set selStates(v) { selStates = v; },
     get setMembership() { return setMembership; },
     get setOpenAt() { return setOpenAt; },
+    get setPoint() { return setPoint; },
     get setShortcut() { return setShortcut; },
     get shareList() { return shareList; },
     get sharePlace() { return sharePlace; },
     get shareTransfer() { return shareTransfer; },
     get shortcuts() { return shortcuts; }, set shortcuts(v) { shortcuts = v; },
     get showList() { return showList; },
+    get showMe() { return showMe; },
     get showModes() { return showModes; }, set showModes(v) { showModes = v; },
     get showPromise() { return showPromise; }, set showPromise(v) { showPromise = v; },
+    get showSaved() { return showSaved; }, set showSaved(v) { showSaved = v; },
+    get showSelection() { return showSelection; },
+    get showSteps() { return showSteps; }, set showSteps(v) { showSteps = v; },
     get showUnknown() { return showUnknown; }, set showUnknown(v) { showUnknown = v; },
     get showVia() { return showVia; }, set showVia(v) { showVia = v; },
+    get showWeek() { return showWeek; }, set showWeek(v) { showWeek = v; },
+    get skipPop() { return skipPop; }, set skipPop(v) { skipPop = v; },
+    get spoken() { return spoken; }, set spoken(v) { spoken = v; },
     get startDirections() { return startDirections; },
+    get startWatch() { return startWatch; },
     get stationKind() { return stationKind; },
     get status() { return status; },
+    get stopWatch() { return stopWatch; },
     get swap() { return swap; },
     get swipeStart() { return swipeStart; }, set swipeStart(v) { swipeStart = v; },
     get swiped() { return swiped; }, set swiped(v) { swiped = v; },
     get title() { return title; },
     get to() { return to; }, set to(v) { to = v; },
+    get toast() { return toast; }, set toast(v) { toast = v; },
+    get toastAction() { return toastAction; }, set toastAction(v) { toastAction = v; },
+    get toastTimer() { return toastTimer; }, set toastTimer(v) { toastTimer = v; },
     get toggleChip() { return toggleChip; },
     get togglePin() { return togglePin; },
     get toggleZoom() { return toggleZoom; },
@@ -2081,9 +853,13 @@
     get useMyPosition() { return useMyPosition; },
     get useShortcut() { return useShortcut; },
     get via() { return via; }, set via(v) { via = v; },
+    get viewChosen() { return viewChosen; }, set viewChosen(v) { viewChosen = v; },
+    get viewHash() { return viewHash; }, set viewHash(v) { viewHash = v; },
     get viewer() { return viewer; }, set viewer(v) { viewer = v; },
     get viewerEl() { return viewerEl; }, set viewerEl(v) { viewerEl = v; },
     get viewerIdx() { return viewerIdx; }, set viewerIdx(v) { viewerIdx = v; },
+    get voice() { return voice; }, set voice(v) { voice = v; },
+    get wakeLock() { return wakeLock; }, set wakeLock(v) { wakeLock = v; },
     get walkEta() { return walkEta; },
     get week() { return week; },
     get whenText() { return whenText; },
@@ -2095,6 +871,18 @@
   };
   setContext('app', app);
   // </app>
+  const { clampZoom, toggleZoom, zoomStart, zoomMove, zoomEnd } = createZoom(app);
+  const { favData, addCustomLayers, drawRoute, line, shade, dimPlaces, setMapMode, fitOptions, boundsOf, fitTo, onMapClick, openPoint, openFeature, frame, placeMarker, labelColor, clearSelPhoto, clearPhotoPins, clearSelection, showSelection } = createMapDraw(app);
+  const { saveFavorites, setShortcut, useShortcut } = createShortcuts(app);
+  const { saveChips, moveChip, toggleChip, renameChip, resetChips, catOf } = createChips(app);
+  const { sameSpot, saveAll, keepOf, saveTap, setMembership, togglePin, removeFromList, createList, renameList, deleteList, refreshSaved, openSavedList, shareList, keepIncomingList, makeTransfer, shareTransfer, applyIncoming, makeBackup, doRestore } = createMyPlaces(app);
+  const { remember, forgetRecents, openPlace, sharePlace, loadDepartures, closePlace } = createPlace(app);
+  const { clearSearch, hitFilter, catIcon, applyHit, displayName, collectCategory, applyOpenFilter, setOpenAt, momentFrom, quickMoment, nearView, reloadCategoryHere, pickCategory, clearCategory, dist, openCategoryFromSearch, onKey, pickResult } = createSearch(app);
+  const { say, isolate, closeTop, onPopState, onKeyDown, undoToast, showMe } = createScreen(app);
+  const { setHeading, onOrientation, startCompass, startWatch, stopWatch, getPosition, startupLocate, locError, locDetail, locate, pickOnMap } = createLocation(app);
+  const { startDirections, closeDirections, pointOf, setPoint, addStop, removeStop, editField, useMyPosition, swap, computeRoutes, chooseMode, sheetToTop, pickStreet, pickTransit } = createDirections(app);
+  const { speak, transitSteps, startNav, onFix, updateNav, reroute, endNav } = createNav(app);
+  const { importFile } = createImport(app);
 </script>
 
 
