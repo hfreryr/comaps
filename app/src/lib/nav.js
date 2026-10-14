@@ -56,6 +56,18 @@ export function progress(nav, lonlat, hint = 0) {
   return { s: best.s, off: best.off, k, heading: seg };
 }
 
+/** Reste du tracé à parcourir, à partir de la distance s (le tronçon déjà fait disparaît de la carte, comme dans Plans et Maps). */
+export function remaining(nav, s) {
+  const { coords, cum } = nav;
+  if (s <= 0) return coords;
+  let i = cum.findIndex((c) => c > s);
+  if (i < 0) return [coords.at(-1), coords.at(-1)];
+  i = Math.max(1, i);
+  const t = (s - cum[i - 1]) / ((cum[i] - cum[i - 1]) || 1);
+  const a = coords[i - 1], b = coords[i];
+  return [[a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t], ...coords.slice(i)];
+}
+
 /** Angle de la flèche d'une manœuvre Valhalla (0 = tout droit, 90 = à droite, -90 = à gauche). */
 export function arrowAngle(type) {
   return ({

@@ -5,7 +5,7 @@ import { MODE_NAMES, fmtDistance, fmtDuration, fmtTime, streetRoute, trafficEsti
 import { empty } from '#lib/maplayers.js';
 import { exitLabel } from '#lib/exits.js';
 import { placeLabel } from '#lib/rame.js';
-import { prepare, progress, spokenDistance } from '#lib/nav.js';
+import { prepare, progress, remaining, spokenDistance } from '#lib/nav.js';
 
 /** @param {any} app */
 export function createNav(app) {
@@ -96,6 +96,13 @@ export function createNav(app) {
     app.meMarker?.setRotationAlignment('map');      // la flèche suit la carte (qui tourne avec vous)
     app.meMarker?.setRotation(heading);
     app.meMarker?.getElement().classList.add('navigating');
+    // sur la carte : seul le reste du trajet reste en bleu, et le point de départ disparaît (la flèche suffit)
+    if (app.nav.kind !== 'transit') {
+      const color = app.nav.mode === 'bike' ? app.BIKE_COLOR : app.WALK_COLOR;
+      app.map.getSource('route')?.setData({ type: 'FeatureCollection', features: [app.line(remaining(app.nav, app.nav.s), app.nav.mode, color, '#1B3F9E')] });
+    }
+    app.map.getSource('route-ends')?.setData({ type: 'FeatureCollection', features: app.showVia && app.via && app.nav.steps.findIndex((st) => st.type === 'stop') > app.nav.k
+      ? [{ type: 'Feature', geometry: { type: 'Point', coordinates: [app.via.lon, app.via.lat] }, properties: { kind: 'via' } }] : [] });
     if (app.navFollow) {
       app.map.easeTo({ center: [app.lastFix.lon, app.lastFix.lat], bearing: heading, pitch: 50, zoom: cfg.zoom,
         offset: [0, Math.round(window.innerHeight * 0.18)], duration: 900 });

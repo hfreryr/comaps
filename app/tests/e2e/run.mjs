@@ -171,6 +171,30 @@ const tests = {
     assert(!errors.length, errors.join(' | '));
     await ctx.close();
   },
+  async 'aperçu d\'itinéraire : la fiche se réduit à une fine bande, puis remonte'() {
+    const { p, ctx, errors } = await page();
+    await p.click('.chip:has-text("Restaurants")'); await p.waitForTimeout(6000);
+    await p.click('.nearby li button >> nth=0'); await p.waitForTimeout(3000);
+    await p.click('.action.primary'); await p.waitForSelector('.route-sheet .mode-tabs', { timeout: 15000 }); await p.waitForTimeout(6000);
+    // glisser du doigt (événements tactiles réels) depuis la poignée
+    const cdp = await ctx.newCDPSession(p);
+    const swipe = async (y0, y1) => {
+      const pt = (y) => [{ x: 195, y }];
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: pt(y0) });
+      for (let k = 1; k <= 8; k++) { await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: pt(y0 + (y1 - y0) * k / 8) }); await p.waitForTimeout(40); }
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); await p.waitForTimeout(700);
+    };
+    const box = async () => p.$eval('.route-sheet', (e) => e.getBoundingClientRect());
+    const top = (await box()).top;
+    await swipe(top + 8, 840);
+    const low = await box();
+    assert(low.height < 120 && low.height > 40, `fiche pas réduite à une bande : ${Math.round(low.height)} px`);
+    assert(await p.$eval('.route-sheet .mode-tabs', (e) => e.getBoundingClientRect().bottom <= 844), 'durées des modes cachées');
+    await swipe(low.top + 8, low.top - 250);
+    assert((await box()).height > low.height + 60, 'la fiche ne remonte pas');
+    assert(!errors.length, errors.join(' | '));
+    await ctx.close();
+  },
   async 'Mes lieux : favori, nouvelle liste, renommer, supprimer'() {
     const { p, ctx, errors } = await page();
     await p.fill('#search', "Ed's rue Muller"); await p.waitForSelector('.results li.opt button', { timeout: 20000 }); await pick(p); await p.waitForTimeout(3000);
@@ -266,7 +290,16 @@ const tests = {
     await p.fill('#search', 'Panthéon'); await p.waitForSelector('.results li.opt button', { timeout: 20000 }); await pick(p); await p.waitForTimeout(2500);
     await p.click('.action.primary'); await p.waitForTimeout(6000);
     await p.click('.mode-tabs .mode-tab >> nth=0'); await p.waitForTimeout(3000);
-    await p.click('.sum-actions .go'); await p.waitForSelector('.nav-top', { timeout: 8000 });
+    await p.click('.sum-actions .go'); await p.waitForSelector('.nav-top', { timeout: 8000 }); await p.waitForTimeout(1500);
+    // pendant le guidage : plus de point de départ, ni de rond bleu ; on avance → le tronçon fait disparaît du tracé
+    const ends = () => p.evaluate(() => window.__map.getSource('route-ends').serialize().data.features.length);
+    assert((await ends()) === 0, 'point de départ encore affiché pendant le guidage');
+    assert(!(await p.$eval('.me .me-dot', (e) => e.offsetParent !== null || getComputedStyle(e).display !== 'none').catch(() => false)), 'rond bleu encore visible');
+    const coords = (await p.evaluate(() => window.__nav())).coords;
+    const mid = coords[Math.floor(coords.length / 2)];
+    await ctx.setGeolocation({ latitude: mid[1], longitude: mid[0] }); await p.waitForTimeout(4000);
+    const first = await p.evaluate(() => window.__map.getSource('route').serialize().data.features[0].geometry.coordinates[0]);
+    assert(Math.hypot(first[0] - mid[0], first[1] - mid[1]) < 0.0005, `le tracé ne commence pas à la position : ${first} / ${mid}`);
     await p.click('.nav-end'); await p.waitForTimeout(800);
     assert((await p.locator('.nav-top').count()) === 0, 'guidage non terminé');
     assert(!errors.length, errors.join(' | '));
