@@ -59,6 +59,8 @@ Piste testée : l'image que le **site web du lieu** propose pour les partages (`
 → **≈ 90 lieux, soit 7 % de la zone**. Qualité bonne quand elle existe, couverture trop faible pour en faire la source principale ; question juridique (réutilisation hors aperçu de lien) non tranchée.
 Même test avec les sites connus d'**Overture** (6e) : 882 restaurants / cafés / bars, **713 ont un site (81 %)** contre 38 % dans OSM ; sur 698 sites testés : 136 images retenues (**15 %** des lieux), 253 sites injoignables depuis notre environnement de test (filtrage réseau probable, plafond réel estimé ≈ 25 %).
 
+**En cours** : [plan de nettoyage](docs/plan-nettoyage.md) (tests, sécurité, rangement du code, textes), décidé le 14/10/2026.
+
 ## Valeurs
 
 - **Zéro pistage** : aucune donnée personnelle collectée.
