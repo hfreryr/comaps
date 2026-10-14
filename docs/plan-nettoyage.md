@@ -92,7 +92,7 @@ Le fichier principal est passé de 3 770 à 3 340 lignes, puis à environ 730 li
 | Étape | État | Date |
 |---|---|---|
 | 0. Règles | fait (proposition de changement) | 14/10 |
-| 1. Tests | fait : 47 tests unitaires, 14 de bout en bout, 5 pipeline ; un bug trouvé et corrigé | 14/10 |
+| 1. Tests | fait : 51 tests unitaires, 14 de bout en bout, 5 pipeline ; un bug trouvé et corrigé | 14/10 |
 | 2. Sécurité | fait (sauf la partie du porteur du projet) | 14/10 |
 | 3. Rangement | fait : 20 composants d'écran, 13 modules de logique, page à ~730 lignes | 14/10 |
 | 4. Textes | fait : 664 textes dans `fr.js`, test de couverture | 14/10 |
