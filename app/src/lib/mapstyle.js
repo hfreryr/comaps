@@ -1,22 +1,22 @@
 // Style de carte maison, sur les tuiles vectorielles OpenFreeMap (schéma OpenMapTiles).
-// Intention : une carte calme et nette. Fond chaud très clair, routes blanches cernées de gris (lisibles, comme Plans),
+// Intention : une carte calme et nette. Îlots crème, rues grises pleines sans liseré (comme Plans),
 // voies rapides ambrées, parcs et eau doux, bâtiments en léger relief, et des lieux
-// signalés par une pastille colorée à pictogramme blanc. Police : Open Sans, hébergée avec l'app.
+// signalés par une pastille colorée à pictogramme blanc. Police : Inter (SIL OFL), hébergée avec l'app.
 
 export const C = {
-  land: '#F4F0E6',
-  landAlt: '#F1EEE8',      // zones commerciales et équipements
-  pedestrian: '#FBFAF7',
-  building: '#EEE5CE',
-  buildingEdge: '#E2D7BC',
+  land: '#F4EFDF',
+  landAlt: '#EFEADA',      // zones commerciales et équipements
+  pedestrian: '#EAEAEA',
+  building: '#EFE8D3',
+  buildingEdge: '#E6DEC6',
   building3d: '#EAE6E0',
   park: '#D4EBCB',
   wood: '#C7E3BC',
   water: '#ABD4F2',
   waterLabel: '#4A84B5',
-  road: '#FFFFFF',
-  roadCase: '#D9D4CB',      // contour gris des rues : c'est lui qui les rend lisibles sur le fond clair (comme Plans)
-  majorCase: '#CDC7BC',
+  road: '#CBD1D1',
+  roadCase: '#CCD1D1',      // en mode clair, contour de la même couleur que la rue : pas de liseré (comme Plans)
+  majorCase: '#CDD2D2',
   highway: '#FAD98A',
   highwayCase: '#EDC060',
   path: '#D3CEC6',
@@ -28,10 +28,13 @@ export const C = {
 };
 
 export const FONT = {
-  regular: ['Open Sans Regular'],
-  semibold: ['Open Sans Semibold'],
-  bold: ['Open Sans Bold'],
-  italic: ['Open Sans Italic']
+  // Inter (SIL OFL 1.1), la plus proche des polices système des téléphones ; glyphes préparés par
+  // scripts/build_fonts.sh dans static/fonts/ (servis avec l'app, rien chez Google).
+  regular: ['Inter Regular'],
+  medium: ['Inter Medium'],
+  semibold: ['Inter SemiBold'],
+  bold: ['Inter Bold'],
+  italic: ['Inter Italic']
 };
 
 // Familles de lieux : couleur, pictogramme et sous-classes OpenMapTiles.
@@ -121,7 +124,10 @@ export const DARK_LAND = '#1E2126';
 const DARK_HALO = 'rgba(22,24,28,0.9)';
 const DARK = {
   '#F6F4F0': DARK_LAND, '#F4F0E6': DARK_LAND, '#EEE5CE': '#2A2E34', '#E2D7BC': '#33373E',
-  '#D9D4CB': '#2B2F35', '#CDC7BC': '#31353C', '#D2CDC4': '#3A3F47', '#F1EEE8': '#22262B', '#FBFAF7': '#262A30',
+  '#D9D4CB': '#2B2F35', '#CDC7BC': '#31353C', '#D2CDC4': '#3A3F47',
+  // palette claire du 14/10 (rues grises sans contour, îlots crème) : le mode sombre garde ses couleurs
+  '#F4EFDF': DARK_LAND, '#EFEADA': '#22262B', '#EAEAEA': '#262A30', '#EFE8D3': '#2A2E34', '#E6DEC6': '#33373E',
+  '#CBD1D1': '#3A3F47', '#CCD1D1': '#2B2F35', '#CDD2D2': '#31353C', '#F1EEE8': '#22262B', '#FBFAF7': '#262A30',
   '#D4EBCB': '#1F3326', '#C7E3BC': '#1C3022', '#ABD4F2': '#16304A',
   '#E8E5DF': '#2A2E34', '#E3DFD9': '#33373E',
   '#D3CEC6': '#4A4F57', '#EEEBE6': '#2B2F35', '#E9E5DF': '#31353C',
@@ -196,8 +202,8 @@ function lightStyle(base) {
       { id: 'path', type: 'line', source: 'omt', 'source-layer': 'transportation', minzoom: 16,
         filter: ['all', ['==', ['geometry-type'], 'LineString'], ['match', ['get', 'subclass'], ['path', 'track', 'bridleway', 'steps'], true, false]],
         paint: { 'line-color': C.path, 'line-width': zoom([16, 0.8, 19, 2]), 'line-dasharray': [2.5, 2] } },
-      // petites rues : grises de loin (sinon blanc sur fond clair, invisibles), blanches cernées de gris de près
-      ...roadPair('road-minor', ['minor', 'service'], { color: ['interpolate', ['linear'], ['zoom'], 14, '#D2CDC4', 15.5, C.road], casing: C.roadCase, widths: [12, 0.4, 14, 1.6, 16, 6, 19, 22], caseFade: [14, 15] }),
+      // rues grises à tous les zooms, sans liseré (comme Plans)
+      ...roadPair('road-minor', ['minor', 'service'], { color: C.road, casing: C.roadCase, widths: [12, 0.4, 14, 1.6, 16, 6, 19, 22], caseFade: [14, 15] }),
       ...roadPair('road-mid', ['tertiary', 'secondary'], { color: C.road, casing: C.majorCase, widths: [10, 0.6, 14, 3.2, 16, 9, 19, 30] }),
       ...roadPair('road-major', ['primary', 'trunk'], { color: C.road, casing: C.majorCase, widths: [8, 0.8, 14, 4.6, 16, 12, 19, 36] }),
       ...roadPair('road-highway', ['motorway'], { color: C.highway, casing: C.highwayCase, widths: [6, 0.8, 14, 5.5, 16, 13, 19, 38] }),
@@ -231,14 +237,15 @@ function lightStyle(base) {
       { id: 'road-name-major', type: 'symbol', source: 'omt', 'source-layer': 'transportation_name', minzoom: 12.5, maxzoom: 14,
         filter: ['match', ['get', 'class'], ['motorway', 'trunk', 'primary', 'secondary'], true, false],
         layout: { 'symbol-placement': 'line', 'text-field': NAME, 'text-font': FONT.semibold, 'text-size': 9.5,
-                  'text-transform': 'uppercase', 'text-letter-spacing': 0.08, 'text-max-angle': 25, 'symbol-spacing': 400 },
+                  'text-transform': 'uppercase', 'text-letter-spacing': 0.06, 'text-max-angle': 25, 'symbol-spacing': 400 },
         paint: { 'text-color': '#8C9096', 'text-halo-color': C.halo, 'text-halo-width': 1.4 } },
       { id: 'road-name', type: 'symbol', source: 'omt', 'source-layer': 'transportation_name', minzoom: 14,
         filter: ['match', ['get', 'class'], ['motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'minor'], true, false],
-        layout: { 'symbol-placement': 'line', 'text-field': NAME, 'text-font': FONT.regular,
-                  'text-size': zoom([14, 10.5, 17, 13, 19, 15]), 'text-max-angle': 28, 'symbol-spacing': 320,
-                  'text-letter-spacing': 0.02 },
-        paint: { 'text-color': C.roadLabel, 'text-halo-color': C.halo, 'text-halo-width': 1.6 } },
+        // noms de rues en capitales espacées, comme Plans
+        layout: { 'symbol-placement': 'line', 'text-field': NAME, 'text-font': FONT.medium, 'text-transform': 'uppercase',
+                  'text-size': zoom([14, 9.5, 17, 11.5, 19, 13]), 'text-max-angle': 28, 'symbol-spacing': 320,
+                  'text-letter-spacing': 0.07 },
+        paint: { 'text-color': C.roadLabel, 'text-halo-color': C.halo, 'text-halo-width': 1.3 } },
 
       // Autres lieux (banques, bureaux, services) : seulement de très près.
       { id: 'poi-other', type: 'symbol', source: 'omt', 'source-layer': 'poi', minzoom: 18,
@@ -265,8 +272,8 @@ function lightStyle(base) {
 
       { id: 'place-small', type: 'symbol', source: 'omt', 'source-layer': 'place', minzoom: 12, maxzoom: 17,
         filter: ['match', ['get', 'class'], ['suburb', 'quarter', 'neighbourhood'], true, false],
-        layout: { 'text-field': NAME, 'text-font': FONT.semibold, 'text-size': zoom([12, 10.5, 16, 13]),
-                  'text-transform': 'uppercase', 'text-letter-spacing': 0.12, 'text-max-width': 7 },
+        layout: { 'text-field': NAME, 'text-font': FONT.bold, 'text-size': zoom([12, 10.5, 16, 13]),
+                  'text-transform': 'uppercase', 'text-letter-spacing': 0.06, 'text-max-width': 7 },
         paint: { 'text-color': C.labelSoft, 'text-halo-color': 'rgba(255,255,255,0.8)', 'text-halo-width': 1.4 } },
       { id: 'place-city', type: 'symbol', source: 'omt', 'source-layer': 'place', maxzoom: 13,
         filter: ['match', ['get', 'class'], ['city', 'town'], true, false],

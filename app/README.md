@@ -122,9 +122,18 @@ Enquête et mesures : [`docs/espace-ecran.md`](../docs/espace-ecran.md). Appliqu
 - une échelle de tailles unique (`--fs-body`, `--fs-meta`, `--fs-small`, `--gutter` dans le style de `+page.svelte`), avec une densité proche de Google Maps : barre de recherche, raccourcis, champs et marges des fiches plus compacts. Les champs de saisie restent à 16 px, sinon Safari zoome au moment de taper ;
 - le cadrage de la carte tient compte de la hauteur réelle du haut d'écran et de la fiche, mesurée au lieu de valeurs fixes.
 
-## Rues lisibles en mode clair (14/10/2026)
+## Fond de carte clair et polices (14/10/2026)
 
-Retour de test : en mode clair, on voyait mal les rues (blanches sur fond presque blanc). Comme Plans : contour gris des rues (`roadCase`, `majorCase`), petites rues grises de loin et blanches de près, fond et bâtiments un peu plus chauds (`src/lib/mapstyle.js`). Le mode sombre est inchangé : vérifié pixel par pixel à trois niveaux de zoom (0 pixel différent).
+Retours de test : en mode clair on voyait mal les rues, puis le contour gris ajouté « fait cheap ». Comme Plans, mesuré sur ses captures :
+- **rues grises pleines à tous les zooms, sans liseré** (`#CBD1D1`) ;
+- **îlots crème** (`#F4EFDF`) et bâtiments à peine plus soutenus (`src/lib/mapstyle.js`).
+
+Le mode sombre garde ses couleurs : chaque nouvelle couleur claire a sa traduction sombre d'origine.
+
+**Polices de la carte** :
+- **Inter** (SIL Open Font License 1.1) remplace Open Sans. C'est la police libre la plus proche des polices système des téléphones.
+- Les noms de rues sont **en capitales espacées** et les quartiers en gras, comme dans Plans.
+- Les glyphes sont préparés par `scripts/build_fonts.sh` dans `static/fonts/` (12 Mo, servis avec l'app, rien chez Google). La licence est dans `static/fonts/Inter-OFL.txt`.
 
 ## Listes de catégories : comportement (13/10/2026, soir)
 

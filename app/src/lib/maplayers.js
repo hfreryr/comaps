@@ -28,7 +28,7 @@ export function addRouteLayers(map, dark) {
     paint: { 'line-color': '#6F7A88', 'line-width': width(3.2, 5.5), 'line-dasharray': [0, 1.7] } }, before);
   // Étiquettes sur les tracés : « 18 min » sur celui choisi, « +2 min » sur les autres (comme Plans et Maps)
   map.addSource('route-tags', { type: 'geojson', data: empty() });
-  const tagLayout = { 'text-field': ['get', 'label'], 'text-font': ['Open Sans Bold'], 'text-size': 13,
+  const tagLayout = { 'text-field': ['get', 'label'], 'text-font': ['Inter Bold'], 'text-size': 13,
     'icon-image': ['case', ['get', 'sel'], 'tag-sel', 'tag-alt'], 'icon-text-fit': 'both', 'icon-text-fit-padding': [4, 8, 4, 8] };
   // les étiquettes restent toujours visibles ; leur position (routeTags) évite qu'elles se chevauchent
   map.addLayer({ id: 'route-tag', type: 'symbol', source: 'route-tags', filter: ['!', ['get', 'sel']],
@@ -48,19 +48,19 @@ export function addPlaceLayers(map, dark, favs) {
   map.addSource('cat-hits', { type: 'geojson', data: empty() });
   map.addLayer({ id: 'cat-hit', type: 'symbol', source: 'cat-hits',
     layout: { 'icon-image': ['get', 'icon'], 'icon-size': 1.15, 'icon-allow-overlap': true, 'symbol-sort-key': ['get', 'i'],
-              'text-field': ['get', 'name'], 'text-font': ['Open Sans Bold'], 'text-size': 12.5, 'text-anchor': 'left',
+              'text-field': ['get', 'name'], 'text-font': ['Inter Bold'], 'text-size': 12.5, 'text-anchor': 'left',
               'text-offset': [1.3, 0], 'text-max-width': 8, 'text-optional': true },
     paint: { 'text-color': ['get', 'tc'], 'text-halo-color': dark ? 'rgba(22,24,28,0.9)' : '#FFFFFF', 'text-halo-width': 1.8 } });
   map.addSource('selected', { type: 'geojson', data: empty() });
   map.addSource('favs', { type: 'geojson', data: favs });
   map.addLayer({ id: 'fav', type: 'symbol', source: 'favs',
     layout: { 'icon-image': ['get', 'icon'], 'icon-allow-overlap': true, 'icon-size': ['interpolate', ['linear'], ['zoom'], 11, 0.8, 16, 1.05],
-              'text-field': ['step', ['zoom'], '', 14, ['get', 'name']], 'text-font': ['Open Sans Semibold'], 'text-size': 12,
+              'text-field': ['step', ['zoom'], '', 14, ['get', 'name']], 'text-font': ['Inter SemiBold'], 'text-size': 12,
               'text-anchor': 'left', 'text-offset': [1.1, 0], 'text-optional': true, 'text-max-width': 8 },
     paint: { 'text-color': ['get', 'tc'], 'text-halo-color': dark ? 'rgba(22,24,28,0.9)' : '#FFFFFF', 'text-halo-width': 1.6 } });
   map.addLayer({ id: 'selected', type: 'symbol', source: 'selected',
     layout: { 'icon-image': ['get', 'icon'], 'icon-allow-overlap': true, 'icon-ignore-placement': true,
-              'text-field': ['get', 'name'], 'text-font': ['Open Sans Bold'], 'text-size': 13.5, 'text-anchor': 'left',
+              'text-field': ['get', 'name'], 'text-font': ['Inter Bold'], 'text-size': 13.5, 'text-anchor': 'left',
               'text-offset': [1.75, 0], 'text-max-width': 9, 'text-allow-overlap': true },
     paint: { 'text-color': ['get', 'tc'], 'text-halo-color': dark ? 'rgba(22,24,28,0.95)' : '#FFFFFF', 'text-halo-width': 2 } });
 }
