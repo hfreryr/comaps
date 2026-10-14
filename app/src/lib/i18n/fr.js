@@ -25,6 +25,7 @@ export default {
   'recherche.depart': 'Départ',
   'recherche.arrivee': 'Arrivée',
   // ——— Résultats de recherche ———
+  'resultats.ville_ou_arrondissement': 'Ville ou arrondissement',
   'resultats.liste_aria': 'Résultats de la recherche',
   'resultats.ou_touchez_la_carte_pour_choisir_un': 'Ou touchez la carte pour choisir un point.',
   'resultats.votre_position': 'Votre position',

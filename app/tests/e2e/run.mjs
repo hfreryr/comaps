@@ -109,6 +109,20 @@ const tests = {
     assert(!errors.length, errors.join(' | '));
     await ctx.close();
   },
+  async 'choisir « Paris 8e » cadre la zone et garde les raccourcis'() {
+    const { p, ctx, errors } = await page();
+    await p.fill('#search', 'paris 8e'); await p.waitForSelector('.results li.opt button', { timeout: 30000 });
+    assert(/Arrondissement/.test(await p.$eval('.results li.opt', (e) => e.innerText)), 'arrondissement absent des résultats');
+    await pick(p); await p.waitForTimeout(2500);
+    assert((await p.locator('section.sheet').count()) === 0, 'une fiche s\'ouvre pour une zone');
+    assert((await p.locator('.chip:has-text("Restaurants")').count()) === 1, 'raccourcis masqués');
+    const c = await p.evaluate(() => window.__map.getCenter());
+    assert(Math.abs(c.lat - 48.873) < 0.01 && Math.abs(c.lng - 2.312) < 0.015, `carte mal cadrée : ${c.lat}, ${c.lng}`);
+    await p.click('.chip:has-text("Restaurants")'); await p.waitForTimeout(6000);
+    assert((await p.locator('.nearby li').count()) > 3, 'pas de restaurants dans la zone');
+    assert(!errors.length, errors.join(' | '));
+    await ctx.close();
+  },
   async 'adresse via Géoplateforme'() {
     const { p, ctx } = await page();
     await p.fill('#search', '57 rue de rennes'); await p.waitForSelector('.results li.opt', { timeout: 30000 });
