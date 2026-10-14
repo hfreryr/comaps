@@ -98,6 +98,17 @@ const tests = {
     assert(/introuvable/.test(txt) && !/hors de la zone/.test(txt), `message attendu « introuvable » : ${txt.slice(0, 200)}`);
     await ctx.close();
   },
+  async 'Photon en panne : la recherche par nom passe par nos données'() {
+    const { p, ctx, errors } = await page();
+    await p.route('**/photon.komoot.io/**', (r) => r.abort());
+    await p.fill('#search', 'Café de Flore'); await p.waitForSelector('.results li.opt button', { timeout: 15000 });
+    const first = await p.$eval('.results li.opt', (e) => e.innerText);
+    assert(/Café de Flore/.test(first), `résultat inattendu : ${first}`);
+    await pick(p); await p.waitForSelector('.sheet h1', { timeout: 10000 }); await p.waitForTimeout(2000);
+    assert(/Horaires|Ouvert|Fermé/.test(await p.$eval('.sheet', (e) => e.innerText)), 'fiche incomplète');
+    assert(!errors.length, errors.join(' | '));
+    await ctx.close();
+  },
   async 'adresse via Géoplateforme'() {
     const { p, ctx } = await page();
     await p.fill('#search', '57 rue de rennes'); await p.waitForSelector('.results li.opt', { timeout: 30000 });
