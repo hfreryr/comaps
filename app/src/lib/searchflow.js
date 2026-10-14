@@ -241,6 +241,15 @@ export function createSearch(app) {
       return;
     }
     clearCategory();
+    if (r.area && !app.assigning) {
+      // une zone (arrondissement, quartier, ville) : on y cadre la carte, sans fiche, et les raccourcis restent là
+      app.query = r.name;
+      app.results = [];
+      app.closePlace();
+      document.activeElement?.blur();
+      app.map.flyTo({ center: [r.lon, r.lat], zoom: 14.3, duration: 900 });
+      return;
+    }
     if (app.assigning) {
       const which = app.assigning;
       app.assigning = null;

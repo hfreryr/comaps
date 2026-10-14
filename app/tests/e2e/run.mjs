@@ -114,6 +114,31 @@ const tests = {
     assert(!errors.length, errors.join(' | '));
     await ctx.close();
   },
+  async 'Photon en panne : la recherche par nom passe par nos données'() {
+    const { p, ctx, errors } = await page();
+    await p.route('**/photon.komoot.io/**', (r) => r.abort());
+    await p.fill('#search', 'Café de Flore'); await p.waitForSelector('.results li.opt button', { timeout: 15000 });
+    const first = await p.$eval('.results li.opt', (e) => e.innerText);
+    assert(/Café de Flore/.test(first), `résultat inattendu : ${first}`);
+    await pick(p); await p.waitForSelector('.sheet h1', { timeout: 10000 }); await p.waitForTimeout(2000);
+    assert(/Horaires|Ouvert|Fermé/.test(await p.$eval('.sheet', (e) => e.innerText)), 'fiche incomplète');
+    assert(!errors.length, errors.join(' | '));
+    await ctx.close();
+  },
+  async 'choisir « Paris 8e » cadre la zone et garde les raccourcis'() {
+    const { p, ctx, errors } = await page();
+    await p.fill('#search', 'paris 8e'); await p.waitForSelector('.results li.opt button', { timeout: 30000 });
+    assert(/Arrondissement/.test(await p.$eval('.results li.opt', (e) => e.innerText)), 'arrondissement absent des résultats');
+    await pick(p); await p.waitForTimeout(2500);
+    assert((await p.locator('section.sheet').count()) === 0, 'une fiche s\'ouvre pour une zone');
+    assert((await p.locator('.chip:has-text("Restaurants")').count()) === 1, 'raccourcis masqués');
+    const c = await p.evaluate(() => window.__map.getCenter());
+    assert(Math.abs(c.lat - 48.873) < 0.01 && Math.abs(c.lng - 2.312) < 0.015, `carte mal cadrée : ${c.lat}, ${c.lng}`);
+    await p.click('.chip:has-text("Restaurants")'); await p.waitForTimeout(6000);
+    assert((await p.locator('.nearby li').count()) > 3, 'pas de restaurants dans la zone');
+    assert(!errors.length, errors.join(' | '));
+    await ctx.close();
+  },
   async 'adresse via Géoplateforme'() {
     const { p, ctx } = await page();
     await p.fill('#search', '57 rue de rennes'); await p.waitForSelector('.results li.opt', { timeout: 30000 });
@@ -137,6 +162,29 @@ const tests = {
     const h = await p.$eval('.sheet', (e) => e.getBoundingClientRect().height);
     assert(h < 300, `la liste s'ouvre trop grande (${h}px) : attendu un aperçu`);
     assert((await p.locator('.chip.on').count()) === 1, 'catégorie non marquée active');
+    await ctx.close();
+  },
+  async 'retirer un lieu d\'une liste depuis le menu « ⋯ » de sa fiche'() {
+    const { p, ctx, errors } = await page();
+    await p.click('.chip:has-text("Restaurants")'); await p.waitForTimeout(6000);
+    await p.click('.nearby li button >> nth=0'); await p.waitForTimeout(3000);
+    await p.click('.fab button >> nth=0'); await p.waitForTimeout(500);              // cœur : ajouté aux Favoris
+    await p.click('.fab button >> nth=2');                                           // ⋯
+    await p.click('.pmenu button:has-text("Enregistré dans")');
+    await p.waitForSelector('.pick-lists'); await p.uncheck('.pick-lists li:has-text("Favoris") input'); await p.waitForTimeout(400);
+    await p.click('.done'); await p.waitForTimeout(500);
+    assert((await p.locator('.fab button.on').count()) === 0, 'toujours enregistré');
+    assert(!errors.length, errors.join(' | '));
+    await ctx.close();
+  },
+  async 'chercher « fleuriste » propose de l\'ajouter aux raccourcis'() {
+    const { p, ctx, errors } = await page();
+    assert((await p.locator('.chip:has-text("Fleuristes")').count()) === 0, 'déjà en raccourci');
+    await p.fill('#search', 'fleuriste'); await p.waitForTimeout(1500); await p.press('#search', 'Enter');
+    await p.waitForSelector('.add-chip', { timeout: 10000 }); await p.click('.add-chip'); await p.waitForTimeout(500);
+    assert((await p.locator('.chip:has-text("Fleuristes")').count()) === 1, 'raccourci non ajouté');
+    assert((await p.locator('.add-chip').count()) === 0, 'le bouton reste affiché');
+    assert(!errors.length, errors.join(' | '));
     await ctx.close();
   },
   async 'aperçu d\'itinéraire : la fiche se réduit à une fine bande, puis remonte'() {

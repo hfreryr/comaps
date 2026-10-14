@@ -145,7 +145,10 @@ export async function wikiInfo({ wikidata, wikipedia }, signal) {
     const meta = ii.extmetadata || {};
     const artist = stripTags(meta.Artist?.value).slice(0, 60);
     const licence = stripTags(meta.LicenseShortName?.value);
-    return { src: ii.thumburl, full: ii.responsiveUrls?.['2'] || ii.thumburl, page: ii.descriptionurl, title: page.title,
+    // plein écran : 1 200 px suffisent sur téléphone (la version 2 400 px s'affichait « bande par bande », test P3) ;
+    // la grande version seulement sur grand écran
+    const wide = typeof window !== 'undefined' && window.innerWidth > 800;
+    return { src: ii.thumburl, full: (wide && ii.responsiveUrls?.['2']) || ii.thumburl, page: ii.descriptionurl, title: page.title,
       credit: [artist, licence].filter(Boolean).join(' · ') };
   };
   const API = 'https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*&prop=imageinfo&iiprop=url|extmetadata&iiurlwidth=1200';

@@ -232,6 +232,12 @@
                 </button>
               {/each}
             {/if}
+            {#if app.isFav}
+              <!-- là où l'on cherche spontanément (tests P3 et P4) : les listes du lieu, pour l'en retirer ou le déplacer -->
+              <button role="menuitem" onclick={() => { app.placeMenu = false; app.listPicker = true; }}>
+                {tx('fiche.enregistre_dans_listes', { listes: app.savedEntry.lists.map((id) => app.listOf(id).name).join(', ') })}
+              </button>
+            {/if}
             <button role="menuitem" onclick={app.copyAddress}>{tx('fiche.copier_adresse')}</button>
             <button role="menuitem" onclick={() => { app.placeMenu = false; app.sharePlace(); }}>{tx('liste.partager')}</button>
           </div>

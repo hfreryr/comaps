@@ -9,6 +9,7 @@
 import { tx } from '#lib/i18n/index.js';
 import { city } from './cities/index.js';
 import { typeLabel } from './places.js';
+import { searchLocal } from './localsearch.js';
 
 const PHOTON = 'https://photon.komoot.io';
 const GEOPF = 'https://data.geopf.fr/geocodage';
@@ -29,6 +30,7 @@ function fromPhoton(f) {
     name: p.name || addr,
     type: isAddress ? tx('fiche.adresse') : typeLabel(p.osm_key, p.osm_value),
     subclass: isAddress ? null : p.osm_value,
+    area: p.osm_key === 'place' && ['suburb', 'quarter', 'neighbourhood', 'city_district', 'city', 'town', 'village'].includes(p.osm_value),
     address: isAddress ? [p.postcode, p.city].filter(Boolean).join(' ') : addr,
     lat, lon
   };
@@ -38,6 +40,11 @@ function fromGeopf(f) {
   const p = f.properties;
   const [lon, lat] = f.geometry.coordinates;
   const street = p.type === 'street' || p.type === 'locality';
+  if (p.type === 'municipality') {
+    // ville ou arrondissement : une zone, pas un lieu (la carte s'y cadre, les raccourcis restent disponibles)
+    return { id: `ban:${p.id}`, name: p.name, type: tx('resultats.ville_ou_arrondissement'), subclass: null, address: p.postcode || '',
+      lat, lon, score: p.score, area: true };
+  }
   return {
     id: `ban:${p.id}`,
     name: street ? `${p.name}, ${p.postcode} ${p.city}` : `${p.name}, ${p.postcode} ${p.city}`,
@@ -47,6 +54,26 @@ function fromGeopf(f) {
     lat, lon,
     score: p.score
   };
+}
+
+// Photon est un service public gratuit : il peut être en panne ou très lent (constaté le 14/10/2026).
+// Au-delà de ce délai, on cherche dans nos propres données.
+const PHOTON_TIMEOUT = 4000;
+
+/** Photon, ou à défaut nos données de lieux (même forme de résultats). */
+async function byName(query, near, signal, limit = 7) {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), PHOTON_TIMEOUT);
+  signal?.addEventListener('abort', () => ctl.abort());
+  try {
+    const r = await photon(query, near, ctl.signal, limit);
+    return r.length ? r : (await searchLocal(query, near)).slice(0, limit);
+  } catch (e) {
+    if (signal?.aborted) throw e;                       // recherche remplacée par une plus récente
+    return (await searchLocal(query, near)).slice(0, limit);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 async function photon(query, near, signal, limit = 7) {
@@ -88,11 +115,11 @@ export async function search(query, at = city.center, signal) {
     // l'adresse d'abord (rapide) ; Photon n'est consulté que si l'adresse n'est pas nette (un nom de commerce avec un chiffre…)
     const a = await geopf(q, at, signal).catch(() => []);
     if (a[0]?.type === 'Adresse' && a[0].score > 0.8) return a.slice(0, 5);
-    const p = await photon(q, at, signal, 5).catch(() => []);
+    const p = await byName(q, at, signal, 5).catch(() => []);
     const places = p.filter((r) => r.type !== 'Adresse' && !a.some((x) => near(x, r)));
     return [...a.slice(0, 1), ...places.slice(0, 3), ...a.slice(1)].slice(0, 7);
   }
-  return photon(q, at, signal);
+  return byName(q, at, signal);
 }
 
 /** Adresse la plus proche d'un point (nom de rue ou lieu). */
