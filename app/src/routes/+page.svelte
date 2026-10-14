@@ -3091,7 +3091,7 @@
     --shadow-chip: 0 0 0 0.5px rgb(0 0 0 / 0.07), 0 1px 4px rgb(0 0 0 / 0.12);
     --shadow-sheet: 0 -1px 0 rgb(0 0 0 / 0.04), 0 -8px 30px rgb(0 0 0 / 0.12);
     --ui: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-    --page: #f6f4f0;
+    --page: #f4f0e6;
     --accent-btn: #2a5bd7;
     --soft-accent: #f5f8ff;
     --me-bg: #e8eefc;

@@ -1,22 +1,22 @@
 // Style de carte maison, sur les tuiles vectorielles OpenFreeMap (schéma OpenMapTiles).
-// Intention : une carte calme et nette. Fond chaud très clair, routes blanches sans contour
-// appuyé, voies rapides ambrées, parcs et eau doux, bâtiments en léger relief, et des lieux
+// Intention : une carte calme et nette. Fond chaud très clair, routes blanches cernées de gris (lisibles, comme Plans),
+// voies rapides ambrées, parcs et eau doux, bâtiments en léger relief, et des lieux
 // signalés par une pastille colorée à pictogramme blanc. Police : Open Sans, hébergée avec l'app.
 
 export const C = {
-  land: '#F6F4F0',
+  land: '#F4F0E6',
   landAlt: '#F1EEE8',      // zones commerciales et équipements
   pedestrian: '#FBFAF7',
-  building: '#E8E5DF',
-  buildingEdge: '#E3DFD9',
+  building: '#EEE5CE',
+  buildingEdge: '#E2D7BC',
   building3d: '#EAE6E0',
   park: '#D4EBCB',
   wood: '#C7E3BC',
   water: '#ABD4F2',
   waterLabel: '#4A84B5',
   road: '#FFFFFF',
-  roadCase: '#EEEBE6',
-  majorCase: '#E9E5DF',
+  roadCase: '#D9D4CB',      // contour gris des rues : c'est lui qui les rend lisibles sur le fond clair (comme Plans)
+  majorCase: '#CDC7BC',
   highway: '#FAD98A',
   highwayCase: '#EDC060',
   path: '#D3CEC6',
@@ -120,7 +120,8 @@ function roadPair(id, classes, { color, casing, widths, minzoom = 0, caseFade })
 export const DARK_LAND = '#1E2126';
 const DARK_HALO = 'rgba(22,24,28,0.9)';
 const DARK = {
-  '#F6F4F0': DARK_LAND, '#F1EEE8': '#22262B', '#FBFAF7': '#262A30',
+  '#F6F4F0': DARK_LAND, '#F4F0E6': DARK_LAND, '#EEE5CE': '#2A2E34', '#E2D7BC': '#33373E',
+  '#D9D4CB': '#2B2F35', '#CDC7BC': '#31353C', '#D2CDC4': '#3A3F47', '#F1EEE8': '#22262B', '#FBFAF7': '#262A30',
   '#D4EBCB': '#1F3326', '#C7E3BC': '#1C3022', '#ABD4F2': '#16304A',
   '#E8E5DF': '#2A2E34', '#E3DFD9': '#33373E',
   '#D3CEC6': '#4A4F57', '#EEEBE6': '#2B2F35', '#E9E5DF': '#31353C',
@@ -195,7 +196,8 @@ function lightStyle(base) {
       { id: 'path', type: 'line', source: 'omt', 'source-layer': 'transportation', minzoom: 16,
         filter: ['all', ['==', ['geometry-type'], 'LineString'], ['match', ['get', 'subclass'], ['path', 'track', 'bridleway', 'steps'], true, false]],
         paint: { 'line-color': C.path, 'line-width': zoom([16, 0.8, 19, 2]), 'line-dasharray': [2.5, 2] } },
-      ...roadPair('road-minor', ['minor', 'service'], { color: C.road, casing: C.roadCase, widths: [12, 0.4, 14, 1.6, 16, 6, 19, 22], caseFade: [14, 15] }),
+      // petites rues : grises de loin (sinon blanc sur fond clair, invisibles), blanches cernées de gris de près
+      ...roadPair('road-minor', ['minor', 'service'], { color: ['interpolate', ['linear'], ['zoom'], 14, '#D2CDC4', 15.5, C.road], casing: C.roadCase, widths: [12, 0.4, 14, 1.6, 16, 6, 19, 22], caseFade: [14, 15] }),
       ...roadPair('road-mid', ['tertiary', 'secondary'], { color: C.road, casing: C.majorCase, widths: [10, 0.6, 14, 3.2, 16, 9, 19, 30] }),
       ...roadPair('road-major', ['primary', 'trunk'], { color: C.road, casing: C.majorCase, widths: [8, 0.8, 14, 4.6, 16, 12, 19, 36] }),
       ...roadPair('road-highway', ['motorway'], { color: C.highway, casing: C.highwayCase, widths: [6, 0.8, 14, 5.5, 16, 13, 19, 38] }),
