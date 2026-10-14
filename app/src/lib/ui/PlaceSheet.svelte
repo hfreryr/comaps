@@ -145,6 +145,8 @@
       {/if}
       {#if app.info?.covered === false}
         <p class="contrib">{tx('fiche.ce_lieu_est_hors_de_la_zone_couverte')}</p>
+      {:else if app.info?.missing && !app.place.name}
+        <p class="contrib">{tx('fiche.lieu_introuvable')}</p>
       {/if}
       <p class="contrib">
         {#if app.osmDate}{tx('fiche.donnees_openstreetmap_du', { osmDate: app.osmDate })} {/if}{tx('fiche.une_info_manque_ou_est_fausse')}

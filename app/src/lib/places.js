@@ -2,7 +2,7 @@
 // Aucun service tiers n'est interrogé lieu par lieu. La recherche par texte est dans geocode.js.
 import { tx } from '#lib/i18n/index.js';
 import { kindOf, expectsHours, practical, goodToKnow } from './placeinfo.js';
-import { placeById, placesInBounds } from './placestore.js';
+import { placeById, placesInBounds, covers } from './placestore.js';
 import { city } from './cities/index.js';
 
 export const PARIS = city.center;
@@ -42,6 +42,15 @@ export function typeLabel(key, value) {
   return TYPES[value] || (key === 'highway' ? tx('resultats.rue') : key === 'place' ? tx('fiche.lieu') : null);
 }
 
+/** Type lisible d'un lieu d'après ses étiquettes OSM (« Vêtements », « Restaurant »…), ou null. */
+export function typeOfTags(t) {
+  for (const k of ['amenity', 'shop', 'tourism', 'leisure', 'healthcare', 'office', 'craft', 'historic', 'railway']) {
+    const label = t[k] && typeLabel(k, t[k]);
+    if (label) return label;
+  }
+  return null;
+}
+
 function address(p) {
   const line = [p.housenumber, p.street].filter(Boolean).join(' ');
   const where = p.postcode ? `${p.postcode} ${p.city || ''}`.trim() : p.district || p.city;
@@ -52,7 +61,8 @@ function address(p) {
 export async function details(place) {
   if (!place.osmType) return {};
   const hit = await placeById(place.osmType, place.osmId, place.lat, place.lon).catch(() => null);
-  if (!hit) return { covered: false };
+  // absent : soit la zone n'est pas couverte par nos données, soit le lieu n'y est pas (supprimé, lien erroné)
+  if (!hit) return (await covers(place.lat, place.lon).catch(() => false)) ? { covered: true, missing: true } : { covered: false };
   return { ...fromTags(hit.tags), facade: hit.facade || null };
 }
 
@@ -61,6 +71,7 @@ export function fromTags(t) {
   return {
     covered: true,
     name: t.name,
+    type: typeOfTags(t),
     address: street ? [street, t['addr:postcode']].filter(Boolean).join(', ') : null,
     cuisine: t.cuisine,
     hours: t.opening_hours,
