@@ -4,6 +4,7 @@
 // Confidentialité : la photo et l'extrait sont demandés à Wikimedia (fondation à but non lucratif,
 // sans publicité) au moment où l'on ouvre la fiche d'un lieu qui a une page Wikipédia ou Wikidata.
 // Rien d'autre n'est envoyé que le nom de la page demandée.
+import { tx } from '#lib/i18n/index.js';
 import { APP_AGENT } from './config.js';
 
 // En-tête demandé par Wikimedia pour identifier l'app (politique « User-Agent »). Commons l'accepte en CORS ;
@@ -14,36 +15,36 @@ const WM = { headers: { 'Api-User-Agent': APP_AGENT } };
 /** Type de lieu en français, le plus précis possible d'après les étiquettes OSM. */
 export function kindOf(t) {
   const { amenity, historic, tourism, leisure, building, shop } = t;
-  if (amenity === 'fountain') return 'Fontaine';
-  if (amenity === 'drinking_water') return "Point d'eau potable";
+  if (amenity === 'fountain') return tx('types.fontaine');
+  if (amenity === 'drinking_water') return tx('categories.point_eau_potable');
   if (amenity === 'place_of_worship') {
-    if (building === 'cathedral' || t['church:type'] === 'cathedral') return 'Cathédrale';
-    if (building === 'chapel') return 'Chapelle';
-    if (building === 'basilica' || /basilique/i.test(t.name || '')) return 'Basilique';
-    return { christian: 'Église', muslim: 'Mosquée', jewish: 'Synagogue', buddhist: 'Temple bouddhiste' }[t.religion] || 'Lieu de culte';
+    if (building === 'cathedral' || t['church:type'] === 'cathedral') return tx('types.cathedrale');
+    if (building === 'chapel') return tx('types.chapelle');
+    if (building === 'basilica' || /basilique/i.test(t.name || '')) return tx('types.basilique');
+    return { christian: tx('types.eglise'), muslim: tx('types.mosquee'), jewish: tx('types.synagogue'), buddhist: tx('types.temple_bouddhiste') }[t.religion] || tx('types.lieu_de_culte');
   }
   if (tourism === 'artwork') {
-    return { statue: 'Statue', sculpture: 'Sculpture', mural: 'Fresque', fountain: 'Fontaine', bust: 'Buste' }[t.artwork_type] || "Œuvre d'art";
+    return { statue: tx('types.statue'), sculpture: tx('types.sculpture'), mural: tx('types.fresque'), fountain: tx('types.fontaine'), bust: tx('types.buste') }[t.artwork_type] || tx('types.uvre_art');
   }
   if (historic === 'memorial') {
-    return { statue: 'Statue', plaque: 'Plaque commémorative', war_memorial: 'Monument aux morts', bust: 'Buste', stele: 'Stèle' }[t.memorial] || 'Mémorial';
+    return { statue: tx('types.statue'), plaque: tx('types.plaque_commemorative'), war_memorial: tx('types.monument_aux_morts'), bust: tx('types.buste'), stele: tx('types.stele') }[t.memorial] || tx('types.memorial');
   }
-  const H = { monument: 'Monument', castle: 'Château', palace: 'Palais', church: 'Église', ruins: 'Vestiges', archaeological_site: 'Site archéologique',
-    city_gate: 'Porte de ville', building: 'Bâtiment historique', tomb: 'Tombe', wayside_cross: 'Croix' };
+  const H = { monument: tx('types.monument'), castle: tx('types.chateau'), palace: tx('types.palais'), church: tx('types.eglise'), ruins: tx('types.vestiges'), archaeological_site: tx('types.site_archeologique'),
+    city_gate: tx('types.porte_de_ville'), building: tx('types.batiment_historique'), tomb: tx('types.tombe'), wayside_cross: tx('types.croix') };
   if (H[historic]) return H[historic];
-  const T = { museum: 'Musée', gallery: "Galerie d'art", viewpoint: 'Point de vue', zoo: 'Zoo', theme_park: "Parc d'attractions", aquarium: 'Aquarium' };
+  const T = { museum: tx('types.musee'), gallery: tx('types.galerie_art'), viewpoint: tx('types.point_de_vue'), zoo: tx('types.zoo'), theme_park: tx('types.parc_attractions'), aquarium: tx('types.aquarium') };
   if (T[tourism]) return T[tourism];
-  const A = { theatre: 'Théâtre', cinema: 'Cinéma', library: 'Bibliothèque', arts_centre: 'Centre culturel', hospital: 'Hôpital',
-    townhall: 'Mairie', university: 'Université', marketplace: 'Marché', post_office: 'Bureau de poste', concert_hall: 'Salle de concert' };
+  const A = { theatre: tx('types.theatre'), cinema: tx('types.cinema'), library: tx('types.bibliotheque'), arts_centre: tx('types.centre_culturel'), hospital: tx('carte.hopital'),
+    townhall: tx('types.mairie'), university: tx('types.universite'), marketplace: tx('types.marche'), post_office: tx('types.bureau_de_poste'), concert_hall: tx('types.salle_de_concert') };
   if (A[amenity]) return A[amenity];
-  const L = { park: 'Parc', garden: 'Jardin', playground: 'Aire de jeux', stadium: 'Stade', swimming_pool: 'Piscine', sports_centre: 'Centre sportif' };
+  const L = { park: tx('types.parc'), garden: tx('types.jardin'), playground: tx('types.aire_de_jeux'), stadium: tx('types.stade'), swimming_pool: tx('types.piscine'), sports_centre: tx('types.centre_sportif') };
   if (L[leisure]) return L[leisure];
-  if (t.place === 'square') return 'Place';
-  if (t.man_made === 'tower') return 'Tour';
-  if (t.man_made === 'bridge' || t.bridge === 'yes' && t.name) return 'Pont';
-  if (building === 'cathedral') return 'Cathédrale';
-  if (building === 'church') return 'Église';
-  if (tourism === 'attraction') return 'Lieu touristique';
+  if (t.place === 'square') return tx('types.place');
+  if (t.man_made === 'tower') return tx('types.tour');
+  if (t.man_made === 'bridge' || t.bridge === 'yes' && t.name) return tx('types.pont');
+  if (building === 'cathedral') return tx('types.cathedrale');
+  if (building === 'church') return tx('types.eglise');
+  if (tourism === 'attraction') return tx('types.lieu_touristique');
   return null;   // on garde le type déjà connu (restaurants, boutiques…)
 }
 
@@ -60,10 +61,10 @@ export function expectsHours(t) {
 /** Détails pratiques affichés en bas de fiche. */
 export function practical(t) {
   const out = [];
-  if (t.heritage || t['heritage:operator'] === 'mhs' || t['ref:mhs']) out.push({ icon: 'heritage', text: 'Monument historique' });
-  if (t.fee === 'no') out.push({ icon: 'ticket', text: 'Accès gratuit' });
-  else if (t.fee === 'yes') out.push({ icon: 'ticket', text: 'Accès payant' });
-  const wc = { yes: 'Accessible en fauteuil roulant', limited: 'Accès partiel en fauteuil roulant', no: 'Non accessible en fauteuil roulant' }[t.wheelchair];
+  if (t.heritage || t['heritage:operator'] === 'mhs' || t['ref:mhs']) out.push({ icon: 'heritage', text: tx('types.monument_historique') });
+  if (t.fee === 'no') out.push({ icon: 'ticket', text: tx('types.acces_gratuit') });
+  else if (t.fee === 'yes') out.push({ icon: 'ticket', text: tx('types.acces_payant') });
+  const wc = { yes: tx('types.accessible_en_fauteuil_roulant'), limited: tx('types.acces_partiel_en_fauteuil_roulant'), no: tx('types.non_accessible_en_fauteuil_roulant') }[t.wheelchair];
   if (wc) out.push({ icon: 'wheelchair', text: wc });
   return out;
 }
@@ -88,17 +89,17 @@ export function goodToKnow(t) {
   else if (yes('diet:vegan')) add('Options végétaliennes');
   else if (yes('diet:vegetarian')) add('Options végétariennes');
   if (yes('diet:gluten_free')) add('Options sans gluten');
-  if (yes('takeaway')) add(t.takeaway === 'only' ? 'Uniquement à emporter' : 'À emporter');
+  if (yes('takeaway')) add(t.takeaway === 'only' ? tx('types.uniquement_a_emporter') : tx('types.a_emporter'));
   if (t.delivery === 'yes') add('Livraison');
   if (t.reservation === 'required') add('Réservation obligatoire', false);
   else if (t.reservation === 'recommended') add('Réservation conseillée');
   else if (t.reservation === 'yes') add('Réservation possible');
   else if (t.reservation === 'no') add('Sans réservation');
-  if (['wlan', 'yes', 'wifi'].includes(t.internet_access)) add(t['internet_access:fee'] === 'no' ? 'Wi-Fi gratuit' : 'Wi-Fi');
+  if (['wlan', 'yes', 'wifi'].includes(t.internet_access)) add(t['internet_access:fee'] === 'no' ? tx('types.wi_fi_gratuit') : 'Wi-Fi');
   if (t.air_conditioning === 'yes') add('Climatisé');
-  if (t.toilets === 'yes') add(t['toilets:wheelchair'] === 'yes' ? 'Toilettes accessibles' : 'Toilettes');
+  if (t.toilets === 'yes') add(t['toilets:wheelchair'] === 'yes' ? tx('types.toilettes_accessibles') : tx('categories.toilettes'));
   if (t.changing_table === 'yes') add('Table à langer');
-  if (t.dog === 'yes' || t.dog === 'leashed') add(t.dog === 'leashed' ? 'Chiens acceptés en laisse' : 'Chiens acceptés');
+  if (t.dog === 'yes' || t.dog === 'leashed') add(t.dog === 'leashed' ? tx('types.chiens_acceptes_en_laisse') : tx('types.chiens_acceptes'));
   else if (t.dog === 'no') add('Chiens interdits', false);
   if (t.self_service === 'yes') add('Libre-service');
   if (t.second_hand === 'only') add("Seconde main");

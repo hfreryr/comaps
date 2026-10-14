@@ -1,5 +1,6 @@
 // Guidage pas à pas : voix, étapes, suivi de la position et recalcul.
 // Code sorti de +page.svelte : il lit et modifie l'état de l'écran par l'objet « app » (bloc « app » de la page).
+import { tx } from '#lib/i18n/index.js';
 import { MODE_NAMES, fmtDistance, fmtDuration, fmtTime, streetRoute, trafficEstimate } from '#lib/routing.js';
 import { empty } from '#lib/maplayers.js';
 import { exitLabel } from '#lib/exits.js';
@@ -20,17 +21,17 @@ export function createNav(app) {
     const coords = [], steps = [];
     it.legs.forEach((leg, i) => {
       const idx = Math.max(0, coords.length - 1);
-      if (leg.mode === 'STOP') { steps.push({ text: `Arrêt : ${leg.from}`, type: 'stop', idx, t: +leg.start }); return; }
+      if (leg.mode === 'STOP') { steps.push({ text: tx('itin.arret_2', { from: leg.from }), type: 'stop', idx, t: +leg.start }); return; }
       coords.push(...leg.coords);
       if (leg.mode === 'WALK') {
         const dest = leg.to === 'Arrivée' || i === it.legs.length - 1 ? app.to.label : leg.to;
-        steps.push({ text: `Marchez jusqu'à ${dest}`, sub: `${fmtDuration(leg.duration)}${leg.distance ? ` · ${fmtDistance(leg.distance)}` : ''}`, type: 'walk', idx, t: +leg.start });
+        steps.push({ text: tx('guidage.marchez_jusqu_a', { dest }), sub: `${fmtDuration(leg.duration)}${leg.distance ? ` · ${fmtDistance(leg.distance)}` : ''}`, type: 'walk', idx, t: +leg.start });
       } else {
         const tip = app.legExits[`${app.picked}|${i}|${leg.to}`];
-        const name = `${MODE_NAMES[leg.mode] || 'Ligne'} ${leg.line}`.trim();
-        steps.push({ text: `Prenez le ${name} direction ${leg.headsign}`, sub: `À ${leg.from} · départ ${fmtTime(leg.start)}${tip?.place ? ` · montez ${placeLabel(tip.place)}` : ''}`,
+        const name = `${MODE_NAMES[leg.mode] || tx('itin.ligne')} ${leg.line}`.trim();
+        steps.push({ text: tx('guidage.prenez_le_direction', { name, headsign: leg.headsign }), sub: tx('guidage.a_depart', { from: leg.from, fmtTime: fmtTime(leg.start), suite: tip?.place ? tx('guidage.montez', { placeLabel: placeLabel(tip.place) }) : '' }),
           type: 'board', idx, t: +leg.start, leg });
-        steps.push({ text: `Descendez à ${leg.to}`, sub: `${leg.stops ? `${leg.stops + 1} arrêts · ` : ''}arrivée ${fmtTime(leg.end)}${tip?.exit ? ` · ${exitLabel(tip.exit).replace(/^Sortie/, 'sortie')}` : ''}`,
+        steps.push({ text: tx('guidage.descendez_a', { to: leg.to }), sub: tx('guidage.arrivee', { arrets: leg.stops ? tx('itin.arrets', { n: leg.stops + 1 }) : '', fmtTime: fmtTime(leg.end), sortie: tip?.exit ? ` · ${exitLabel(tip.exit).replace(/^Sortie/, 'sortie')}` : '' }),
           type: 'alight', idx: Math.max(0, coords.length - 1), t: +leg.end - 60000, leg });
       }
     });
@@ -70,7 +71,7 @@ export function createNav(app) {
   function onFix(pos) {
     if (!app.nav) return;
     const { latitude: lat, longitude: lon, heading, speed } = pos.coords;
-    app.me = { label: 'Votre position', lat, lon, isMe: true };
+    app.me = { label: tx('resultats.votre_position'), lat, lon, isMe: true };
     app.lastFix = { lat, lon, heading: speed > 1 && heading != null && !Number.isNaN(heading) ? heading : null };
     app.showMe(lat, lon);
     updateNav();
@@ -99,7 +100,7 @@ export function createNav(app) {
       app.map.easeTo({ center: [app.lastFix.lon, app.lastFix.lat], bearing: heading, pitch: 50, zoom: cfg.zoom,
         offset: [0, Math.round(window.innerHeight * 0.18)], duration: 900 });
     }
-    if (app.nav.arrived && !app.spoken.has('fin')) { app.spoken.add('fin'); speak(`Vous êtes arrivé. ${app.to.label}`); return; }
+    if (app.nav.arrived && !app.spoken.has('fin')) { app.spoken.add('fin'); speak(tx('guidage.vous_etes_arrive', { label: app.to.label })); return; }
     if (app.nav.kind === 'transit') {
       if (k !== prevK) speak(app.nav.steps[k].text);
       return;
@@ -126,8 +127,8 @@ export function createNav(app) {
       app.nav = { ...app.nav, ...prepare(route.raw, route.steps, route.duration), option: route, s: 0, k: 0, startedAt: Date.now() };
       app.spoken = new Set();
       app.offCount = 0;
-      app.say('Nouvel itinéraire');
-      speak('Nouvel itinéraire. ' + (route.steps[0]?.speak || ''));
+      app.say(tx('guidage.nouvel_itineraire'));
+      speak(tx('guidage.nouvel_itineraire_2') + (route.steps[0]?.speak || ''));
       app.map.getSource('route')?.setData({ type: 'FeatureCollection', features: [app.line(route.coords, app.nav.mode, app.nav.mode === 'bike' ? app.BIKE_COLOR : app.WALK_COLOR, app.nav.mode === 'bike' ? '#1B3F9E' : '#1B3F9E')] });
     } catch { /* on réessaiera au prochain écart */ }
     app.rerouting = false;

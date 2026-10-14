@@ -6,6 +6,7 @@
 // Formats acceptés : l'archive .zip telle que Google la fournit, ou les fichiers qu'elle contient
 // (« Lieux enregistrés.json » / « Saved Places.json », « Adresses avec libellé.json » /
 // « Labeled places.json », listes « Enregistrées/*.csv »).
+import { tx } from '#lib/i18n/index.js';
 
 /** Lit une archive .zip (méthodes « stockée » et « deflate ») : [{ name, text() }] */
 async function unzip(buf) {
@@ -123,7 +124,7 @@ export async function readGoogleExport(file) {
     else {
       try {
         // « Lieux enregistrés.json » / « Saved Places.json » : les lieux suivis (étoile) de Google
-        const starred = /saved places|lieux enregistr/i.test(base) ? 'Lieux suivis' : '';
+        const starred = /saved places|lieux enregistr/i.test(base) ? tx('import.lieux_suivis') : '';
         all.push(...fromGeoJSON(JSON.parse(text)).map((p) => ({ ...p, listName: starred })));
       } catch { /* fichier ignoré */ }
     }

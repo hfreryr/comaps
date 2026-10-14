@@ -1,5 +1,6 @@
 // Lieux : détails d'un lieu et lieux d'une catégorie, lus dans les tuiles préparées à l'avance (placestore.js).
 // Aucun service tiers n'est interrogé lieu par lieu. La recherche par texte est dans geocode.js.
+import { tx } from '#lib/i18n/index.js';
 import { kindOf, expectsHours, practical, goodToKnow } from './placeinfo.js';
 import { placeById, placesInBounds } from './placestore.js';
 import { city } from './cities/index.js';
@@ -7,38 +8,38 @@ import { city } from './cities/index.js';
 export const PARIS = city.center;
 
 const TYPES = {
-  restaurant: 'Restaurant', cafe: 'Café', bar: 'Bar', pub: 'Pub', fast_food: 'Restauration rapide',
-  bakery: 'Boulangerie', pastry: 'Pâtisserie', supermarket: 'Supermarché', convenience: 'Épicerie',
-  pharmacy: 'Pharmacie', books: 'Librairie', clothes: 'Vêtements', hairdresser: 'Coiffeur',
-  museum: 'Musée', gallery: "Galerie d'art", cinema: 'Cinéma', theatre: 'Théâtre', hotel: 'Hôtel',
-  park: 'Parc', garden: 'Jardin', station: 'Gare', subway_entrance: 'Entrée de métro',
-  post_office: 'Bureau de poste', bank: 'Banque', library: 'Bibliothèque', school: 'École',
-  hospital: 'Hôpital', doctors: 'Médecin', church: 'Église', place_of_worship: 'Lieu de culte',
-  attraction: 'Lieu touristique', monument: 'Monument', florist: 'Fleuriste', butcher: 'Boucherie',
-  cheese: 'Fromagerie', wine: 'Caviste', ice_cream: 'Glacier', marketplace: 'Marché',
-  fast_food: 'Restauration rapide', supermarket: 'Supermarché', grocery: 'Épicerie',
-  clothing_store: 'Vêtements', jewelry: 'Bijouterie', shoes: 'Chaussures', art_gallery: "Galerie d'art",
-  subway: 'Station de métro', halt: 'Gare', hostel: 'Auberge de jeunesse', dentist: 'Dentiste',
-  beauty: 'Institut de beauté', optician: 'Opticien', gift: 'Cadeaux', toys: 'Jouets',
-  cemetery: 'Cimetière', grave_yard: 'Cimetière', florist: 'Fleuriste', tobacco: 'Tabac', newsagent: 'Presse',
-  kiosk: 'Kiosque', laundry: 'Laverie', dry_cleaning: 'Pressing', bicycle_rental: 'Vélos en libre-service',
-  bicycle: 'Magasin de vélos', parcel_locker: 'Consigne à colis', playground: 'Aire de jeux', clinic: 'Clinique',
-  veterinary: 'Vétérinaire', pet: 'Animalerie', sports_centre: 'Centre sportif', fitness_centre: 'Salle de sport',
-  swimming_pool: 'Piscine', toilets: 'Toilettes', drinking_water: "Point d'eau", charging_station: 'Borne de recharge',
-  parking: 'Parking', police: 'Police', hardware: 'Quincaillerie', doityourself: 'Bricolage', mobile_phone: 'Téléphonie',
-  computer: 'Informatique', electronics: 'Électronique', stationery: 'Papeterie', copyshop: 'Reprographie',
-  townhall: 'Mairie', musical_instrument: 'Instruments de musique', music: 'Disquaire', nightclub: 'Boîte de nuit',
-  escape_game: 'Escape game', coworking: 'Coworking', chocolate: 'Chocolatier', confectionery: 'Confiserie',
-  greengrocer: 'Primeur', deli: 'Traiteur', alcohol: 'Caviste', beverages: 'Boissons', cosmetics: 'Cosmétiques',
-  perfumery: 'Parfumerie', bag: 'Maroquinerie', atm: 'Distributeur', fuel: 'Station-service', yoga: 'Yoga',
-  climbing: 'Escalade', viewpoint: 'Point de vue', memorial: 'Mémorial', castle: 'Château', guest_house: "Chambre d'hôtes",
-  christian: 'Église', jewish: 'Synagogue', muslim: 'Mosquée', buddhist: 'Temple bouddhiste', paint: 'Peinture',
-  house: 'Adresse', street: 'Rue', residential: 'Rue', city: 'Ville', suburb: 'Quartier'
+  restaurant: tx('types.restaurant'), cafe: tx('types.cafe'), bar: tx('types.bar'), pub: tx('types.pub'), fast_food: tx('categories.restauration_rapide'),
+  bakery: tx('types.boulangerie'), pastry: tx('types.patisserie'), supermarket: tx('types.supermarche'), convenience: tx('types.epicerie'),
+  pharmacy: tx('types.pharmacie'), books: tx('types.librairie'), clothes: tx('categories.vetements'), hairdresser: tx('types.coiffeur'),
+  museum: tx('types.musee'), gallery: tx('types.galerie_art'), cinema: tx('types.cinema'), theatre: tx('types.theatre'), hotel: tx('types.hotel'),
+  park: tx('types.parc'), garden: tx('types.jardin'), station: tx('ecran.gare'), subway_entrance: tx('ecran.entree_de_metro'),
+  post_office: tx('types.bureau_de_poste'), bank: tx('types.banque'), library: tx('types.bibliotheque'), school: tx('types.ecole'),
+  hospital: tx('carte.hopital'), doctors: tx('types.medecin'), church: tx('types.eglise'), place_of_worship: tx('types.lieu_de_culte'),
+  attraction: tx('types.lieu_touristique'), monument: tx('types.monument'), florist: tx('types.fleuriste'), butcher: tx('types.boucherie'),
+  cheese: tx('types.fromagerie'), wine: tx('types.caviste'), ice_cream: tx('types.glacier'), marketplace: tx('types.marche'),
+  fast_food: tx('categories.restauration_rapide'), supermarket: tx('types.supermarche'), grocery: tx('types.epicerie'),
+  clothing_store: tx('categories.vetements'), jewelry: tx('types.bijouterie'), shoes: tx('types.chaussures'), art_gallery: tx('types.galerie_art'),
+  subway: tx('ecran.station_de_metro'), halt: tx('ecran.gare'), hostel: tx('types.auberge_de_jeunesse'), dentist: tx('types.dentiste'),
+  beauty: tx('types.institut_de_beaute'), optician: tx('types.opticien'), gift: tx('types.cadeaux'), toys: tx('categories.jouets'),
+  cemetery: tx('types.cimetiere'), grave_yard: tx('types.cimetiere'), florist: tx('types.fleuriste'), tobacco: tx('types.tabac'), newsagent: tx('types.presse'),
+  kiosk: tx('types.kiosque'), laundry: tx('types.laverie'), dry_cleaning: tx('types.pressing'), bicycle_rental: tx('types.velos_en_libre_service'),
+  bicycle: tx('types.magasin_de_velos'), parcel_locker: tx('types.consigne_a_colis'), playground: tx('types.aire_de_jeux'), clinic: tx('types.clinique'),
+  veterinary: tx('types.veterinaire'), pet: tx('types.animalerie'), sports_centre: tx('types.centre_sportif'), fitness_centre: tx('types.salle_de_sport'),
+  swimming_pool: tx('types.piscine'), toilets: tx('categories.toilettes'), drinking_water: tx('types.point_eau'), charging_station: tx('categories.borne_de_recharge'),
+  parking: tx('categories.parking'), police: tx('categories.police'), hardware: tx('types.quincaillerie'), doityourself: tx('categories.bricolage'), mobile_phone: tx('types.telephonie'),
+  computer: tx('types.informatique'), electronics: tx('types.electronique'), stationery: tx('types.papeterie'), copyshop: tx('types.reprographie'),
+  townhall: tx('types.mairie'), musical_instrument: tx('types.instruments_de_musique'), music: tx('types.disquaire'), nightclub: tx('types.boite_de_nuit'),
+  escape_game: tx('types.escape_game'), coworking: tx('categories.coworking'), chocolate: tx('types.chocolatier'), confectionery: tx('types.confiserie'),
+  greengrocer: tx('types.primeur'), deli: tx('types.traiteur'), alcohol: tx('types.caviste'), beverages: tx('types.boissons'), cosmetics: tx('types.cosmetiques'),
+  perfumery: tx('types.parfumerie'), bag: tx('types.maroquinerie'), atm: tx('types.distributeur'), fuel: tx('types.station_service'), yoga: tx('types.yoga'),
+  climbing: tx('types.escalade'), viewpoint: tx('types.point_de_vue'), memorial: tx('types.memorial'), castle: tx('types.chateau'), guest_house: tx('types.chambre_hotes'),
+  christian: tx('types.eglise'), jewish: tx('types.synagogue'), muslim: tx('types.mosquee'), buddhist: tx('types.temple_bouddhiste'), paint: tx('types.peinture'),
+  house: tx('fiche.adresse'), street: tx('resultats.rue'), residential: tx('resultats.rue'), city: tx('types.ville'), suburb: tx('types.quartier')
 };
 
 export function typeLabel(key, value) {
-  if (key === 'railway' && value === 'station') return 'Station';
-  return TYPES[value] || (key === 'highway' ? 'Rue' : key === 'place' ? 'Lieu' : null);
+  if (key === 'railway' && value === 'station') return tx('liste.station');
+  return TYPES[value] || (key === 'highway' ? tx('resultats.rue') : key === 'place' ? tx('fiche.lieu') : null);
 }
 
 function address(p) {

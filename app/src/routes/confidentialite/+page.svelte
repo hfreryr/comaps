@@ -1,49 +1,50 @@
 <script>
+  import { tx } from '#lib/i18n/index.js';
   // Page « Qui voit quoi » : ce que l'app envoie, à qui, et ce que chaque service en fait (vérifié le 13/10/2026).
   const rows = [
-    ['Fond de carte', 'OpenFreeMap (projet indépendant, financé par dons)', 'Votre adresse IP et la zone de carte affichée', 'Journaux anonymisés sans IP, effacés sous 7 jours ; IP possible dans les journaux d’erreur (7 j) ou en cas d’incident (30 j max) ; peut passer par Cloudflare', 'https://openfreemap.org/privacy/'],
-    ['Détails des lieux, listes, horaires, devantures', 'Nos propres fichiers, préparés chaque nuit depuis OpenStreetMap et Panoramax', 'Rien : ce sont des fichiers servis avec le site', 'Hébergés par GitHub Pages pour l’instant', 'https://docs.github.com/en/pages'],
-    ['Photos de devanture', 'Panoramax (Ville de Paris / IGN, OSM France)', 'Votre IP et la photo demandée', 'Service public ; images servies depuis un stockage OVH', 'https://panoramax.fr'],
-    ['Adresses', 'Géoplateforme (IGN, service public)', 'Votre IP et l’adresse tapée', 'Service public français', 'https://www.data.gouv.fr/dataservices/api-geoplateforme-geocodage'],
-    ['Noms de lieux', 'Photon (instance publique de komoot)', 'Votre IP et le texte tapé', 'Aucune politique publiée ; à remplacer par notre propre serveur', 'https://photon.komoot.io'],
-    ['Itinéraires à pied, vélo, voiture', 'Valhalla (serveur public FOSSGIS, association allemande)', 'Votre IP, le départ (souvent votre position) et l’arrivée', 'Aucune politique publiée ; à remplacer par notre propre serveur', 'https://routing.openstreetmap.de/about.html'],
-    ['Transports en commun', 'Transitous (projet libre)', 'Votre IP, le départ et l’arrivée, la station consultée', 'Aucune politique publiée ; à remplacer par notre propre serveur', 'https://transitous.org'],
-    ['Photos et textes des monuments', 'Wikimedia (Wikidata, Wikipédia, Commons)', 'Votre IP et le lieu consulté', 'Fondation à but non lucratif, sans publicité', 'https://foundation.wikimedia.org/wiki/Policy:Privacy_policy']
+    [tx('confidentialite.fond_de_carte'), tx('confidentialite.openfreemap_projet_independant'), tx('confidentialite.votre_adresse_ip_et_la_zone_de_carte'), tx('confidentialite.journaux_anonymises_sans_ip_effaces'), 'https://openfreemap.org/privacy/'],
+    [tx('confidentialite.details_des_lieux_listes_horaires'), tx('confidentialite.nos_propres_fichiers_prepares_chaque'), tx('confidentialite.rien_ce_sont_des_fichiers_servis'), tx('confidentialite.heberges_par_github_pages_pour'), 'https://docs.github.com/en/pages'],
+    [tx('confidentialite.photos_de_devanture'), tx('confidentialite.panoramax_ville_de_paris_ign_osm'), tx('confidentialite.votre_ip_et_la_photo_demandee'), tx('confidentialite.service_public_images_servies_depuis'), 'https://panoramax.fr'],
+    [tx('confidentialite.adresses'), tx('confidentialite.geoplateforme_ign_service_public'), tx('confidentialite.votre_ip_et_adresse_tapee'), tx('confidentialite.service_public_francais'), 'https://www.data.gouv.fr/dataservices/api-geoplateforme-geocodage'],
+    [tx('confidentialite.noms_de_lieux'), tx('confidentialite.photon_instance_publique_de_komoot'), tx('confidentialite.votre_ip_et_le_texte_tape'), tx('confidentialite.aucune_politique_publiee_a_remplacer'), 'https://photon.komoot.io'],
+    [tx('confidentialite.itineraires_a_pied_velo_voiture'), tx('confidentialite.valhalla_serveur_public_fossgis'), tx('confidentialite.votre_ip_le_depart_souvent_votre'), tx('confidentialite.aucune_politique_publiee_a_remplacer'), 'https://routing.openstreetmap.de/about.html'],
+    [tx('confidentialite.transports_en_commun'), tx('confidentialite.transitous_projet_libre'), tx('confidentialite.votre_ip_le_depart_et_arrivee_la'), tx('confidentialite.aucune_politique_publiee_a_remplacer'), 'https://transitous.org'],
+    [tx('confidentialite.photos_et_textes_des_monuments'), tx('confidentialite.wikimedia_wikidata_wikipedia_commons'), tx('confidentialite.votre_ip_et_le_lieu_consulte'), tx('confidentialite.fondation_a_but_non_lucratif_sans'), 'https://foundation.wikimedia.org/wiki/Policy:Privacy_policy']
   ];
 </script>
 
-<svelte:head><title>Qui voit quoi · Untracked Maps</title></svelte:head>
+<svelte:head><title>{tx('confidentialite.qui_voit_quoi_untracked_maps')}</title></svelte:head>
 
 <div class="scroller">
 <main>
-  <a class="back" href="/">‹ Retour à la carte</a>
-  <h1>Qui voit quoi</h1>
-  <p class="lead">Untracked Maps ne collecte rien sur vous : pas de compte, pas de mesure d’audience, pas de publicité. Vos lieux enregistrés, vos listes et votre position restent sur votre téléphone.</p>
-  <p>Mais une carte a besoin de services pour afficher le fond de carte, chercher une adresse ou calculer un trajet. <strong>Ces services reçoivent votre adresse IP et votre demande</strong>, comme n’importe quel site que vous visitez. Voici lesquels, et ce qu’ils en font, d’après leurs politiques publiées (vérifiées le 13 octobre 2026). Là où rien n’est publié, nous le disons.</p>
+  <a class="back" href="/">{tx('confidentialite.retour_a_la_carte')}</a>
+  <h1>{tx('confidentialite.qui_voit_quoi')}</h1>
+  <p class="lead">{tx('confidentialite.untracked_maps_ne_collecte_rien_sur')}</p>
+  <p>{tx('confidentialite.mais_une_carte_a_besoin_de_services')} <strong>{tx('confidentialite.ces_services_recoivent_votre_adresse')}</strong>{tx('confidentialite.comme_importe_quel_site_que_vous')}</p>
   <table>
-    <thead><tr><th>Pour</th><th>Service</th><th>Ce qu’il reçoit</th><th>Ce qu’il en fait</th></tr></thead>
+    <thead><tr><th>{tx('confidentialite.pour')}</th><th>{tx('confidentialite.service')}</th><th>{tx('confidentialite.ce_il_recoit')}</th><th>{tx('confidentialite.ce_il_en_fait')}</th></tr></thead>
     <tbody>
       {#each rows as [what, who, gets, does, url]}
         <tr><td>{what}</td><td><a href={url} target="_blank" rel="noopener">{who}</a></td><td>{gets}</td><td>{does}</td></tr>
       {/each}
     </tbody>
   </table>
-  <h2>Ce qui ne quitte jamais votre téléphone</h2>
+  <h2>{tx('confidentialite.ce_qui_ne_quitte_jamais_votre')}</h2>
   <ul>
-    <li>Vos lieux enregistrés, vos listes, Maison et Travail, vos raccourcis.</li>
-    <li>Votre position, sauf pour calculer un itinéraire (elle est alors le point de départ envoyé au service d’itinéraires) et pendant le guidage, qui tourne entièrement sur l’appareil.</li>
-    <li>L’historique de vos recherches récentes.</li>
+    <li>{tx('confidentialite.vos_lieux_enregistres_vos_listes')}</li>
+    <li>{tx('confidentialite.votre_position_sauf_pour_calculer_un')}</li>
+    <li>{tx('confidentialite.historique_de_vos_recherches')}</li>
   </ul>
-  <h2>Ce que nous changerons avant tout lancement public</h2>
-  <p>La recherche, les itinéraires et les transports passeront par <strong>nos propres serveurs, sans journaux d’adresses IP</strong>. Cette page sera mise à jour à chaque changement de service.</p>
-  <h2>Sécurité</h2>
+  <h2>{tx('confidentialite.ce_que_nous_changerons_avant_tout')}</h2>
+  <p>{tx('confidentialite.la_recherche_les_itineraires_et_les')} <strong>{tx('confidentialite.nos_propres_serveurs_sans_journaux')}</strong>{tx('confidentialite.cette_page_sera_mise_a_jour_a_chaque')}</p>
+  <h2>{tx('confidentialite.securite')}</h2>
   <ul>
-    <li>L’app est un site sans serveur ni compte : il n’existe chez nous aucune base de données à pirater.</li>
-    <li>Votre navigateur n’exécute que notre code et ne contacte que les services listés ci-dessus (politique de sécurité du contenu).</li>
-    <li>Les liens de partage, les sauvegardes et les imports sont vérifiés champ par champ avant d’être lus. Une sauvegarde peut être chiffrée par un mot de passe que nous ne connaissons pas.</li>
-    <li>Une faille ? Signalez-la sans la rendre publique : <a href="https://github.com/hfreryr/untracked/security" target="_blank" rel="noopener">page Sécurité du code source</a>.</li>
+    <li>{tx('confidentialite.app_est_un_site_sans_serveur_ni')}</li>
+    <li>{tx('confidentialite.votre_navigateur_execute_que_notre')}</li>
+    <li>{tx('confidentialite.les_liens_de_partage_les_sauvegardes')}</li>
+    <li>{tx('confidentialite.une_faille_signalez_la_sans_la')} <a href="https://github.com/hfreryr/untracked/security" target="_blank" rel="noopener">{tx('confidentialite.page_securite_du_code_source')}</a>.</li>
   </ul>
-  <p class="foot">Code source libre (AGPL-3.0) : <a href="https://github.com/hfreryr/untracked" target="_blank" rel="noopener">github.com/hfreryr/untracked</a>. Données © contributeurs OpenStreetMap (ODbL).</p>
+  <p class="foot">{tx('confidentialite.code_source_libre_agpl_3_0')} <a href="https://github.com/hfreryr/untracked" target="_blank" rel="noopener">{tx('confidentialite.github_com_hfreryr_untracked')}</a>{tx('confidentialite.donnees_contributeurs_openstreetmap')}</p>
 </main>
 </div>
 

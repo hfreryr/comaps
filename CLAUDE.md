@@ -39,7 +39,7 @@ Voir `README.md` pour la feuille de route.
 - **App : toute nouvelle fonction va dans son propre fichier** (`app/src/lib/ui/` pour l'écran, `app/src/lib/` pour la logique), jamais dans `app/src/routes/+page.svelte`, qui ne doit plus grossir.
 - **État de l'écran** : les composants et modules le lisent par `getContext('app')` ; un nom ajouté doit figurer dans le bloc `// <app>` de `+page.svelte` (avec un `set` s'il est modifié). `npm run check` le vérifie.
 - **Toute nouvelle fonction arrive avec son test** (unitaire `node --test` ou de bout en bout `npm run e2e`).
-- **Tout nouveau texte affiché passe par le fichier de textes** dès qu'il existe (plan de nettoyage, étape 4).
+- **Tout texte affiché passe par le fichier de textes** `app/src/lib/i18n/fr.js`, appelé par `tx('clé')` (accords : entrée sous forme de fonction avec `pluriel`). Un test échoue si un texte est écrit en dur.
 - Avant de publier un changement visible, comparer les captures avant/après (`app/tests/visual/`), puis publier avec `bash app/scripts/publish.sh` uniquement (jamais à la main : il préserve les données des actions automatiques).
 - Plan de travail en cours : `docs/plan-nettoyage.md` (cocher les cases au fur et à mesure).
 - Garder le `README.md` à jour à chaque étape franchie.

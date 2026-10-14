@@ -1,4 +1,5 @@
 <script>
+  import { tx } from '#lib/i18n/index.js';
   import { getContext } from 'svelte';
 
   // État et actions de la page (voir le bloc « app » de +page.svelte)
@@ -9,31 +10,31 @@
   {#if !app.directions}
     <div class="modes-ctl">
       {#if Math.abs(app.bearing) > 1 || app.pitch > 1}
-        <button class="round-btn compass" onclick={() => app.map.easeTo({ bearing: 0, pitch: 0, duration: 500 })} aria-label="Remettre le nord en haut">
+        <button class="round-btn compass" onclick={() => app.map.easeTo({ bearing: 0, pitch: 0, duration: 500 })} aria-label={tx('carte.remettre_le_nord_en_haut')}>
           <svg viewBox="0 0 24 24" aria-hidden="true" style:transform={`rotate(${-app.bearing}deg)`}><path d="M12 3 15.5 12h-7z" class="solid north" /><path d="M8.5 12h7L12 21z" /></svg>
         </button>
       {/if}
       {#if app.showModes}
-        <div class="modes-pop" role="menu" aria-label="Type de carte">
+        <div class="modes-pop" role="menu" aria-label={tx('carte.type_de_carte')}>
           <button role="menuitemradio" aria-checked={app.mapMode === 'plan'} class:on={app.mapMode === 'plan'} onclick={() => app.setMapMode('plan')}>
-            <span class="thumb plan" aria-hidden="true"></span>Plan
+            <span class="thumb plan" aria-hidden="true"></span>{tx('carte.plan')}
           </button>
           <button role="menuitemradio" aria-checked={app.mapMode === 'transit'} class:on={app.mapMode === 'transit'} onclick={() => app.setMapMode('transit')}>
-            <span class="thumb transit" aria-hidden="true"></span>Transports
+            <span class="thumb transit" aria-hidden="true"></span>{tx('carte.transports')}
           </button>
           <label class="saved-toggle">
             <input type="checkbox" checked={app.showSaved} onchange={(e) => { app.showSaved = e.currentTarget.checked; try { localStorage.setItem('mes-lieux-carte', app.showSaved ? 'oui' : 'non'); } catch { /* rien */ } }} />
-            Mes lieux sur la carte
+            {tx('carte.mes_lieux_sur_la_carte')}
           </label>
         </div>
       {/if}
-      <button class="round-btn" onclick={() => (app.showModes = !app.showModes)} aria-label="Type de carte" aria-expanded={app.showModes}>
+      <button class="round-btn" onclick={() => (app.showModes = !app.showModes)} aria-label={tx('carte.type_de_carte')} aria-expanded={app.showModes}>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3.5 8.5 4.5L12 12.5 3.5 8z" /><path d="m3.5 12 8.5 4.5 8.5-4.5M3.5 16l8.5 4.5 8.5-4.5" /></svg>
       </button>
     </div>
   {/if}
   <button class="locate" class:busy={app.locating} class:following={app.followMode !== 'none'} onclick={app.locate}
-    aria-label={app.followMode === 'follow' ? 'Orienter la carte dans votre direction' : app.followMode === 'heading' ? 'Remettre le nord en haut' : 'Me localiser'}>
+    aria-label={app.followMode === 'follow' ? tx('carte.orienter_la_carte_dans_votre') : app.followMode === 'heading' ? tx('carte.remettre_le_nord_en_haut') : tx('carte.me_localiser')}>
     {#if app.followMode === 'heading'}
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5 17 13H7z" class="solid" /><path d="M7 13h10l-5 8.5z" /><circle cx="12" cy="13" r="1.3" class="solid" /></svg>
     {:else}

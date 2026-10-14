@@ -1,6 +1,7 @@
 <!-- Fiche itinéraire : modes en onglets, résumé de l'itinéraire choisi (ce que montre l'aperçu),
      puis étapes et autres itinéraires en tirant la fiche. Modèle : Google Maps et Plans (voir docs/espace-ecran.md). -->
 <script>
+  import { tx } from '#lib/i18n/index.js';
   import { draggable } from '#lib/sheet.js';
   import { MODE_NAMES, fmtDuration, fmtTime, fmtDistance } from '#lib/routing.js';
   import { placeLabel } from '#lib/rame.js';
@@ -13,16 +14,16 @@
   const current = $derived(routes[mode]);
 </script>
 
-<section class="sheet route-sheet" aria-label="Itinéraire" use:draggable={{ key: `${from?.lat},${to?.lat},${mode}`, start: 'peek' }}>
-  <button class="grip" aria-label="Agrandir la fiche"></button>
-  <div class="mode-tabs" role="tablist" aria-label="Mode de déplacement">
+<section class="sheet route-sheet" aria-label={tx('fiche.itineraire')} use:draggable={{ key: `${from?.lat},${to?.lat},${mode}`, start: 'peek' }}>
+  <button class="grip" aria-label={tx('liste.agrandir_la_fiche')}></button>
+  <div class="mode-tabs" role="tablist" aria-label={tx('itin.mode_de_deplacement')}>
     {#each MODES as m}
       {@const r = routes[m.id]}
       <button class="mode-tab" class:on={mode === m.id} role="tab" aria-selected={mode === m.id} onclick={() => chooseMode(m.id)} aria-label={m.label}>
         <ModeIcon id={m.id} />
         <span class="mode-time">
           {#if !r}{m.label}
-          {:else if r.status === 'loading'}<span class="dots" aria-label="Calcul en cours"></span>
+          {:else if r.status === 'loading'}<span class="dots" aria-label={tx('itin.calcul_en_cours')}></span>
           {:else if r.status === 'ok'}{fmtDuration(m.id === 'transit' ? (r.data[m.id === mode ? picked : 0] || r.data[0]).duration
             : (streetOpts(r.data)[m.id === mode ? pickedStreet : 0] || r.data).duration)}
           {:else}–{/if}
@@ -31,20 +32,20 @@
     {/each}
   </div>
   {#if !from}
-    <p class="empty" data-peek-end>Choisissez un point de départ pour calculer l'itinéraire.</p>
+    <p class="empty" data-peek-end>{tx('itin.choisissez_un_point_de_depart_pour')}</p>
   {:else if !current || current.status === 'loading'}
-    <p class="empty" data-peek-end>Calcul de l'itinéraire…</p>
+    <p class="empty" data-peek-end>{tx('itin.calcul_de_itineraire')}</p>
   {:else if current.status === 'none' && mode === 'transit' && routes.walk?.status === 'ok'}
     <div data-peek-end>
-      <p class="empty">Pas de transport utile sur ce trajet : à pied, c'est {fmtDuration(routes.walk.data.duration)}.</p>
-      <button class="retry" onclick={() => chooseMode('walk')}>Voir le trajet à pied</button>
+      <p class="empty">{tx('itin.pas_de_transport_utile_sur_ce_trajet', { fmtDuration: fmtDuration(routes.walk.data.duration) })}</p>
+      <button class="retry" onclick={() => chooseMode('walk')}>{tx('itin.voir_le_trajet_a_pied')}</button>
     </div>
   {:else if current.status === 'none'}
-    <p class="empty" data-peek-end>Aucun itinéraire {mode === 'transit' ? 'en transports en commun' : mode === 'bike' ? 'à vélo' : mode === 'car' ? 'en voiture' : 'à pied'} trouvé entre ces deux points.</p>
+    <p class="empty" data-peek-end>{tx('itin.aucun_itineraire_trouve_entre_ces', { mode: mode === 'transit' ? tx('itin.en_transports_en_commun') : mode === 'bike' ? tx('itin.a_velo') : mode === 'car' ? tx('itin.en_voiture') : tx('itin.a_pied') })}</p>
   {:else if current.status === 'error'}
     <div data-peek-end>
-      <p class="empty">Le service d'itinéraire ne répond pas. Réessayez dans un instant.</p>
-      <button class="retry" onclick={computeRoutes}>Réessayer</button>
+      <p class="empty">{tx('itin.le_service_itineraire_ne_repond_pas')}</p>
+      <button class="retry" onclick={computeRoutes}>{tx('itin.reessayer')}</button>
     </div>
   {:else if mode !== 'transit'}
     {@const opts = streetOpts(current.data)}
@@ -52,41 +53,41 @@
     <div class="sum" data-peek-end>
       <div class="sum-text">
         <span class="sum-dur">{fmtDuration(sel.duration)}</span>
-        <span class="sum-sub">Arrivée {arrival(sel.duration)} · {fmtDistance(sel.distance)}</span>
-        <span class="sum-tag" class:best={pickedStreet === 0}>{pickedStreet === 0 ? (opts.length > 1 ? 'Le plus rapide' : '') : altTag(sel, opts[0])}</span>
+        <span class="sum-sub">{tx('itin.arrivee', { arrival: arrival(sel.duration), fmtDistance: fmtDistance(sel.distance) })}</span>
+        <span class="sum-tag" class:best={pickedStreet === 0}>{pickedStreet === 0 ? (opts.length > 1 ? tx('itin.le_plus_rapide') : '') : altTag(sel, opts[0])}</span>
       </div>
       <div class="sum-actions">
         <button class="go" onclick={() => startNav(sel)}>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4 19 20l-7-4-7 4z" class="solid" /></svg>Aller
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4 19 20l-7-4-7 4z" class="solid" /></svg>{tx('itin.aller')}
         </button>
-        {#if !showVia}<button class="soft-btn" onclick={addStop}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12M6 12h12" /></svg>Arrêt</button>{/if}
+        {#if !showVia}<button class="soft-btn" onclick={addStop}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12M6 12h12" /></svg>{tx('itin.arret')}</button>{/if}
       </div>
     </div>
     {#if opts.length > 1}
-      <h3 class="sub-h">Autres itinéraires <small>(aussi sur la carte)</small></h3>
+      <h3 class="sub-h">{tx('itin.autres_itineraires')} <small>{tx('itin.aussi_sur_la_carte')}</small></h3>
       <ul class="alt-list">
         {#each opts as r, i}
           {#if i !== pickedStreet}
             <li><button onclick={() => pickStreet(i)}>
               <span class="alt-dur">{fmtDuration(r.duration)}</span>
-              <span class="alt-sub">Arrivée {arrival(r.duration)} · {fmtDistance(r.distance)} · {i === 0 ? 'le plus rapide' : altTag(r, opts[0]).toLowerCase()}</span>
+              <span class="alt-sub">{tx('itin.arrivee_2', { arrival: arrival(r.duration), fmtDistance: fmtDistance(r.distance), etiquette: i === 0 ? tx('itin.le_plus_rapide_2') : altTag(r, opts[0]).toLowerCase() })}</span>
             </button></li>
           {/if}
         {/each}
       </ul>
     {/if}
     {#if mode === 'bike'}
-      <p class="traffic-note">Itinéraire adapté aux vélos : pistes cyclables et rues calmes en priorité.</p>
+      <p class="traffic-note">{tx('itin.itineraire_adapte_aux_velos_pistes')}</p>
     {/if}
     {#if mode === 'car'}
-      <p class="traffic-note">{sel.traffic ? `Estimation avec le ${sel.traffic}` : 'Estimation sur route fluide'}, d'après les capteurs de la Ville de Paris. Pas de trafic en temps réel : nous ne suivons pas les téléphones.</p>
+      <p class="traffic-note">{tx('itin.apres_les_capteurs_de_la_ville_de', { estimation: sel.traffic ? tx('itin.estimation_avec_le', { traffic: sel.traffic }) : tx('itin.estimation_sur_route_fluide') })}</p>
     {/if}
-    <h3 class="sub-h">Étapes</h3>
+    <h3 class="sub-h">{tx('itin.etapes')}</h3>
     <ol class="steps">
       {#each sel.steps as st}
         <li class:stop={st.stop}><span>{st.text}</span>{#if st.distance >= 10}<span class="step-dist">{fmtDistance(st.distance)}</span>{/if}</li>
       {/each}
-      <li class="arrive"><span>Arrivée : {to.label}</span></li>
+      <li class="arrive"><span>{tx('itin.arrivee_3', { label: to.label })}</span></li>
     </ol>
   {:else}
     {@const it = current.data[picked] || current.data[0]}
@@ -96,17 +97,17 @@
           <LegChain it={it} />
           <span class="sum-dur small">{fmtDuration(it.duration)}</span>
         </span>
-        <span class="sum-sub"><strong>{fmtTime(it.board.start)}</strong> à {it.board.from}{#if it.board.realTime}{' '}<span class="live" title="Horaire en temps réel">●</span>{' '}{:else} · {/if}{inMinutes(it.board.start)}</span>
-        <span class="sum-sub">{#if it.next.length}Puis {it.next.map(fmtTime).join(' · ')}{' · '}{/if}Arrivée {fmtTime(it.end)}</span>
+        <span class="sum-sub"><strong>{fmtTime(it.board.start)}</strong> à {it.board.from}{#if it.board.realTime}{' '}<span class="live" title={tx('itin.horaire_en_temps_reel')}>●</span>{' '}{:else} · {/if}{inMinutes(it.board.start)}</span>
+        <span class="sum-sub">{#if it.next.length}{tx('itin.puis', { horaires: it.next.map(fmtTime).join(' · '), suite: ' · ' })}{/if}{tx('itin.arrivee_4', { fmtTime: fmtTime(it.end) })}</span>
       </div>
       <div class="sum-actions">
         <button class="go" onclick={() => startNav(it)}>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4 19 20l-7-4-7 4z" class="solid" /></svg>Aller
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4 19 20l-7-4-7 4z" class="solid" /></svg>{tx('itin.aller')}
         </button>
-        {#if !showVia}<button class="soft-btn" onclick={addStop}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12M6 12h12" /></svg>Arrêt</button>{/if}
+        {#if !showVia}<button class="soft-btn" onclick={addStop}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12M6 12h12" /></svg>{tx('itin.arret')}</button>{/if}
       </div>
     </div>
-    <h3 class="sub-h">Étapes</h3>
+    <h3 class="sub-h">{tx('itin.etapes')}</h3>
     <ol class="legs">
       {#each it.legs as leg, li}
         {#if leg.mode === 'STOP'}
@@ -114,8 +115,8 @@
             <span class="leg-time">{fmtTime(leg.start)}</span>
             <span class="leg-rail stop" aria-hidden="true"></span>
             <span class="leg-body">
-              <span class="leg-place">Arrêt : {leg.from}</span>
-              <span class="leg-meta">Reprise à {fmtTime(leg.end)}{leg.duration > 90 ? ` · ${fmtDuration(leg.duration)} sur place` : ''}</span>
+              <span class="leg-place">{tx('itin.arret_2', { from: leg.from })}</span>
+              <span class="leg-meta">{tx('itin.reprise_a', { fmtTime: fmtTime(leg.end), suite: leg.duration > 90 ? tx('itin.sur_place', { fmtDuration: fmtDuration(leg.duration) }) : '' })}</span>
             </span>
           </li>
         {:else if leg.mode === 'WALK'}
@@ -124,7 +125,7 @@
             <span class="leg-rail walk" aria-hidden="true"></span>
             <span class="leg-body">
               <span class="leg-place">{leg.from}</span>
-              <span class="leg-meta">Marcher {fmtDuration(leg.duration)}{leg.distance ? ` · ${fmtDistance(leg.distance)}` : ''}</span>
+              <span class="leg-meta">{tx('itin.marcher', { fmtDuration: fmtDuration(leg.duration), suite: leg.distance ? ` · ${fmtDistance(leg.distance)}` : '' })}</span>
             </span>
           </li>
         {:else}
@@ -135,12 +136,12 @@
               <span class="leg-place">{leg.from}</span>
               <span class="leg-meta">
                 <span class="badge small" style:background={leg.color} style:color={leg.textColor}>{badge(leg)}</span>
-                {MODE_NAMES[leg.mode] || ''} direction {leg.headsign}
+                {tx('itin.direction', { ligne: MODE_NAMES[leg.mode] || '', headsign: leg.headsign })}
               </span>
-              <span class="leg-meta">{leg.stops ? `${leg.stops + 1} arrêts · ` : ''}{fmtDuration(leg.duration)}{leg.realTime ? ' · temps réel' : ''}</span>
+              <span class="leg-meta">{leg.stops ? tx('itin.arrets', { n: leg.stops + 1 }) : ''}{fmtDuration(leg.duration)}{leg.realTime ? tx('itin.temps_reel') : ''}</span>
               {#each [legExits[`${picked}|${li}|${leg.to}`]] as tip}
               {#if tip?.place}
-                <span class="leg-tip"><span class="car-ic" aria-hidden="true"></span>Montez {placeLabel(tip.place)}{tip.transfer ? ` pour la correspondance${tip.transfer.line ? ` avec la ligne ${tip.transfer.line}` : ''}` : ''}</span>
+                <span class="leg-tip"><span class="car-ic" aria-hidden="true"></span>{tx('itin.montez', { placeLabel: placeLabel(tip.place), suite: tip.transfer ? tx('itin.pour_la_correspondance', { ligne: tip.transfer.line ? tx('itin.avec_la_ligne', { line: tip.transfer.line }) : '' }) : '' })}</span>
               {/if}
               {#if tip?.exit && exitPhrase(tip.exit)}
                 <span class="leg-exit"><span class="exit-sq" aria-hidden="true"></span>À {leg.to}, {exitPhrase(tip.exit)}</span>
@@ -157,19 +158,19 @@
       </li>
     </ol>
     {#if current.data.length > 1}
-      <h3 class="sub-h">Autres itinéraires</h3>
+      <h3 class="sub-h">{tx('itin.autres_itineraires')}</h3>
       <ul class="alt-list">
         {#each current.data as o, i}
           {#if i !== picked}
             <li><button onclick={() => pickTransit(i)}>
               <span class="opt-top"><LegChain it={o} /><span class="alt-dur">{fmtDuration(o.duration)}</span></span>
-              <span class="alt-sub">{fmtTime(o.board.start)} à {o.board.from} · arrivée {fmtTime(o.end)}</span>
+              <span class="alt-sub">{tx('itin.a_arrivee', { fmtTime: fmtTime(o.board.start), from: o.board.from, fmtTime2: fmtTime(o.end) })}</span>
             </button></li>
           {/if}
         {/each}
       </ul>
     {/if}
-    <p class="credit">Horaires : <a href="https://transitous.org/sources/" target="_blank" rel="noopener">Transitous et réseaux de transport</a> · Place dans la rame : RATP / Île-de-France Mobilités</p>
+    <p class="credit">{tx('fiche.horaires')} <a href="https://transitous.org/sources/" target="_blank" rel="noopener">{tx('fiche.transitous_et_reseaux_de_transport')}</a> {tx('itin.place_dans_la_rame_ratp_ile_de')}</p>
   {/if}
 </section>
 

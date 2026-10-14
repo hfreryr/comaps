@@ -1,4 +1,5 @@
 <script>
+  import { tx } from '#lib/i18n/index.js';
   import { getContext } from 'svelte';
   import ListDot from '#lib/ui/ListDot.svelte';
   import PinnedRow from '#lib/ui/PinnedRow.svelte';
@@ -13,14 +14,14 @@
 
 
     <section class="sheet" aria-label={app.category.label} use:draggable={app.category.saved ? { key: app.category.label, onDismiss: app.clearCategory } : { key: app.category.label, start: 'peek' }}>
-      <button class="grip" aria-label="Agrandir la fiche"></button>
-      <button class="close" onclick={app.clearCategory} aria-label="Fermer la liste">
+      <button class="grip" aria-label={tx('liste.agrandir_la_fiche')}></button>
+      <button class="close" onclick={app.clearCategory} aria-label={tx('liste.fermer_la_liste')}>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" /></svg>
       </button>
       {#if app.category.saved && !app.savedList && !app.category.shared && !app.hubPanel}
-        <h1>{app.chipList.find((c) => c.key === 'saved')?.label || 'Mes lieux'}</h1>
+        <h1>{app.chipList.find((c) => c.key === 'saved')?.label || tx('resultats.mes_lieux')}</h1>
         <PinnedRow inSearch={false} />
-        <h2 class="hub-h">Listes</h2>
+        <h2 class="hub-h">{tx('liste.listes')}</h2>
         <ul class="hub-lists">
           {#each app.lists as l (l.id)}
             <li><button onclick={() => app.openSavedList(l.id)}>
@@ -33,103 +34,103 @@
           <li>
             {#if app.hubPanel === 'newlist'}{:else}
               <form class="new-list" onsubmit={(e) => { e.preventDefault(); app.createList(app.newListName); app.newListName = ''; }}>
-                <input bind:value={app.newListName} placeholder="Nouvelle liste…" aria-label="Nom de la nouvelle liste" maxlength="40" />
-                <button class="link" disabled={!app.newListName.trim()}>Créer</button>
+                <input bind:value={app.newListName} placeholder={tx('liste.nouvelle_liste')} aria-label={tx('liste.nom_de_la_nouvelle_liste')} maxlength="40" />
+                <button class="link" disabled={!app.newListName.trim()}>{tx('liste.creer')}</button>
               </form>
             {/if}
           </li>
         </ul>
-        <h2 class="hub-h">Vos données</h2>
+        <h2 class="hub-h">{tx('liste.vos_donnees')}</h2>
         <ul class="rows hub-rows">
           <li class="row"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14" /></svg>
-            <button class="row-btn" onclick={() => { app.importOpen = true; }}><span>Importer depuis Google Maps</span></button></li>
+            <button class="row-btn" onclick={() => { app.importOpen = true; }}><span>{tx('liste.importer_depuis_google_maps')}</span></button></li>
           <li class="row"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="1" /><rect x="13.5" y="3.5" width="7" height="7" rx="1" /><rect x="3.5" y="13.5" width="7" height="7" rx="1" /><path d="M13.5 13.5h3v3h-3zM18 18h2.5M20.5 13.5V16" /></svg>
-            <button class="row-btn" onclick={app.makeTransfer}><span>Transférer vers un autre appareil</span></button></li>
+            <button class="row-btn" onclick={app.makeTransfer}><span>{tx('liste.transferer_vers_un_autre_appareil')}</span></button></li>
           <li class="row"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 18.5h10.5a4 4 0 0 0 .5-8 6 6 0 0 0-11.6-1.6A4.8 4.8 0 0 0 7 18.5z" /><path d="M12 11v5M9.8 13.2 12 11l2.2 2.2" /></svg>
-            <button class="row-btn" onclick={() => (app.hubPanel = 'backup')}><span>Sauvegarder<small class="why" class:warn={app.favorites.length >= 5 && (app.backupAge === null || app.backupAge > 30)}>{app.backupAge === null ? 'Jamais sauvegardé' : app.backupAge === 0 ? 'Dernière sauvegarde aujourd\'hui' : `Dernière sauvegarde il y a ${app.backupAge} jour${app.backupAge > 1 ? 's' : ''}`}</small></span></button></li>
+            <button class="row-btn" onclick={() => (app.hubPanel = 'backup')}><span>{tx('liste.sauvegarder')}<small class="why" class:warn={app.favorites.length >= 5 && (app.backupAge === null || app.backupAge > 30)}>{app.backupAge === null ? tx('liste.jamais_sauvegarde') : app.backupAge === 0 ? tx('liste.derniere_sauvegarde_aujourd_hui') : tx('liste.derniere_sauvegarde_il_y_a_jour', { n: app.backupAge })}</small></span></button></li>
           <li class="row"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3M4.5 4.5v4h4" /></svg>
-            <button class="row-btn" onclick={() => (app.hubPanel = 'restore')}><span>Restaurer une sauvegarde</span></button></li>
+            <button class="row-btn" onclick={() => (app.hubPanel = 'restore')}><span>{tx('liste.restaurer_une_sauvegarde')}</span></button></li>
           <li class="row"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4" /></svg>
-            <button class="row-btn" onclick={() => { app.clearCategory(); app.editChips = true; }}><span>Personnaliser les raccourcis</span></button></li>
+            <button class="row-btn" onclick={() => { app.clearCategory(); app.editChips = true; }}><span>{tx('recherche.personnaliser_les_raccourcis')}</span></button></li>
         </ul>
-        <p class="credit">Vos lieux restent sur cet appareil : ni compte, ni serveur. Sauvegardez-les pour ne pas les perdre.</p>
+        <p class="credit">{tx('liste.vos_lieux_restent_sur_cet_appareil')}</p>
       {:else if app.category.saved && app.hubPanel === 'transfer'}
-        <button class="link back-link" onclick={() => (app.hubPanel = null)}>‹ Mes lieux</button>
-        <h1>Transférer</h1>
-        <p class="kind">Ouvrez ce lien ou scannez ce code sur l'autre appareil.</p>
-        {#if !app.transfer}<p class="muted">Préparation…</p>
+        <button class="link back-link" onclick={() => (app.hubPanel = null)}>{tx('liste.mes_lieux')}</button>
+        <h1>{tx('liste.transferer')}</h1>
+        <p class="kind">{tx('liste.ouvrez_ce_lien_ou_scannez_ce_code')}</p>
+        {#if !app.transfer}<p class="muted">{tx('liste.preparation')}</p>
         {:else}
-          {#if app.transfer.qr}<div class="qr" aria-label="QR code de transfert">{@html app.transfer.qr}</div>
-          {:else}<p class="credit">Trop de lieux pour un QR code : envoyez-vous le lien (AirDrop, Signal à vous-même…).</p>{/if}
-          <button class="go wide done" onclick={app.shareTransfer}>Envoyer le lien</button>
-          <p class="credit">⚠️ Ce lien contient tous vos lieux : envoyez-le seulement à vous-même. Il n'est stocké sur aucun serveur.</p>
+          {#if app.transfer.qr}<div class="qr" aria-label={tx('liste.qr_code_de_transfert')}>{@html app.transfer.qr}</div>
+          {:else}<p class="credit">{tx('liste.trop_de_lieux_pour_un_qr_code')}</p>{/if}
+          <button class="go wide done" onclick={app.shareTransfer}>{tx('liste.envoyer_le_lien')}</button>
+          <p class="credit">{tx('liste.ce_lien_contient_tous_vos_lieux')}</p>
         {/if}
       {:else if app.category.saved && app.hubPanel === 'backup'}
-        <button class="link back-link" onclick={() => (app.hubPanel = null)}>‹ Mes lieux</button>
-        <h1>Sauvegarder</h1>
-        <p class="kind">Un fichier avec vos listes, Maison, Travail et vos raccourcis, à ranger où vous voulez : iCloud Drive, Proton Drive, un ordinateur…</p>
-        <label class="pw">Mot de passe (facultatif, pour chiffrer le fichier)
-          <input type="password" bind:value={app.backupPassword} autocomplete="new-password" placeholder="Aucun" /></label>
-        {#if app.backupPassword}<p class="credit">Sans ce mot de passe, personne ne pourra lire le fichier, vous non plus : notez-le.</p>{/if}
-        <button class="go wide done" onclick={app.makeBackup}>Créer la sauvegarde</button>
+        <button class="link back-link" onclick={() => (app.hubPanel = null)}>{tx('liste.mes_lieux')}</button>
+        <h1>{tx('liste.sauvegarder')}</h1>
+        <p class="kind">{tx('liste.un_fichier_avec_vos_listes_maison')}</p>
+        <label class="pw">{tx('liste.mot_de_passe_facultatif_pour')}
+          <input type="password" bind:value={app.backupPassword} autocomplete="new-password" placeholder={tx('liste.aucun')} /></label>
+        {#if app.backupPassword}<p class="credit">{tx('liste.sans_ce_mot_de_passe_personne_ne')}</p>{/if}
+        <button class="go wide done" onclick={app.makeBackup}>{tx('liste.creer_la_sauvegarde')}</button>
       {:else if app.category.saved && app.hubPanel === 'restore'}
-        <button class="link back-link" onclick={() => { app.hubPanel = null; app.restoreNeedsPw = false; }}>‹ Mes lieux</button>
-        <h1>Restaurer</h1>
-        <p class="kind">Choisissez un fichier de sauvegarde d'Untracked Maps. Ses lieux s'ajoutent à ceux de cet appareil.</p>
+        <button class="link back-link" onclick={() => { app.hubPanel = null; app.restoreNeedsPw = false; }}>{tx('liste.mes_lieux')}</button>
+        <h1>{tx('liste.restaurer')}</h1>
+        <p class="kind">{tx('liste.choisissez_un_fichier_de_sauvegarde')}</p>
         {#if app.restoreNeedsPw}
-          <label class="pw">Ce fichier est protégé : mot de passe
+          <label class="pw">{tx('liste.ce_fichier_est_protege_mot_de_passe')}
             <input type="password" bind:value={app.restorePassword} autocomplete="current-password" /></label>
-          <button class="go wide done" onclick={() => app.doRestore()}>Restaurer</button>
+          <button class="go wide done" onclick={() => app.doRestore()}>{tx('liste.restaurer')}</button>
         {:else}
           <label class="action primary import-btn">
             <input type="file" accept=".json,application/json" hidden onchange={(e) => { const f = e.currentTarget.files?.[0]; e.currentTarget.value = ''; app.doRestore(f); }} />
-            Choisir le fichier
+            {tx('liste.choisir_le_fichier')}
           </label>
         {/if}
       {:else if app.category.saved}
         {@const l = app.category.shared ? app.category : app.listOf(app.savedList)}
-        {#if !app.category.shared}<button class="link back-link" onclick={() => { app.savedList = null; app.refreshSaved(); }}>‹ Mes lieux</button>{/if}
+        {#if !app.category.shared}<button class="link back-link" onclick={() => { app.savedList = null; app.refreshSaved(); }}>{tx('liste.mes_lieux')}</button>{/if}
         <h1 class="list-title"><ListDot l={l} size={30} />{l.name || app.category.label}</h1>
-        <p class="kind">{app.category.shared ? `Liste partagée · ${app.nearby.length} lieu${app.nearby.length > 1 ? 'x' : ''}` : app.nearby.length ? `${app.nearby.length} lieu${app.nearby.length > 1 ? 'x' : ''}, ${app.nearbyFromMe ? 'les plus proches de vous d\'abord' : 'par distance'}` : 'Aucun lieu pour l\'instant : touchez « Enregistrer » sur la fiche d\'un lieu.'}</p>
+        <p class="kind">{app.category.shared ? tx('liste.liste_partagee_lieu', { n: app.nearby.length }) : app.nearby.length ? tx('liste.lieu', { n: app.nearby.length, ordre: app.nearbyFromMe ? tx('liste.les_plus_proches_de_vous_abord') : tx('liste.par_distance') }) : tx('liste.aucun_lieu_pour_instant_touchez')}</p>
         <div class="list-actions">
           {#if app.category.shared}
-            <button class="go" onclick={app.keepIncomingList}>Ajouter à Mes lieux</button>
+            <button class="go" onclick={app.keepIncomingList}>{tx('liste.ajouter_a_mes_lieux')}</button>
           {:else}
-            {#if app.nearby.length}<button class="link" onclick={() => { app.listEditing = !app.listEditing; app.swiped = null; }}>{app.listEditing ? 'Terminé' : 'Modifier'}</button>{/if}
-            {#if app.nearby.length && !app.listEditing}<button class="link" onclick={() => app.shareList(l)}>Partager</button>{/if}
-            <button class="link" onclick={() => app.renameList(l)}>Renommer</button>
-            {#if !['fav', 'todo'].includes(l.id)}<button class="link danger" onclick={() => app.deleteList(l)}>Supprimer</button>{/if}
+            {#if app.nearby.length}<button class="link" onclick={() => { app.listEditing = !app.listEditing; app.swiped = null; }}>{app.listEditing ? tx('enregistrer.termine') : tx('liste.modifier')}</button>{/if}
+            {#if app.nearby.length && !app.listEditing}<button class="link" onclick={() => app.shareList(l)}>{tx('liste.partager')}</button>{/if}
+            <button class="link" onclick={() => app.renameList(l)}>{tx('liste.renommer')}</button>
+            {#if !['fav', 'todo'].includes(l.id)}<button class="link danger" onclick={() => app.deleteList(l)}>{tx('liste.supprimer')}</button>{/if}
           {/if}
         </div>
       {:else}
       <h1>{app.chipList.find((c) => c.key === app.category.key)?.label || app.category.label}</h1>
       {#if app.openAt && app.openCounts}
-        <p class="kind">{app.openCounts.open ? `${app.openCounts.open} ouvert${app.openCounts.open > 1 ? 's' : ''} ${app.openAt.now ? 'maintenant' : momentLabel(app.openAt.at).replace(/ (\d)/, ' à $1')}` : `Aucun ouvert ${app.openAt.now ? 'maintenant' : momentLabel(app.openAt.at).replace(/ (\d)/, ' à $1')} dans cette zone`}</p>
+        <p class="kind">{app.openCounts.open ? tx('liste.n_ouverts', { n: app.openCounts.open, quand: app.openAt.now ? tx('horaires.maintenant') : momentLabel(app.openAt.at).replace(/ (\d)/, ' à $1') }) : tx('liste.aucun_ouvert_dans_cette_zone', { quand: app.openAt.now ? tx('horaires.maintenant') : momentLabel(app.openAt.at).replace(/ (\d)/, ' à $1') })}</p>
       {:else}
-        <p class="kind">{app.nearby.length ? (app.nearbyFromMe ? 'Les plus proches de vous' : 'Autour du centre de la carte') : app.nearbyDone ? 'Aucun dans cette zone. Déplacez la carte pour chercher ailleurs.' : 'Recherche…'}</p>
+        <p class="kind">{app.nearby.length ? (app.nearbyFromMe ? tx('liste.les_plus_proches_de_vous') : tx('liste.autour_du_centre_de_la_carte')) : app.nearbyDone ? tx('liste.aucun_dans_cette_zone_deplacez_la') : tx('resultats.recherche')}</p>
       {/if}
       {#if !app.category.transit}
         <div class="open-pills">
-          <button class="opill" class:on={app.openAt?.now} aria-pressed={!!app.openAt?.now} onclick={() => app.setOpenAt(app.openAt?.now ? null : { now: true })}>Ouvert maintenant</button>
+          <button class="opill" class:on={app.openAt?.now} aria-pressed={!!app.openAt?.now} onclick={() => app.setOpenAt(app.openAt?.now ? null : { now: true })}>{tx('liste.ouvert_maintenant')}</button>
           <button class="opill" class:on={!!app.openAt?.at} aria-expanded={app.momentPicker} onclick={() => (app.momentPicker = !app.momentPicker)}>
-            {app.openAt?.at ? momentLabel(app.openAt.at).replace(/^./, (x) => x.toUpperCase()) : 'Ouvert à…'}
+            {app.openAt?.at ? momentLabel(app.openAt.at).replace(/^./, (x) => x.toUpperCase()) : tx('liste.ouvert_a')}
             <svg viewBox="0 0 24 24" aria-hidden="true" class="chev" class:flip={app.momentPicker}><path d="m7 10 5 5 5-5" /></svg>
           </button>
-          {#if app.openAt}<button class="opill-x" onclick={() => app.setOpenAt(null)} aria-label="Retirer le filtre d'horaires">
+          {#if app.openAt}<button class="opill-x" onclick={() => app.setOpenAt(null)} aria-label={tx('liste.retirer_le_filtre_horaires')}>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" /></svg></button>{/if}
         </div>
         {#if app.momentPicker}
           <div class="moment">
             <div class="moment-quick">
-              <button onclick={() => app.quickMoment('midi')}>Midi</button>
-              <button onclick={() => app.quickMoment('soir')}>Ce soir</button>
-              <button onclick={() => app.quickMoment('demain-soir')}>Demain soir</button>
+              <button onclick={() => app.quickMoment('midi')}>{tx('liste.midi')}</button>
+              <button onclick={() => app.quickMoment('soir')}>{tx('liste.ce_soir')}</button>
+              <button onclick={() => app.quickMoment('demain-soir')}>{tx('liste.demain_soir')}</button>
             </div>
             <div class="moment-sel">
-              <select aria-label="Jour" value={app.pickerDay} onchange={(e) => { const [h, m] = app.pickerTime.split(':').map(Number); app.setOpenAt({ at: app.momentFrom(+e.currentTarget.value, h, m) }); app.momentPicker = true; }}>
+              <select aria-label={tx('liste.jour')} value={app.pickerDay} onchange={(e) => { const [h, m] = app.pickerTime.split(':').map(Number); app.setOpenAt({ at: app.momentFrom(+e.currentTarget.value, h, m) }); app.momentPicker = true; }}>
                 {#each app.pickerDays as d}<option value={d.i}>{d.label}</option>{/each}
               </select>
-              <select aria-label="Heure" value={app.pickerTime} onchange={(e) => { const [h, m] = e.currentTarget.value.split(':').map(Number); app.setOpenAt({ at: app.momentFrom(app.pickerDay, h, m) }); app.momentPicker = true; }}>
+              <select aria-label={tx('liste.heure')} value={app.pickerTime} onchange={(e) => { const [h, m] = e.currentTarget.value.split(':').map(Number); app.setOpenAt({ at: app.momentFrom(app.pickerDay, h, m) }); app.momentPicker = true; }}>
                 {#each app.pickerHours as [h, m]}<option value={`${h}:${m}`}>{h} h {m ? '30' : ''}</option>{/each}
               </select>
             </div>
@@ -147,7 +148,7 @@
               if (Math.abs(dx) > 30 && Math.abs(dx) > Math.abs(dy) * 1.5) { app.swiped = dx < 0 ? app.swipeStart.id : null; app.swipeStart = null; }
             } : undefined}>
             {#if app.category.saved && app.savedList && sv}
-              <button class="swipe-del" onclick={() => app.removeFromList(sv, app.savedList)} aria-label={`Retirer ${sv.name} de la liste`}>
+              <button class="swipe-del" onclick={() => app.removeFromList(sv, app.savedList)} aria-label={tx('liste.retirer_de_la_liste', { name: sv.name })}>
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 7V5h4v2M7 7l1 13h8l1-13M10.5 10.5v6M13.5 10.5v6" /></svg>
               </button>
             {/if}
@@ -166,14 +167,14 @@
                       </span>
                     {/each}
                   {:else if sd?.status === 'loading'}
-                    <span class="r-meta">Prochains passages…</span>
+                    <span class="r-meta">{tx('liste.prochains_passages')}</span>
                   {:else if sd?.status === 'none'}
-                    <span class="r-meta">Aucun passage dans l'heure</span>
+                    <span class="r-meta">{tx('liste.aucun_passage_dans_heure')}</span>
                   {:else}
-                    <span class="r-meta">{typeLabel('', f.properties.subclass) || 'Station'} · touchez pour les horaires</span>
+                    <span class="r-meta">{tx('liste.touchez_pour_les_horaires', { type: typeLabel('', f.properties.subclass) || tx('liste.station') })}</span>
                   {/if}
                 {:else}
-                <span class="r-meta">{app.category.saved ? [app.nearby.find((n) => n.f === f)?.saved?.type, app.nearby.find((n) => n.f === f)?.saved?.address].filter(Boolean).join(' · ') || 'Lieu enregistré' : typeLabel('', f.properties.subclass) || app.category.label}{#if st?.open != null}{' · '}<span class:is-open={st.open} class:is-closed={!st.open}>{st.label}</span>{/if}</span>
+                <span class="r-meta">{app.category.saved ? [app.nearby.find((n) => n.f === f)?.saved?.type, app.nearby.find((n) => n.f === f)?.saved?.address].filter(Boolean).join(' · ') || tx('liste.lieu_enregistre') : typeLabel('', f.properties.subclass) || app.category.label}{#if st?.open != null}{' · '}<span class:is-open={st.open} class:is-closed={!st.open}>{st.label}</span>{/if}</span>
                 {/if}
               </span>
               <span class="n-dist">{fmtDistance(d)}</span>
@@ -184,8 +185,8 @@
       </ul>
       {#if app.openAt && app.openCounts?.unknown && !app.category?.saved}
         <button class="unknown-row" onclick={() => { app.showUnknown = !app.showUnknown; app.applyOpenFilter(); }}>
-          {app.showUnknown ? 'Masquer' : 'Afficher'} les {app.openCounts.unknown} lieux aux horaires inconnus
-          <small>Personne ne les a encore indiqués sur OpenStreetMap : certains sont peut-être ouverts.</small>
+          {tx('liste.les_lieux_aux_horaires_inconnus', { action: app.showUnknown ? tx('liste.masquer') : tx('liste.afficher'), n: app.openCounts.unknown })}
+          <small>{tx('liste.personne_ne_les_a_encore_indiques')}</small>
         </button>
       {/if}
     </section>

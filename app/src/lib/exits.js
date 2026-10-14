@@ -4,6 +4,7 @@
 //
 // La place conseillée dans la rame (tête ou queue) n'existe dans aucune source ouverte connue
 // à ce jour : on ne l'invente pas.
+import { tx } from '#lib/i18n/index.js';
 
 let index = null;
 const load = () => (index ??= fetch(new URL('data/exits.json', location.href))
@@ -40,7 +41,7 @@ export async function bestExit(station, next) {
 }
 
 /** « Sortie 3 · Rue de Rennes » */
-export const exitLabel = (e) => [e.ref && `Sortie ${e.ref}`, e.name].filter(Boolean).join(' · ');
+export const exitLabel = (e) => [e.ref && tx('fiche.sortie', { ref: e.ref }), e.name].filter(Boolean).join(' · ');
 
 /** Tri des sorties pour la fiche d'une station : par numéro, puis par nom. */
 export const sortExits = (list) => [...list].sort((a, b) =>

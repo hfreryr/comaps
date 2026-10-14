@@ -1,6 +1,7 @@
 // Lieux OpenStreetMap lus dans des tuiles préparées à l'avance (scripts/build_places.py).
 // Aucune requête lieu par lieu à un service tiers : l'app charge la tuile (≈ 2,4 km de côté) et y lit tout.
 // Tout reste sur l'appareil ; seules les tuiles consultées sont téléchargées, depuis notre hébergement.
+import { tx } from '#lib/i18n/index.js';
 import { dataBase } from './config.js';
 
 let index = null;          // { zoom, tiles: Set('x/y'), built }
@@ -87,6 +88,6 @@ function facadeOf([id, host, az, bearing, d, lic, by, date]) {
   // tuiles haute définition (16 × 8 de 768 px) pour le plein écran
   const tile = (col, row) => `https://${host}/api/pictures/${id}/tiled/${col}_${row}.jpg`;
   const rel = ((bearing - az + 540) % 360) - 180;     // où regarder, en degrés depuis le centre de la photo
-  const credit = lic.startsWith('etalab') ? 'Ville de Paris / IGN, Panoramax' : `${by || 'contributeur'}, Panoramax (${lic})`;
+  const credit = lic.startsWith('etalab') ? tx('photos.ville_de_paris_ign_panoramax') : tx('photos.panoramax_2', { auteur: by || 'contributeur', lic });
   return { id, src, tile, rel, d, credit, lic, date, page: `https://api.panoramax.xyz/#focus=pic&pic=${id}` };
 }

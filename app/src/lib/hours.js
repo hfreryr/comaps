@@ -1,8 +1,9 @@
 // Transforme le champ OSM opening_hours en une phrase lisible :
 // « Ouvert · ferme à 19 h », « Fermé · ouvre demain à 9 h 30 ».
+import { tx } from '#lib/i18n/index.js';
 import opening_hours from 'opening_hours';
 
-const DAYS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
+const DAYS = tx('horaires.jours');
 
 function time(d) {
   const h = d.getHours();
@@ -15,10 +16,10 @@ function when(d, now) {
     (new Date(d.getFullYear(), d.getMonth(), d.getDate()) -
       new Date(now.getFullYear(), now.getMonth(), now.getDate())) / 86400000
   );
-  if (days === 0) return `à ${time(d)}`;
-  if (days === 1 && d.getHours() < 6) return `cette nuit à ${time(d)}`;
-  if (days === 1) return `demain à ${time(d)}`;
-  if (days < 7) return `${DAYS[d.getDay()]} à ${time(d)}`;
+  if (days === 0) return tx('horaires.a', { time: time(d) });
+  if (days === 1 && d.getHours() < 6) return tx('horaires.cette_nuit_a', { time: time(d) });
+  if (days === 1) return tx('horaires.demain_a', { time: time(d) });
+  if (days < 7) return tx('horaires.a_2', { jour: DAYS[d.getDay()], time: time(d) });
   return `le ${d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}`;
 }
 
@@ -32,13 +33,13 @@ export function hoursStatus(value, lat, lon, now = new Date()) {
     const open = oh.getState(now);
     const unknown = oh.getUnknown(now);
     const next = oh.getNextChange(now);
-    if (unknown) return { open: null, label: 'Horaires incertains' };
+    if (unknown) return { open: null, label: tx('horaires.horaires_incertains') };
     if (open) {
-      return { open: true, label: next ? `Ouvert · ferme ${when(next, now)}` : 'Ouvert 24 h/24' };
+      return { open: true, label: next ? tx('horaires.ouvert_ferme', { when: when(next, now) }) : tx('horaires.ouvert_24_h_24') };
     }
-    return { open: false, label: next ? `Fermé · ouvre ${when(next, now)}` : 'Fermé' };
+    return { open: false, label: next ? tx('horaires.ferme_ouvre', { when: when(next, now) }) : tx('horaires.ferme') };
   } catch {
-    return { open: null, label: 'Horaires non lisibles' };
+    return { open: null, label: tx('horaires.horaires_non_lisibles') };
   }
 }
 
@@ -72,7 +73,7 @@ export function hoursTable(value, lat, lon, now = new Date()) {
         ? '24 h/24'
         : intervals.length
           ? intervals.map(([a, b]) => `${time(a)} – ${time(b)}`).join(', ')
-          : 'Fermé';
+          : tx('horaires.ferme');
       rows.push({ day: DAYS[from.getDay()], today: from.toDateString() === now.toDateString(), text });
     }
     return rows;
@@ -89,14 +90,14 @@ export function statusAt(value, lat, lon, at) {
   if (!value) return { open: null, label: '' };
   try {
     const oh = new opening_hours(value, { lat, lon, address: { country_code: 'fr', state: 'Île-de-France' } });
-    if (oh.getUnknown(at)) return { open: null, label: 'Horaires incertains' };
+    if (oh.getUnknown(at)) return { open: null, label: tx('horaires.horaires_incertains') };
     if (!oh.getState(at)) {
       const next = oh.getNextChange(at);
-      return { open: false, label: next ? `Fermé à ${time(at)} · ouvre ${when(next, at)}` : 'Fermé' };
+      return { open: false, label: next ? tx('horaires.ferme_a_ouvre', { time: time(at), when: when(next, at) }) : tx('horaires.ferme') };
     }
     const next = oh.getNextChange(at);
     // (le moment est déjà affiché par le filtre : on dit seulement jusqu'à quand)
-    return { open: true, label: next && next - at < 20 * 3600e3 ? `Ferme ${when(next, at)}` : 'Ouvert' };
+    return { open: true, label: next && next - at < 20 * 3600e3 ? tx('horaires.ferme_2', { when: when(next, at) }) : tx('horaires.ouvert') };
   } catch {
     return { open: null, label: '' };
   }
@@ -105,7 +106,7 @@ export function statusAt(value, lat, lon, at) {
 /** Libellé court d'un moment : « ce soir 20 h », « demain 12 h 30 », « dimanche 15 h ». */
 export function momentLabel(at, now = new Date()) {
   const days = Math.round((new Date(at.getFullYear(), at.getMonth(), at.getDate()) - new Date(now.getFullYear(), now.getMonth(), now.getDate())) / 86400000);
-  const day = days === 0 ? (at.getHours() >= 18 ? 'ce soir' : at.getHours() < 12 ? 'ce matin' : "aujourd'hui")
-    : days === 1 ? 'demain' : DAYS[at.getDay()];
+  const day = days === 0 ? (at.getHours() >= 18 ? tx('horaires.ce_soir') : at.getHours() < 12 ? tx('horaires.ce_matin') : tx('horaires.aujourd_hui'))
+    : days === 1 ? tx('horaires.demain') : DAYS[at.getDay()];
   return `${day} ${time(at)}`;
 }

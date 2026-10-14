@@ -1,4 +1,5 @@
 <script>
+  import { tx } from '#lib/i18n/index.js';
   import { getContext } from 'svelte';
   import { draggable } from '#lib/sheet.js';
 
@@ -7,30 +8,30 @@
 </script>
 
 
-    <section class="sheet" aria-label="Personnaliser les raccourcis" use:draggable={{ key: 'chips', onDismiss: () => (app.editChips = false) }}>
-      <button class="grip" aria-label="Agrandir la fiche"></button>
-      <button class="close" onclick={() => (app.editChips = false)} aria-label="Fermer">
+    <section class="sheet" aria-label={tx('recherche.personnaliser_les_raccourcis')} use:draggable={{ key: 'chips', onDismiss: () => (app.editChips = false) }}>
+      <button class="grip" aria-label={tx('liste.agrandir_la_fiche')}></button>
+      <button class="close" onclick={() => (app.editChips = false)} aria-label={tx('photos.fermer')}>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" /></svg>
       </button>
-      <h1>Raccourcis</h1>
-      <p class="kind">Choisissez ceux qui s'affichent, leur ordre et leur nom.</p>
+      <h1>{tx('raccourcis.raccourcis')}</h1>
+      <p class="kind">{tx('raccourcis.choisissez_ceux_qui_affichent_leur')}</p>
       <ul class="chip-edit">
         {#each app.chipPrefs as pr, i (pr.key)}
-          {#if i === app.chipPrefs.findIndex((x) => x.hidden) && i > 0}<li class="ce-head">Autres raccourcis disponibles</li>{/if}
+          {#if i === app.chipPrefs.findIndex((x) => x.hidden) && i > 0}<li class="ce-head">{tx('raccourcis.autres_raccourcis_disponibles')}</li>{/if}
           {@const c = app.catOf(pr.key)}
           <li class:off={pr.hidden}>
-            <button class="ce-toggle" onclick={() => app.toggleChip(i)} role="switch" aria-checked={!pr.hidden} aria-label={`Afficher ${c.label}`}
+            <button class="ce-toggle" onclick={() => app.toggleChip(i)} role="switch" aria-checked={!pr.hidden} aria-label={tx('raccourcis.afficher', { label: c.label })}
               style:--fam={app.famColor(c)}><span></span></button>
-            <input value={pr.label ?? ''} placeholder={c.label} aria-label={`Nom du raccourci ${c.label}`}
+            <input value={pr.label ?? ''} placeholder={c.label} aria-label={tx('raccourcis.nom_du_raccourci', { label: c.label })}
               onchange={(e) => app.renameChip(i, e.currentTarget.value)} maxlength="20" />
-            <button class="icon-btn" onclick={() => app.moveChip(i, -1)} disabled={i === 0} aria-label={`Monter ${c.label}`}>
+            <button class="icon-btn" onclick={() => app.moveChip(i, -1)} disabled={i === 0} aria-label={tx('raccourcis.monter', { label: c.label })}>
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 14 5-5 5 5" /></svg></button>
-            <button class="icon-btn" onclick={() => app.moveChip(i, 1)} disabled={i === app.chipPrefs.length - 1} aria-label={`Descendre ${c.label}`}>
+            <button class="icon-btn" onclick={() => app.moveChip(i, 1)} disabled={i === app.chipPrefs.length - 1} aria-label={tx('raccourcis.descendre', { label: c.label })}>
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5" /></svg></button>
           </li>
         {/each}
       </ul>
-      <button class="link more" onclick={app.resetChips}>Revenir aux raccourcis d'origine</button>
+      <button class="link more" onclick={app.resetChips}>{tx('raccourcis.revenir_aux_raccourcis_origine')}</button>
     </section>
 
 <style>

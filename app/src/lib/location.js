@@ -1,5 +1,6 @@
 // Position de l'utilisateur et boussole (rien n'est envoyé : tout reste sur l'appareil).
 // Code sorti de +page.svelte : il lit et modifie l'état de l'écran par l'objet « app » (bloc « app » de la page).
+import { tx } from '#lib/i18n/index.js';
 import { reverse } from '#lib/geocode.js';
 
 /** @param {any} app */
@@ -42,7 +43,7 @@ export function createLocation(app) {
     if (app.posWatch != null || !navigator.geolocation || app.nav) return;
     app.posWatch = navigator.geolocation.watchPosition(({ coords }) => {
       if (app.nav) return;
-      app.me = { label: 'Votre position', lat: coords.latitude, lon: coords.longitude, isMe: true };
+      app.me = { label: tx('resultats.votre_position'), lat: coords.latitude, lon: coords.longitude, isMe: true };
       app.showMe(app.me.lat, app.me.lon);
       if (coords.speed > 1 && coords.heading != null) setHeading(coords.heading, false);
       if (app.followMode !== 'none' && !app.map.isMoving()) app.map.easeTo({ center: [app.me.lon, app.me.lat], duration: 600 });
@@ -58,7 +59,7 @@ export function createLocation(app) {
       if (!navigator.geolocation) return reject(new Error('unsupported'));
       navigator.geolocation.getCurrentPosition(
         ({ coords }) => {
-          app.me = { label: 'Votre position', lat: coords.latitude, lon: coords.longitude, isMe: true };
+          app.me = { label: tx('resultats.votre_position'), lat: coords.latitude, lon: coords.longitude, isMe: true };
           app.showMe(app.me.lat, app.me.lon);
           startWatch();
           try { localStorage.setItem('position-ok', '1'); } catch { /* rien */ }
@@ -68,7 +69,7 @@ export function createLocation(app) {
           // délai dépassé en haute précision (intérieur, GPS froid) : on retente avec la position approximative
           if (err.code !== 3) return reject(err);
           navigator.geolocation.getCurrentPosition(({ coords }) => {
-            app.me = { label: 'Votre position', lat: coords.latitude, lon: coords.longitude, isMe: true };
+            app.me = { label: tx('resultats.votre_position'), lat: coords.latitude, lon: coords.longitude, isMe: true };
             app.showMe(app.me.lat, app.me.lon);
             startWatch();
             resolve(app.me);
@@ -90,12 +91,12 @@ export function createLocation(app) {
       let ok = false;
       try { ok = localStorage.getItem('position-ok') === '1'; } catch { /* rien */ }
       if (standalone && !ok && perm?.state !== 'granted') {
-        if (!app.showPromise) app.say('Touchez la flèche pour vous localiser.');
+        if (!app.showPromise) app.say(tx('position.touchez_la_fleche_pour_vous'));
         return;
       }
       let firstTime = false;
       try { firstTime = !localStorage.getItem('position-expliquee'); localStorage.setItem('position-expliquee', '1'); } catch { /* rien */ }
-      if (firstTime && perm?.state !== 'granted' && !app.showPromise) app.say('Votre position reste sur votre téléphone.');
+      if (firstTime && perm?.state !== 'granted' && !app.showPromise) app.say(tx('position.votre_position_reste_sur_votre'));
       const p = await getPosition();
       // (pas si la personne a déjà choisi quoi regarder entre-temps : position arrivée tard)
       if (!app.place && !app.category && !app.directions && !app.viewChosen) { app.followMode = 'follow'; app.map.flyTo({ center: [p.lon, p.lat], zoom: 15.5, duration: 900 }); }
@@ -103,19 +104,19 @@ export function createLocation(app) {
   }
   // Un message qui dit la vraie cause (refus, page non sécurisée, signal introuvable, délai dépassé)
   function locError(e) {
-    if (!window.isSecureContext) return 'Localisation impossible : la page n\'est pas sécurisée. Ouvrez https://untrackedmaps.app.';
+    if (!window.isSecureContext) return tx('position.localisation_impossible_la_page_est');
     if (e?.code === 1) {
       const app = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
       return app
-        ? 'L\'iPhone refuse la localisation à l\'app installée sur l\'écran d\'accueil (problème connu des versions récentes d\'iOS). En attendant, ouvrez untrackedmaps.app dans Safari : la localisation y fonctionne.'
-        : 'Localisation refusée. Autorisez-la dans les réglages du navigateur.';
+        ? tx('position.iphone_refuse_la_localisation_a_app')
+        : tx('position.localisation_refusee_autorisez_la');
     }
-    if (e?.code === 3) return 'Position pas encore trouvée (délai dépassé). Réessayez, idéalement près d\'une fenêtre.';
-    if (e?.code === 2) return 'Position introuvable : vérifiez que le Service de localisation du téléphone est activé.';
-    return 'Localisation indisponible sur cet appareil.';
+    if (e?.code === 3) return tx('position.position_pas_encore_trouvee_delai');
+    if (e?.code === 2) return tx('position.position_introuvable_verifiez_que_le');
+    return tx('position.localisation_indisponible_sur_cet');
   }
   // Détail technique ajouté au message (pour diagnostiquer à distance une localisation qui ne marche pas)
-  const locDetail = (e) => ` [${matchMedia('(display-mode: standalone)').matches || navigator.standalone ? 'app' : 'navigateur'} · ${window.isSecureContext ? 'https' : 'non sécurisé'} · code ${e?.code ?? '?'}${e?.message ? ` · ${e.message}` : ''}]`;
+  const locDetail = (e) => tx('position.code', { mode: matchMedia('(display-mode: standalone)').matches || navigator.standalone ? 'app' : tx('position.navigateur'), securite: window.isSecureContext ? 'https' : tx('position.non_securise'), code: e?.code ?? '?', suite: e?.message ? ` · ${e.message}` : '' });
   // Bouton de localisation, comme Plans et Maps : 1er toucher → centré sur vous ; 2e → la carte tourne
   // dans la direction où vous regardez ; 3e → retour au nord en haut.
   async function locate() {
@@ -125,7 +126,7 @@ export function createLocation(app) {
       startCompass();   // (doit partir du geste, avant toute attente)
       app.followMode = 'heading';
       app.map.easeTo({ center: [app.me.lon, app.me.lat], bearing: app.heading ?? app.map.getBearing(), duration: 500 });
-      if (app.heading == null && app.compassOn) app.say('Direction pas encore disponible : tournez-vous un peu ou marchez quelques pas.');
+      if (app.heading == null && app.compassOn) app.say(tx('position.direction_pas_encore_disponible'));
       return;
     }
     if (app.me && app.followMode === 'heading') {
@@ -141,14 +142,14 @@ export function createLocation(app) {
       if (typeof DeviceOrientationEvent === 'undefined' || typeof DeviceOrientationEvent.requestPermission !== 'function') startCompass();
       app.map.flyTo({ center: [p.lon, p.lat], zoom: Math.max(16, app.map.getZoom()), duration: 800 });
     } catch (e) {
-      app.say(locError(e) + locDetail(e), { label: 'Réessayer', run: locate });
+      app.say(locError(e) + locDetail(e), { label: tx('itin.reessayer'), run: locate });
     } finally {
       app.locating = false;
     }
   }
   // Point choisi en touchant la carte : on retrouve l'adresse la plus proche.
   async function pickOnMap(which, { lng, lat }) {
-    const pt = { label: 'Point sur la carte', lat, lon: lng };
+    const pt = { label: tx('position.point_sur_la_carte'), lat, lon: lng };
     app.setPoint(which, pt);
     if (which === 'to') app.placeMarker(lng, lat);
     app.editing = null;

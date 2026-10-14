@@ -1,5 +1,6 @@
 <!-- Guidage : bandeau de la prochaine manœuvre, bouton Recentrer, étapes, barre du bas (arrivée, voix, fin). -->
 <script>
+  import { tx } from '#lib/i18n/index.js';
   import { arrowAngle, isRoundabout } from '#lib/nav.js';
   import { badge } from '#lib/routeview.js';
   import ModeIcon from './ModeIcon.svelte';
@@ -27,36 +28,36 @@
       {#if navBanner.sub}<span class="nav-sub">{navBanner.sub}</span>{/if}
     </span>
   </div>
-  {#if navBanner.then && !navBanner.arrived}<p class="nav-then">Puis : {navBanner.then}</p>{/if}
+  {#if navBanner.then && !navBanner.arrived}<p class="nav-then">{tx('guidage.puis', { then: navBanner.then })}</p>{/if}
 </div>
 {#if !navFollow}
   <button class="nav-recenter" onclick={recenter}>
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4 19 20l-7-4-7 4z" class="solid" /></svg>Recentrer
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4 19 20l-7-4-7 4z" class="solid" /></svg>{tx('guidage.recentrer')}
   </button>
 {/if}
 {#if navList}
-  <section class="sheet nav-list" aria-label="Étapes du trajet">
-    <h1>Étapes</h1>
+  <section class="sheet nav-list" aria-label={tx('guidage.etapes_du_trajet')}>
+    <h1>{tx('itin.etapes')}</h1>
     <ol class="steps">
       {#each nav.steps as st, i}
         <li class:done={i < nav.k + (nav.kind === 'transit' ? 0 : 1)} class:now={i === (nav.kind === 'transit' ? nav.k : nav.k + 1)}>
           <span>{st.text}{#if st.sub}<small class="why">{st.sub}</small>{/if}</span>
         </li>
       {/each}
-      <li class="arrive"><span>Arrivée : {to.label}</span></li>
+      <li class="arrive"><span>{tx('itin.arrivee_3', { label: to.label })}</span></li>
     </ol>
   </section>
 {/if}
 <div class="nav-bottom">
-  <button class="nav-eta" onclick={() => (navList = !navList)} aria-expanded={navList} aria-label="Voir les étapes">
-    <strong>{navBanner.arrived ? 'Arrivé' : navRemaining.eta}</strong>
+  <button class="nav-eta" onclick={() => (navList = !navList)} aria-expanded={navList} aria-label={tx('guidage.voir_les_etapes')}>
+    <strong>{navBanner.arrived ? tx('guidage.arrive') : navRemaining.eta}</strong>
     <span>{navBanner.arrived ? to.label : `${navRemaining.min} · ${navRemaining.km}`}</span>
   </button>
-  <button class="nav-btn" onclick={() => { voice = !voice; if (!voice && 'speechSynthesis' in window) speechSynthesis.cancel(); }} aria-pressed={voice} aria-label={voice ? 'Couper la voix' : 'Activer la voix'}>
+  <button class="nav-btn" onclick={() => { voice = !voice; if (!voice && 'speechSynthesis' in window) speechSynthesis.cancel(); }} aria-pressed={voice} aria-label={voice ? tx('guidage.couper_la_voix') : tx('guidage.activer_la_voix')}>
     {#if voice}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" /><path d="M15.5 9a4.5 4.5 0 0 1 0 6M18 6.5a8 8 0 0 1 0 11" /></svg>
     {:else}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" /><path d="m16 9.5 5 5M21 9.5l-5 5" /></svg>{/if}
   </button>
-  <button class="nav-end" onclick={endNav}>Fin</button>
+  <button class="nav-end" onclick={endNav}>{tx('guidage.fin')}</button>
 </div>
 
 <style>

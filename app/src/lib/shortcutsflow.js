@@ -1,5 +1,6 @@
 // Maison, Travail et enregistrement des favoris.
 // Code sorti de +page.svelte : il lit et modifie l'état de l'écran par l'objet « app » (bloc « app » de la page).
+import { tx } from '#lib/i18n/index.js';
 
 /** @param {any} app */
 export function createShortcuts(app) {
@@ -16,7 +17,7 @@ export function createShortcuts(app) {
     if (!p) {
       app.assigning = which;
       app.query = '';
-      app.say(which === 'home' ? 'Tapez l\'adresse de votre maison' : 'Tapez l\'adresse de votre travail');
+      app.say(which === 'home' ? tx('resultats.tapez_adresse_de_votre_maison') : tx('resultats.tapez_adresse_de_votre_travail'));
       setTimeout(() => document.getElementById('search')?.focus(), 50);
       return;
     }

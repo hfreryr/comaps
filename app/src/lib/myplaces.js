@@ -1,10 +1,11 @@
 // « Mes lieux » : listes de lieux, transfert vers un autre appareil et sauvegarde.
 // Tout reste sur l'appareil. Aucun serveur : le transfert passe par un lien dont les données sont
 // après le « # » (jamais envoyé au site), la sauvegarde par un fichier que l'on range où l'on veut.
+import { tx } from '#lib/i18n/index.js';
 
 export const DEFAULT_LISTS = [
-  { id: 'fav', name: 'Favoris', icon: 'heart', color: '#D63A7A' },
-  { id: 'todo', name: 'À tester', icon: 'flag', color: '#E0862F' }
+  { id: 'fav', name: tx('meslieux.favoris'), icon: 'heart', color: '#D63A7A' },
+  { id: 'todo', name: tx('meslieux.a_tester'), icon: 'flag', color: '#E0862F' }
 ];
 // Pictogrammes et couleurs proposés pour une nouvelle liste
 export const LIST_ICONS = ['heart', 'flag', 'star', 'utensils', 'cup', 'bed', 'tree', 'bag', 'ticket', 'book'];
@@ -48,11 +49,11 @@ function cleanShort(a) {
   if (lat == null || lon == null) return null;
   const osm = typeof a[3] === 'string' && /^[nwr]\d{1,12}$/.test(a[3]) ? a[3] : '';
   const lists = Array.isArray(a[4]) ? a[4].map(listId).filter(Boolean).slice(0, 50) : [];
-  return [txt(a[0]) || 'Lieu', lat, lon, osm, lists, txt(a[5]), txt(a[6], 80)];
+  return [txt(a[0]) || tx('fiche.lieu'), lat, lon, osm, lists, txt(a[5]), txt(a[6], 80)];
 }
 function cleanLists(ls) {
   if (!Array.isArray(ls)) return null;
-  return ls.slice(0, LIMITS.lists).map((l) => l && listId(l.id) && { id: l.id, name: txt(l.name, 60) || 'Liste', icon: ICON(l.icon) || 'star', color: color(l.color) || '#2A5BD7' }).filter(Boolean);
+  return ls.slice(0, LIMITS.lists).map((l) => l && listId(l.id) && { id: l.id, name: txt(l.name, 60) || tx('meslieux.liste'), icon: ICON(l.icon) || 'star', color: color(l.color) || '#2A5BD7' }).filter(Boolean);
 }
 
 // Un lieu en tableau court : [nom, lat, lon, osm, listes, adresse, type]
@@ -68,13 +69,13 @@ export const packList = (list, places) => pack({ v: 1, l: { n: list.name, i: lis
 export async function unpackList(str) {
   const o = await unpack(str);
   if (!o?.l || !Array.isArray(o.p)) throw new Error('lien');
-  return { list: { name: txt(o.l.n, 60) || 'Liste partagée', icon: ICON(o.l.i) || 'star', color: color(o.l.c) || '#2A5BD7' },
+  return { list: { name: txt(o.l.n, 60) || tx('meslieux.liste_partagee'), icon: ICON(o.l.i) || 'star', color: color(o.l.c) || '#2A5BD7' },
     places: o.p.slice(0, LIMITS.places).map(cleanShort).filter(Boolean).map(long) };
 }
 
 /** Tout « Mes lieux » (listes, lieux, Maison/Travail, épinglés, raccourcis). */
 export function snapshot({ lists, places, shortcuts, pins, chips }) {
-  return { v: 1, app: 'Untracked Maps', date: new Date().toISOString(), lists,
+  return { v: 1, app: tx('meslieux.untracked_maps'), date: new Date().toISOString(), lists,
     p: places.map(short), s: Object.fromEntries(Object.entries(shortcuts || {}).filter(([, v]) => v).map(([k, v]) => [k, short(v)])),
     pins: pins || [], chips: chips || [] };
 }

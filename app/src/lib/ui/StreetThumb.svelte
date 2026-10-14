@@ -1,4 +1,5 @@
 <script>
+  import { tx } from '#lib/i18n/index.js';
   import { getContext } from 'svelte';
   import Facade from '#lib/ui/Facade.svelte';
 
@@ -10,10 +11,10 @@
   {#if app.place && !app.directions && !app.nav && app.info?.facade && app.viewer == null && (app.placeSheetH == null || app.placeSheetH < app.innerH * 0.6)}
     <!-- Vue de la rue posée sur la carte, juste au-dessus de la fiche (comme Plans et Google Maps) ; plein écran au toucher -->
     <button class="street-thumb" style:bottom={app.placeSheetH != null ? `${app.placeSheetH + 12}px` : null} onclick={() => (app.viewer = 'facade')}
-      aria-label="Voir la vue de la rue">
-      <Facade f={app.info.facade} alt={`Vue de la rue : ${app.title}`} />
+      aria-label={tx('photos.voir_la_vue_de_la_rue')}>
+      <Facade f={app.info.facade} alt={tx('photos.vue_de_la_rue', { title: app.title })} />
       <span class="st-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4.5 12a7.5 3.5 0 1 0 15 0M17 9.5l2.5 2.5 2.5-2.5" /><circle cx="12" cy="12" r="1.6" class="solid" /></svg></span>
-      <span class="st-src">Panoramax</span>
+      <span class="st-src">{tx('photos.panoramax')}</span>
     </button>
   {/if}
 

@@ -1,5 +1,6 @@
 // Mise en place de la carte : style clair/sombre, liens partagés à l'ouverture, écouteurs.
 // Code sorti de +page.svelte : il lit et modifie l'état de l'écran par l'objet « app » (bloc « app » de la page).
+import { tx } from '#lib/i18n/index.js';
 import { PARIS } from '#lib/places.js';
 import { mapStyle, provideImage } from '#lib/mapstyle.js';
 import * as maplibregl from 'maplibre-gl';
@@ -39,14 +40,14 @@ export function createMapSetup(app) {
       const lm = /[#&]liste=([\w-]+)/.exec(location.hash), tm = /[#&]transfert=([\w-]+)/.exec(location.hash);
       if (lm || tm) {
         history.replaceState(history.state, '', location.href.replace(/[#&](liste|transfert)=[\w-]+/, ''));
-        if (tm) unpack(tm[1]).then((raw) => { app.incoming = { kind: 'transfer', raw, data: restore(raw) }; }).catch(() => app.say('Ce lien de transfert est incomplet.'));
+        if (tm) unpack(tm[1]).then((raw) => { app.incoming = { kind: 'transfer', raw, data: restore(raw) }; }).catch(() => app.say(tx('ecran.ce_lien_de_transfert_est_incomplet')));
         else unpackList(lm[1]).then((r) => {
           app.incoming = { kind: 'list', ...r };
           app.category = { key: 'shared', saved: true, shared: true, label: r.list.name, name: r.list.name, icon: r.list.icon || 'star', color: r.list.color || '#2A5BD7' };
           app.refreshSaved();
           const pts = app.nearby.slice(0, 10).map((n) => n.f.geometry.coordinates);
           if (pts.length) app.fitTo(pts);
-        }).catch(() => app.say('Ce lien de liste est incomplet.'));
+        }).catch(() => app.say(tx('ecran.ce_lien_de_liste_est_incomplet')));
       }
       // Lien partagé vers un lieu (…#carte=…&lieu=node/123) : on rouvre sa fiche.
       const shared = /[#&]lieu=(node|way|relation)\/(\d+)/.exec(location.hash);
@@ -75,8 +76,8 @@ export function createMapSetup(app) {
     document.addEventListener('visibilitychange', onVis);
     window.addEventListener('popstate', app.onPopState);
     window.addEventListener('keydown', app.onKeyDown);
-    const offline = () => app.say('Pas de connexion. La recherche et les itinéraires reprendront dès le retour du réseau.');
-    const online = () => app.say('Connexion rétablie');
+    const offline = () => app.say(tx('ecran.pas_de_connexion_la_recherche_et_les'));
+    const online = () => app.say(tx('ecran.connexion_retablie'));
     window.addEventListener('offline', offline);
     window.addEventListener('online', online);
     // Boussole : visible seulement quand la carte est tournée ou inclinée.

@@ -1,5 +1,6 @@
 // Itinéraire : départ, arrivée, étapes, calcul et choix du mode.
 // Code sorti de +page.svelte : il lit et modifie l'état de l'écran par l'objet « app » (bloc « app » de la page).
+import { tx } from '#lib/i18n/index.js';
 import { empty } from '#lib/maplayers.js';
 import { streetRoute, trafficEstimate, transitRoutes, transitWithStop } from '#lib/routing.js';
 import { tick } from 'svelte';
@@ -64,7 +65,7 @@ export function createDirections(app) {
   function useMyPosition() {
     app.editing = null;
     app.getPosition().then((p) => { app.from = p; computeRoutes(); })
-      .catch((e) => app.say(`${app.locError(e)} En attendant, choisissez un point de départ.`));
+      .catch((e) => app.say(tx('itin.en_attendant_choisissez_un_point_de', { locError: app.locError(e) })));
   }
   function swap() {
     [app.from, app.to] = [app.to, app.from];

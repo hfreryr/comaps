@@ -79,9 +79,12 @@ Le fichier principal est passé de 3 770 à 3 340 lignes, puis à environ 730 li
 - Bug trouvé en route : l'action de défilement du panorama n'était plus transmise à la visionneuse (corrigé, et désormais détecté par `npm run check`).
 
 ## Étape 4 : textes à part (3 à 4 h)
-- [ ] Un fichier de textes français (`src/lib/i18n/fr.js`) et une fonction d'accès. Tous les textes affichés y passent, accords (pluriels) compris.
-- [ ] Un test qui échoue si un texte affiché n'est pas dans le fichier.
-- [ ] Pas de traduction pour l'instant : la question se posera si l'on vise un lancement hors de France.
+- [x] Un fichier de textes français (`src/lib/i18n/fr.js`, 664 textes) et une fonction d'accès `tx('clé', { valeurs })` (`src/lib/i18n/index.js`). Accords : entrée sous forme de fonction avec `pluriel(n, 'lieu', 'lieux')`.
+- [x] Un test qui échoue si un texte affiché est écrit en dur, si une clé utilisée n'existe pas, si une clé ne sert plus, ou si une valeur `{x}` n'est pas fournie (`tests/unit/textes.test.js`).
+  - Exceptions assumées : vocabulaire de recherche (mots tapés par l'utilisateur, `intent.js`, mots-clés de `categories.js`), profil de ville (`cities/paris.js`), quelques chaînes techniques (listées dans le test).
+  - Limite : un mot isolé en minuscules (« maison ») ne se distingue pas automatiquement d'un identifiant (« walk ») ; ceux qui existaient ont été repérés à la main.
+- [x] Pas de traduction pour l'instant : la question se posera si l'on vise un lancement hors de France.
+- Vérifié : captures avant/après identiques (hors horaires en temps réel), 14 tests de bout en bout.
 
 ---
 
@@ -92,4 +95,4 @@ Le fichier principal est passé de 3 770 à 3 340 lignes, puis à environ 730 li
 | 1. Tests | fait : 47 tests unitaires, 14 de bout en bout, 5 pipeline ; un bug trouvé et corrigé | 14/10 |
 | 2. Sécurité | fait (sauf la partie du porteur du projet) | 14/10 |
 | 3. Rangement | fait : 20 composants d'écran, 13 modules de logique, page à ~730 lignes | 14/10 |
-| 4. Textes | à faire | |
+| 4. Textes | fait : 664 textes dans `fr.js`, test de couverture | 14/10 |

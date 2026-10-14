@@ -1,4 +1,5 @@
 <script>
+  import { tx } from '#lib/i18n/index.js';
   import { getContext } from 'svelte';
   import { draggable } from '#lib/sheet.js';
 
@@ -7,23 +8,23 @@
 </script>
 
 
-    <section class="sheet" aria-label="Importer vos lieux" use:draggable={{ key: 'import', onDismiss: () => (app.importOpen = false) }}>
-      <button class="grip" aria-label="Agrandir la fiche"></button>
-      <button class="close" onclick={() => (app.importOpen = false)} aria-label="Fermer">
+    <section class="sheet" aria-label={tx('import.importer_vos_lieux')} use:draggable={{ key: 'import', onDismiss: () => (app.importOpen = false) }}>
+      <button class="grip" aria-label={tx('liste.agrandir_la_fiche')}></button>
+      <button class="close" onclick={() => (app.importOpen = false)} aria-label={tx('photos.fermer')}>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" /></svg>
       </button>
-      <h1>Vos lieux Google Maps</h1>
-      <p class="kind">Récupérez vos lieux enregistrés, votre maison et votre travail.</p>
+      <h1>{tx('import.vos_lieux_google_maps')}</h1>
+      <p class="kind">{tx('import.recuperez_vos_lieux_enregistres')}</p>
       <ol class="howto">
-        <li>Ouvrez <a href="https://takeout.google.com/" target="_blank" rel="noopener">takeout.google.com</a>, touchez « Tout désélectionner », puis cochez seulement <strong>Maps (vos adresses)</strong>.</li>
-        <li>Touchez « Étape suivante » puis « Créer une exportation ». Google vous envoie un lien par e-mail, souvent en quelques minutes.</li>
-        <li>Téléchargez le fichier .zip, puis choisissez-le ici.</li>
+        <li>{tx('import.ouvrez')} <a href="https://takeout.google.com/" target="_blank" rel="noopener">{tx('import.takeout_google_com')}</a>{tx('import.touchez_tout_deselectionner_puis')} <strong>{tx('import.maps_vos_adresses')}</strong>.</li>
+        <li>{tx('import.touchez_etape_suivante_puis_creer')}</li>
+        <li>{tx('import.telechargez_le_fichier_zip_puis')}</li>
       </ol>
       <label class="action primary import-btn">
         <input type="file" accept=".zip,.json,.csv,application/zip,application/json,text/csv" onchange={app.importFile} hidden />
-        {app.importing || 'Choisir le fichier'}
+        {app.importing || tx('liste.choisir_le_fichier')}
       </label>
-      <p class="credit">Le fichier est lu sur votre téléphone : il n'est envoyé nulle part. Vos lieux restent sur cet appareil.</p>
+      <p class="credit">{tx('import.le_fichier_est_lu_sur_votre')}</p>
     </section>
 
 <style>

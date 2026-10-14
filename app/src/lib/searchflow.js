@@ -1,5 +1,6 @@
 // Recherche et catégories : résultats, filtres « ouvert », liste autour de la carte.
 // Code sorti de +page.svelte : il lit et modifie l'état de l'écran par l'objet « app » (bloc « app » de la page).
+import { tx } from '#lib/i18n/index.js';
 import { ARR_CENTERS } from '#lib/intent.js';
 import { FAMILIES } from '#lib/mapstyle.js';
 import { departures } from '#lib/routing.js';
@@ -30,7 +31,7 @@ export function createSearch(app) {
   // Un lieu sans nom (toilettes, borne…) ou au nom de code (« G-040 ») prend le nom de sa catégorie.
   const displayName = (f, c) => {
     const n = f.properties.name;
-    return !n || (c?.unnamed && /^[A-Z0-9][A-Z0-9 _-]{0,9}$/.test(n)) ? c?.unnamed || n || 'Sans nom' : n;
+    return !n || (c?.unnamed && /^[A-Z0-9][A-Z0-9 _-]{0,9}$/.test(n)) ? c?.unnamed || n || tx('resultats.sans_nom') : n;
   };
   // Lieux d'une catégorie autour d'un point. `fit` : élargir la carte si les plus proches sont hors de la vue
   // (seulement au premier choix de la catégorie, jamais quand on déplace la carte soi-même).
@@ -210,7 +211,7 @@ export function createSearch(app) {
     else if (c.area?.text) {
       const r = (await search(`${c.area.text} Paris`).catch(() => []))[0];
       if (r) center = [r.lon, r.lat];
-      else app.say(`« ${c.area.text} » introuvable : recherche autour de la carte`);
+      else app.say(tx('resultats.introuvable_recherche_autour_de_la', { text: c.area.text }));
     }
     const { when, area, ...cat } = c;
     if (app.category?.key === cat.key) app.category = null;   // (sinon pickCategory refermerait la catégorie)

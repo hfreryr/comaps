@@ -1,5 +1,6 @@
 // Import des lieux enregistrés dans Google Maps (fichier Takeout lu sur l'appareil).
 // Code sorti de +page.svelte : il lit et modifie l'état de l'écran par l'objet « app » (bloc « app » de la page).
+import { tx } from '#lib/i18n/index.js';
 import { PARIS } from '#lib/places.js';
 import { mergeInto } from '#lib/myplaces.js';
 import { readGoogleExport } from '#lib/importgoogle.js';
@@ -12,7 +13,7 @@ export function createImport(app) {
     const file = e.currentTarget.files?.[0];
     e.currentTarget.value = '';
     if (!file) return;
-    app.importing = 'Lecture du fichier…';
+    app.importing = tx('import.lecture_du_fichier');
     try {
       const { places, home, work } = await readGoogleExport(file);
       let added = 0, missed = 0;
@@ -30,12 +31,12 @@ export function createImport(app) {
         let { lat, lon } = p;
         if (!lat || !lon) {
           // L'export n'a pas toujours la position : on cherche le lieu par son nom, comme dans la barre de recherche.
-          app.importing = `Recherche des lieux sans position… ${i + 1} / ${todo.length}`;
+          app.importing = tx('import.recherche_des_lieux_sans_position', { i: i + 1, n: todo.length });
           const r = (await search(p.address || p.name, PARIS).catch(() => []))[0];
           if (!r) { missed++; continue; }
           ({ lat, lon } = r);
         }
-        kept.push({ id: `g${lat},${lon}`, name: p.name || p.address, type: 'Importé de Google Maps', address: p.address || '', lat, lon, lists: [listFor(p.listName)] });
+        kept.push({ id: `g${lat},${lon}`, name: p.name || p.address, type: tx('import.importe_de_google_maps'), address: p.address || '', lat, lon, lists: [listFor(p.listName)] });
       }
       const m = mergeInto({ lists: app.lists, places: app.favorites }, { lists: [], places: kept }, app.sameSpot);
       app.favorites = m.places;
@@ -48,15 +49,15 @@ export function createImport(app) {
         let { lat, lon } = v;
         if (!lat || !lon) { const r = (await search(v.address || v.name, PARIS).catch(() => []))[0]; if (!r) continue; ({ lat, lon } = r); }
         app.setShortcut(k, { id: `${k}${lat}`, name: v.address || v.name, type: app.SHORT_NAMES[k], address: v.address || '', lat, lon });
-        extra += ` · ${app.SHORT_NAMES[k]} défini`;
+        extra += tx('import.defini', { nom: app.SHORT_NAMES[k] });
       }
       app.importing = '';
       app.importOpen = false;
-      if (!added && !extra) app.say(places.length ? 'Ces lieux sont déjà dans vos favoris.' : 'Aucun lieu trouvé dans ce fichier. Choisissez l\'archive Takeout de Google Maps.');
-      else app.say(`${added} lieu${added > 1 ? 'x' : ''} importé${added > 1 ? 's' : ''}${extra}${missed ? ` · ${missed} introuvable${missed > 1 ? 's' : ''}` : ''}`);
+      if (!added && !extra) app.say(places.length ? tx('import.ces_lieux_sont_deja_dans_vos_favoris') : tx('import.aucun_lieu_trouve_dans_ce_fichier'));
+      else app.say(tx('import.lieu_importe', { n: added, extra, manquants: missed ? tx('import.introuvable', { n: missed }) : '' }));
     } catch {
       app.importing = '';
-      app.say('Ce fichier n\'a pas pu être lu. Choisissez l\'archive .zip envoyée par Google.');
+      app.say(tx('import.ce_fichier_a_pas_pu_etre_lu'));
     }
   }
 
