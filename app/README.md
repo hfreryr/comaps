@@ -51,6 +51,15 @@ Interdits par les règles du projet : Overpass (limites d'usage incompatibles av
 - **Données par tuile** (`src/lib/placestore.js`), URL de base configurable (`VITE_DATA_BASE`, `src/lib/config.js`).
 - **Une interface par besoin** : `geocode.js` (adresses et noms, fournisseur selon le pays), `places.js` (détails et catégories, depuis les tuiles), `routing.js`.
 - **Profil de ville** (`src/lib/cities/paris.js`) : boîtes, arrondissements, enrichissements locaux (sorties, rame, trafic). Une donnée absente = fonction désactivée.
+- **Découpage de l'écran** (en cours, commencé le 14/10) : `src/routes/+page.svelte` (3 770 → 3 340 lignes) garde l'état et la carte. Déjà sortis :
+  - `src/lib/ui/RouteSheet.svelte` : fiche itinéraire ;
+  - `NavView.svelte` : guidage ;
+  - `ModeIcon.svelte` et `LegChain.svelte` : petits éléments communs ;
+  - `src/lib/ui/base.css` : styles partagés ;
+  - `src/lib/routeview.js` : mise en forme des itinéraires ;
+  - `src/lib/maplayers.js` : couches maison de la carte.
+
+  Chaque étape est vérifiée par comparaison de captures avant/après et par les tests e2e. Restent la fiche lieu, Mes lieux, la recherche et la visionneuse : elles partagent beaucoup d'état avec la page, il faudra d'abord un module d'état commun.
 
 ## Retours des premiers tests (12/10/2026)
 - **Métro** : raccourci « Métro » (stations les plus proches, prochains passages directement dans la liste) ; la recherche comprend « métro », « station », « métro le plus proche » ; les stations restent toujours visibles sur la carte dès le zoom 13.
