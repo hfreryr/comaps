@@ -1,13 +1,22 @@
-# Mises à jour de sécurité proposées automatiquement (une proposition de changement par mise à jour, à valider).
+# Mises à jour de sécurité proposées automatiquement, regroupées pour limiter le bruit :
+# une proposition de changement par mois et par écosystème, à valider (les tests GitHub tournent dessus).
 version: 2
 updates:
   - package-ecosystem: npm
     directory: /app
-    schedule: { interval: weekly }
-    open-pull-requests-limit: 5
+    schedule: { interval: monthly }
+    groups:
+      app: { patterns: ['*'] }
+    ignore:
+      # Playwright doit rester aligné sur les navigateurs installés pour les tests de bout en bout : mis à jour à la main
+      - dependency-name: playwright
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: monthly }
+    groups:
+      actions: { patterns: ['*'] }
   - package-ecosystem: pip
     directory: /
     schedule: { interval: monthly }
+    groups:
+      pipeline: { patterns: ['*'] }
