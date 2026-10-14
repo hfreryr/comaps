@@ -7,7 +7,8 @@ import { readFileSync } from 'node:fs';
 import { packList, pack, snapshot, DEFAULT_LISTS } from '../../src/lib/myplaces.js';
 
 const PORT = 4199;
-const preview = spawn('npx', ['vite', 'preview', '--port', String(PORT), '--strictPort'], { stdio: 'ignore', detached: true });
+// le site construit (build/), servi tel quel, comme sur GitHub Pages (vite preview dépend de fichiers que svelte-check efface)
+const preview = spawn('python3', ['-m', 'http.server', String(PORT), '-d', new URL('../../build', import.meta.url).pathname], { stdio: 'ignore', detached: true });
 // on attend que le serveur réponde (au plus 30 s)
 for (let i = 0; i < 60; i++) {
   try { if ((await fetch(`http://localhost:${PORT}/`)).ok) break; } catch { /* pas encore prêt */ }
