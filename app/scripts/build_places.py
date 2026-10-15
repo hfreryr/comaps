@@ -93,14 +93,16 @@ class Places(osmium.SimpleHandler):
             return
 
 
-def add_extras(tags, extra):
-    """Comble les manques d'OSM (jamais de remplacement) et note la source de chaque complément."""
+def add_extras(tags, extra, today=None):
+    """Comble les manques d'OSM (jamais de remplacement) et note la source de chaque complément.
+    Un complément daté (horaires d'une saison) n'est plus utilisé après sa date de fin."""
     if not extra:
         return False
+    today = today or time.strftime("%Y-%m-%d")
     alt = {"website": "contact:website", "phone": "contact:phone"}
     added = False
-    for k, (value, source) in extra.items():
-        if k in tags or alt.get(k) in tags:
+    for k, (value, source, *until) in extra.items():
+        if k in tags or alt.get(k) in tags or (until and until[0] < today):
             continue
         tags[k] = value
         tags.setdefault("_src", {})[k] = source

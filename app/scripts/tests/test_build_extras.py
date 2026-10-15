@@ -56,3 +56,79 @@ def test_osm_jamais_remplace():
     assert tags["contact:phone"] == "+33 1 00 00 00 00" and "phone" not in tags
     assert tags["website"] == "https://x.fr" and tags["_src"] == {"website": "overture"}
     assert not add_extras({"website": "https://osm.fr"}, {"website": ["https://x.fr", "overture"]})
+
+
+# ——— Ville de Paris ———
+from build_extras import day_hours, paris_opening_hours, paris_period, paris_rows, paris_keep
+
+
+def test_horaires_du_jour():
+    assert day_hours("07h00 - 08h30 / 11h30 - 13h30 / 16h45 - 22h00") == "07:00-08:30,11:30-13:30,16:45-22:00"
+    assert day_hours("8h - 18h30") == "08:00-18:30"
+    assert day_hours("10H - 19H") == "10:00-19:00"
+    assert day_hours("08:00 - 20:30") == "08:00-20:30"
+    assert day_hours("-") == "off" and day_hours("Fermé") == "off"
+    assert day_hours("Accès libre") is None
+
+
+def rec(**days):
+    base = {f"horaires_{d}": "08h00 - 20h30" for d in ("lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche")}
+    base.update({f"horaires_{k}": v for k, v in days.items()})
+    return base
+
+
+def test_semaine_au_format_osm():
+    assert paris_opening_hours(rec()) == "Mo-Su 08:00-20:30"
+    assert paris_opening_hours(rec(samedi="09h00 - 20h30", dimanche="09h00 - 20h30")) == "Mo-Fr 08:00-20:30; Sa,Su 09:00-20:30"
+    assert paris_opening_hours(rec(lundi="-")) == "Tu-Su 08:00-20:30"
+    assert paris_opening_hours({"ouvert_24h": "Oui"}) == "24/7"
+    assert paris_opening_hours(rec(mardi="Accès libre")) is None          # un jour illisible : rien plutôt que faux
+    assert paris_opening_hours(rec(**{d: "-" for d in ("lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche")})) is None
+
+
+def test_periode_en_vigueur():
+    assert paris_period("du 01/10/26 au 24/10/26", "2026-10-15") == "2026-10-24"
+    assert paris_period("du 26/10/25 au 28/02/26", "2026-10-15") is None   # passée : horaires d'une autre saison
+    assert paris_period("", "2026-10-15") == ""
+
+
+def test_lignes_de_la_ville():
+    recs = [dict(rec(), nom="SQUARE DU TEMPLE - ELIE WIESEL", type="Promenades ouvertes", horaires_periode="du 01/10/26 au 24/10/26",
+                 geo_point_2d={"lat": 48.864, "lon": 2.360}),
+            dict(rec(), nom="Ombrière", type="Ombrière pérenne", geo_point_2d={"lat": 48.8, "lon": 2.3}),
+            dict(rec(), nom="Jardin X", type="Bois", horaires_periode="du 26/10/25 au 28/02/26", geo_point_2d={"lat": 48.8, "lon": 2.3})]
+    assert paris_rows(recs, "2026-10-15") == [("SQUARE DU TEMPLE - ELIE WIESEL", 48.864, 2.360, "Mo-Su 08:00-20:30", "2026-10-24")]
+    assert paris_keep({"leisure": "park"}) and paris_keep({"tourism": "museum"}) and not paris_keep({"amenity": "restaurant"})
+
+
+def test_complement_perime_ignore():
+    tags = {"name": "Square"}
+    assert not add_extras(tags, {"opening_hours": ["Mo-Su 08:00-20:30", "paris", "2026-10-24"]}, today="2026-10-25")
+    assert add_extras(tags, {"opening_hours": ["Mo-Su 08:00-20:30", "paris", "2026-10-24"]}, today="2026-10-15")
+    assert tags["_src"] == {"opening_hours": "paris"}
+
+
+# ——— Enseignes et annuaire ———
+from build_extras import valid_hours, annuaire_hours, annuaire_keep
+
+
+def test_horaires_valides():
+    assert valid_hours("Mo-Fr 10:00-19:30; Sa 10:00-19:00")
+    assert valid_hours("Mo closed; Tu-Fr 09:30-13:00,14:00-18:00; Su off")
+    assert valid_hours("24/7")
+    assert not valid_hours("Mo 14:00-18:30; Su clos")                       # « clos » n'est pas du format OSM
+    assert not valid_hours("Fr 08:30-16:15,09:00-15:30")                    # plages qui se chevauchent
+    assert not valid_hours("")
+
+
+def test_annuaire():
+    p = lambda a, b, h1, h2, h3="", h4="", c="": {"nom_jour_debut": a, "nom_jour_fin": b, "valeur_heure_debut_1": h1,
+                                                  "valeur_heure_fin_1": h2, "valeur_heure_debut_2": h3, "valeur_heure_fin_2": h4, "commentaire": c}
+    assert annuaire_hours([p("Lundi", "Vendredi", "08:30:00", "12:30:00", "13:30:00", "17:30:00")]) == "Mo-Fr 08:30-12:30,13:30-17:30"
+    assert annuaire_hours([p("Lundi", "Vendredi", "09:00:00", "12:45:00", c="Uniquement sur rendez-vous.")]) is None
+    assert annuaire_keep({"amenity": "townhall"}) and not annuaire_keep({"amenity": "school"}) and not annuaire_keep({"leisure": "park"})
+
+
+def test_annuaire_permanence_ecartee():
+    p = {"nom_jour_debut": "Jeudi", "nom_jour_fin": "Jeudi", "valeur_heure_debut_1": "09:00:00", "valeur_heure_fin_1": "17:00:00"}
+    assert annuaire_hours([p]) is None
