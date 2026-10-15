@@ -27,15 +27,17 @@ jobs:
           curl -sSfL -o paris.osm.pbf $B/paris.osm.pbf
           curl -sSfL $B/paris.osm.pbf.md5 | awk '{print $1"  paris.osm.pbf"}' | md5sum -c -
       - run: python app/scripts/build_extras.py paris.osm.pbf --out out/extras.json
-      - name: Horaires publiés par les sites des lieux (schema.org, robots.txt respecté)
-        run: python app/scripts/build_sitehours.py paris.osm.pbf --extras out/extras.json || echo "sites ignorés (le reste est publié)"
+      - name: Horaires publiés par les sites des lieux (Common Crawl d'abord, visites espacées, robots.txt respecté)
+        run: |
+          curl -sSfL -o out/sitehours.json https://untrackedmaps.app/data/sitehours.json || echo '{}' > out/sitehours.json
+          python app/scripts/build_sitehours.py paris.osm.pbf --extras out/extras.json --state out/sitehours.json || echo "sites ignorés (le reste est publié)"
       - name: "Garde-fou : pas de publication si les compléments paraissent vides"
         run: python -c "import json,sys; n=len(json.load(open('out/extras.json'))['places']); print(n,'lieux complétés'); sys.exit(0 if n >= 1000 else 1)"
       - name: Publier dans gh-pages/data/extras.json
         run: |
           git fetch --depth=1 origin gh-pages
           git worktree add pages origin/gh-pages
-          mkdir -p pages/data && cp out/extras.json pages/data/extras.json
-          cd pages && git add -A data/extras.json
+          mkdir -p pages/data && cp out/extras.json pages/data/extras.json && cp out/sitehours.json pages/data/sitehours.json
+          cd pages && git add -A data/extras.json data/sitehours.json
           git -c user.name=untracked-bot -c user.email=bot@untrackedmaps.app commit -qm "Compléments des lieux du $(date -u +%F)" || exit 0
           git push origin HEAD:gh-pages
