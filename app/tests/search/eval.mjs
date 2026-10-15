@@ -8,12 +8,16 @@
 import { readFileSync, readdirSync, writeFileSync, existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { matchPlaces } from '#lib/localsearch.js';
+import { prepare, searchIndex } from '#lib/searchindex.js';
+import { intentOf, nearestOf } from '#lib/searchintent.js';
 
 const here = new URL('.', import.meta.url).pathname;
 const ref = JSON.parse(readFileSync(`${here}reference.json`, 'utf8'));
 const args = process.argv.slice(2);
 const only = args.includes('--only') ? args[args.indexOf('--only') + 1] : null;
 const jsonOut = args.includes('--json') ? args[args.indexOf('--json') + 1] : null;
+// index de recherche (build_search.py) : par défaut celui des tuiles, sinon --index chemin/search.json
+const indexPath = args.includes('--index') ? args[args.indexOf('--index') + 1] : null;
 
 // ——— Nos lieux (tuiles préparées) ———
 const root = `${here}../../static/data/places`;
@@ -56,8 +60,16 @@ function isHit(q, r, at) {
 
 // ——— Moteurs ———
 const localBox = (at) => places.filter((p) => Math.abs(p.lat - at.lat) < 0.032 && Math.abs(p.lon - at.lon) < 0.048);
+const idxFile = indexPath || `${root}/search.json`;
+const idx = existsSync(idxFile) ? prepare(JSON.parse(readFileSync(idxFile, 'utf8'))) : null;
+const asResult = (p) => ({ id: `${LETTER[p.id % 10]}${Math.floor(p.id / 10)}`, name: p.tags.name || '', lon: p.lon, lat: p.lat });
 const engines = {
   async local(q, at) { return matchPlaces(localBox(at), q, at, 7); },
+  // nouvelle recherche sur le téléphone : type de lieu (« pharmacie ») ou index des noms
+  ...(idx ? { async index(q, at) {
+    const f = intentOf(q);
+    return f ? nearestOf(localBox(at), f, at, 7).map(asResult) : searchIndex(idx, q, at, 7);
+  } } : {}),
   // mêmes paramètres que l'app (src/lib/geocode.js) ; curl passe par le proxy de l'environnement
   async photon(q, at) {
     const u = new URL('https://photon.komoot.io/api/');

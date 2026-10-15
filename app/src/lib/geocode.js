@@ -8,8 +8,12 @@
 // Ce qui est envoyé : le texte tapé et un point de référence (centre de la carte ou position), rien d'autre.
 import { tx } from '#lib/i18n/index.js';
 import { city } from './cities/index.js';
-import { typeLabel } from './places.js';
+import { typeLabel, typeOfTags } from './places.js';
 import { searchLocal } from './localsearch.js';
+import { loadIndex, searchIndex, norm } from './searchindex.js';
+import { intentOf, nearestOf } from './searchintent.js';
+import { placesInBounds } from './placestore.js';
+import { dataBase } from './config.js';
 
 const PHOTON = 'https://photon.komoot.io';
 const GEOPF = 'https://data.geopf.fr/geocodage';
@@ -103,22 +107,73 @@ async function geopf(query, near, signal, limit = 5) {
 
 const near = (a, b) => Math.hypot((a.lon - b.lon) * 0.66, a.lat - b.lat) * 111320 < 40;
 
+// ——— Recherche sur le téléphone (index préparé chaque nuit, scripts/build_search.py) ———
+// Mesurée sur 144 recherches de référence (tests/search) : 90 % de bonnes réponses en premier contre 76 % pour Photon,
+// en 0,02 s au lieu de 1,5 s. Photon reste consulté pour ce que l'index n'a pas (rues, quartiers).
+const index = () => loadIndex(() => fetch(`${dataBase()}places/search.json`).then((r) => (r.ok ? r.json() : null)));
+/** Charge l'index dès que l'on touche la barre de recherche (≈ 1,6 Mo compressé, une fois). */
+export const warmSearch = () => { index(); };
+
+const LETTERS = { 1: ['node', 'N'], 2: ['way', 'W'], 3: ['relation', 'R'] };
+function fromTile(p) {
+  const [osmType, letter] = LETTERS[p.id % 10] || LETTERS[1];
+  const osmId = Math.floor(p.id / 10), t = p.tags;
+  const street = [t['addr:housenumber'], t['addr:street']].filter(Boolean).join(' ');
+  return { id: `${letter}${osmId}`, osmType, osmId, name: t.name || typeOfTags(t) || '', type: typeOfTags(t) || '',
+    subclass: t.amenity || t.shop || t.tourism || t.leisure || null, address: [street, t['addr:postcode']].filter(Boolean).join(', '), lat: p.lat, lon: p.lon };
+}
+
+/** « pharmacie », « restaurant italien », « vegan » : les plus proches de ce type, dans nos tuiles. */
+async function byIntent(filter, at, limit) {
+  const dLat = 0.032, dLon = 0.048;
+  const places = await placesInBounds({ west: at.lon - dLon, east: at.lon + dLon, south: at.lat - dLat, north: at.lat + dLat }, 9).catch(() => []);
+  return nearestOf(places, filter, at, limit).map(fromTile);
+}
+
+// même lieu vu par deux moteurs : même identifiant, ou même nom tout près
+const sameAs = (a, b) => a.id === b.id || (Math.hypot((a.lon - b.lon) * 0.66, a.lat - b.lat) * 111320 < 250 && norm(a.name) === norm(b.name));
+
+/**
+ * Lieux par leur nom : d'abord sur le téléphone (instantané), puis Photon pour ce que l'index n'a pas.
+ * onEarly(résultats) : appelé tout de suite avec les résultats du téléphone quand ils sont nets, sans attendre Photon.
+ */
+async function findByName(query, at, signal, limit = 7, onEarly = null) {
+  const intent = intentOf(query);
+  if (intent) {
+    const r = await byIntent(intent, at, limit);
+    if (r.length) return r;
+  }
+  const idx = await index();
+  const mine = idx ? searchIndex(idx, query, at, limit) : [];
+  const strong = mine.filter((r) => r.strong);
+  if (strong.length) onEarly?.(strong);
+  let others = [];
+  try {
+    others = await byName(query, at, signal, limit);
+  } catch (e) {
+    if (signal?.aborted) throw e;
+  }
+  // nos résultats nets d'abord, puis ce que Photon ajoute (rues, quartiers, lieux absents de nos données)
+  const extra = others.filter((o) => !mine.some((m) => sameAs(m, o)));
+  return (strong.length ? [...strong, ...extra] : [...extra, ...mine]).slice(0, limit);
+}
+
 /**
  * Lieux et adresses correspondant au texte, les plus pertinents d'abord.
  * Une adresse (texte avec un numéro) part d'abord au géocodeur de l'État ; les noms vont à Photon.
  */
-export async function search(query, at = city.center, signal) {
+export async function search(query, at = city.center, signal, onEarly = null) {
   const q = query.trim();
   if (!q) return [];
   if (city.country === 'FR' && looksLikeAddress(q)) {
     // l'adresse d'abord (rapide) ; Photon n'est consulté que si l'adresse n'est pas nette (un nom de commerce avec un chiffre…)
     const a = await geopf(q, at, signal).catch(() => []);
     if (a[0]?.type === 'Adresse' && a[0].score > 0.8) return a.slice(0, 5);
-    const p = await byName(q, at, signal, 5).catch(() => []);
+    const p = await findByName(q, at, signal, 5).catch(() => []);
     const places = p.filter((r) => r.type !== 'Adresse' && !a.some((x) => near(x, r)));
     return [...a.slice(0, 1), ...places.slice(0, 3), ...a.slice(1)].slice(0, 7);
   }
-  return byName(q, at, signal);
+  return findByName(q, at, signal, 7, onEarly);
 }
 
 /** Lieux portant ce nom, partout (proches de « at » d'abord) : pour retrouver un lieu importé dont on n'a que le nom. */

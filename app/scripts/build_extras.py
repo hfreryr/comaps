@@ -21,7 +21,7 @@ Sortie : extras.json = {"places": {"<id codé comme dans les tuiles>": {"website
                                      "opening_hours": [valeur, source, fin de validité AAAA-MM-JJ], …}, …}}
 Usage :  python app/scripts/build_extras.py paris.osm.pbf --out extras.json [--overture-release 2026-09-23.1]
 """
-import argparse, json, math, re, sys, time, unicodedata, urllib.request
+import argparse, csv, gzip, io, json, math, re, sys, time, unicodedata, urllib.request
 from collections import Counter, defaultdict
 from pathlib import Path
 
@@ -259,6 +259,26 @@ def valid_hours(oh):
 
 # ——— All The Places : ce que les enseignes publient sur leurs sites (CC0) ———
 ATP_LATEST = "https://data.alltheplaces.xyz/runs/latest.json"
+# Notoriété des entités Wikidata (vues des articles Wikipédia sur un an), domaine public (CC0), mise à jour chaque semaine.
+# Sert à classer la recherche : « élysée » → le palais, pas un salon de massage (tests du 15/10/2026).
+QRANK = "https://qrank.toolforge.org/download/qrank.csv.gz"
+
+
+def qrank_subset(wanted, source=QRANK):
+    """{Qid: rang} pour les seules entités de nos lieux (le fichier complet fait ≈ 125 Mo, lu au fil de l'eau)."""
+    if isinstance(source, str) and source.startswith("http"):
+        req = urllib.request.Request(source, headers={"User-Agent": "UntrackedMapsBot/0.1 (+https://untrackedmaps.app/confidentialite)"})
+        raw = urllib.request.urlopen(req, timeout=120)
+    else:
+        raw = open(source, "rb")
+    out = {}
+    with gzip.open(raw, "rt", encoding="utf-8") as f:
+        for row in csv.reader(f):
+            if row[0] in wanted:
+                out[row[0]] = int(row[1])
+    return out
+
+
 ATP_SKIP = re.compile(r"park|stasher|bagbnb|nannybag|bounce|charg|ev_|lime|velib|cityscoot|indigo|onepark|zenpark|yespark|saemes|effia", re.I)
 COORD = re.compile(rb'"coordinates":\s*\[\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)')
 
@@ -377,6 +397,7 @@ def main():
     ap.add_argument("pbf")
     ap.add_argument("--out", default="extras.json")
     ap.add_argument("--overture-release", help="version d'Overture (par défaut : la plus récente)")
+    ap.add_argument("--qrank", help="qrank.csv.gz déjà téléchargé (sinon : le plus récent)")
     ap.add_argument("--atp", help="archive output.zip d'All The Places déjà téléchargée (sinon : la plus récente)")
     args = ap.parse_args()
     t0 = time.time()
@@ -467,8 +488,16 @@ def main():
         put(oid, "opening_hours", cands[0][1][3], "annuaire", has="opening_hours" in tags)
     extras = {k: v for k, v in extras.items() if v}
 
+    # notoriété Wikidata (QRank) des lieux qui ont un identifiant Wikidata, pour classer la recherche (build_search.py)
+    try:
+        qrank = qrank_subset({tags["wikidata"] for _, _, _, tags in items if tags.get("wikidata")}, args.qrank or QRANK)
+        print(f"QRank : {len(qrank)} lieux connus", file=sys.stderr)
+    except Exception as e:  # noqa: BLE001 — une source en panne ne bloque pas les autres
+        print("QRank ignoré :", e, file=sys.stderr)
+        qrank = {}
+
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
-    Path(args.out).write_text(json.dumps({"v": 1, "built": today, "overture": release, "places": extras},
+    Path(args.out).write_text(json.dumps({"v": 1, "built": today, "overture": release, "places": extras, "qrank": qrank},
                                          ensure_ascii=False, separators=(",", ":")))
     print("compléments : " + ", ".join(f"{k} {v}" for k, v in sorted(stats.items())) + f" ; {len(extras)} lieux, en {time.time() - t0:.0f} s")
 

@@ -1,115 +1,776 @@
 {
-  "about": "Recherches de référence pour mesurer la qualité de la recherche (Paris). « wd » : le lieu attendu (identifiant Wikidata, retrouvé dans nos tuiles) ; « name » + « near » : lieu attendu sans Wikidata ; « any » : n'importe quel lieu de ce type autour du point de départ. « at » : point de départ de la recherche (défaut : centre de Paris). Groupes : seance = tapé pendant les tests utilisateurs ; faute = faute de frappe ou de mémoire.",
-  "at": { "lat": 48.8566, "lon": 2.3522 },
-  "queries": [
-    { "q": "grand palais", "wd": "Q457318", "group": "seance" },
-    { "q": "élysée", "wd": "Q188190", "group": "seance" },
-    { "q": "elysee", "wd": "Q188190", "group": "seance" },
-    { "q": "panthéon", "wd": "Q188856", "group": "seance" },
-    { "q": "gare de lyon", "wd": "Q747541", "group": "seance" },
-    { "q": "musées", "any": { "tag": "tourism=museum" }, "group": "seance" },
-
-    { "q": "tour eiffel", "wd": "Q243", "group": "monument" },
-    { "q": "louvre", "wd": "Q19675", "group": "monument" },
-    { "q": "musée du louvre", "wd": "Q19675", "group": "monument" },
-    { "q": "musée d'orsay", "wd": "Q23402", "group": "monument" },
-    { "q": "orsay", "wd": "Q23402", "group": "monument" },
-    { "q": "notre-dame", "wd": "Q2981", "group": "monument" },
-    { "q": "notre dame de paris", "wd": "Q2981", "group": "monument" },
-    { "q": "sacré-cœur", "wd": "Q28785", "group": "monument" },
-    { "q": "arc de triomphe", "wd": "Q64436", "group": "monument" },
-    { "q": "opéra garnier", "wd": "Q187840", "group": "monument" },
-    { "q": "opéra bastille", "wd": "Q638423", "group": "monument" },
-    { "q": "invalides", "wd": "Q188977", "group": "monument" },
-    { "q": "place de la concorde", "wd": "Q189503", "group": "monument" },
-    { "q": "jardin du luxembourg", "wd": "Q309458", "group": "monument" },
-    { "q": "luxembourg", "wd": "Q309458", "group": "monument" },
-    { "q": "buttes-chaumont", "wd": "Q532113", "group": "monument" },
-    { "q": "centre pompidou", "wd": "Q178065", "group": "monument" },
-    { "q": "beaubourg", "wd": "Q178065", "group": "monument" },
-    { "q": "philharmonie", "wd": "Q3378907", "group": "monument" },
-    { "q": "catacombes", "wd": "Q28924", "group": "monument" },
-    { "q": "parc monceau", "wd": "Q1414059", "group": "monument" },
-    { "q": "jardin des plantes", "wd": "Q730948", "group": "monument" },
-    { "q": "saint-sulpice", "wd": "Q295844", "group": "monument" },
-    { "q": "musée rodin", "wd": "Q650519", "group": "monument" },
-    { "q": "musée picasso", "wd": "Q743206", "group": "monument" },
-    { "q": "orangerie", "wd": "Q726781", "group": "monument" },
-    { "q": "sainte-chapelle", "wd": "Q193193", "group": "monument" },
-    { "q": "conciergerie", "wd": "Q138101", "group": "monument" },
-    { "q": "place des vosges", "wd": "Q898629", "group": "monument" },
-    { "q": "père lachaise", "wd": "Q311", "group": "monument" },
-    { "q": "parc de la villette", "wd": "Q246448", "group": "monument" },
-    { "q": "bois de boulogne", "wd": "Q209626", "group": "monument" },
-    { "q": "fondation louis vuitton", "wd": "Q3075489", "group": "monument" },
-    { "q": "palais de tokyo", "wd": "Q1535247", "group": "monument" },
-    { "q": "institut du monde arabe", "wd": "Q860166", "group": "monument" },
-    { "q": "moulin rouge", "wd": "Q151030", "group": "monument" },
-    { "q": "roland garros", "wd": "Q1613027", "group": "monument" },
-    { "q": "parc des princes", "wd": "Q193431", "group": "monument" },
-    { "q": "accor arena", "wd": "Q537720", "group": "monument" },
-    { "q": "bercy", "wd": "Q537720", "group": "monument", "note": "ancien nom de l'Accor Arena ; ambigu (quartier, ministère)" },
-
-    { "q": "gare du nord", "wd": "Q745942", "group": "gare" },
-    { "q": "gare de l'est", "wd": "Q1494172", "group": "gare" },
-    { "q": "gare montparnasse", "wd": "Q631114", "group": "gare" },
-    { "q": "montparnasse", "wd": "Q631114", "group": "gare" },
-    { "q": "saint-lazare", "wd": "Q747506", "group": "gare" },
-    { "q": "gare saint lazare", "wd": "Q747506", "group": "gare" },
-    { "q": "châtelet", "wd": "Q800627", "group": "gare" },
-    { "q": "chatelet les halles", "wd": "Q800627", "group": "gare" },
-    { "q": "bibliothèque françois mitterrand", "wd": "Q2856214", "group": "gare" },
-
-    { "q": "café de flore", "wd": "Q1025686", "group": "commerce" },
-    { "q": "deux magots", "wd": "Q1147912", "group": "commerce" },
-    { "q": "shakespeare and company", "wd": "Q1503157", "group": "commerce" },
-    { "q": "bon marché", "wd": "Q1200698", "group": "commerce" },
-    { "q": "galeries lafayette", "wd": "Q218613", "group": "commerce" },
-    { "q": "hôpital necker", "wd": "Q3145188", "group": "commerce" },
-    { "q": "sorbonne université", "wd": "Q41497113", "group": "commerce" },
-    { "q": "mavrommatis", "name": "Mavrommatis", "near": [2.3517, 48.8403], "group": "commerce" },
-
-    { "q": "tour eifel", "wd": "Q243", "group": "faute" },
-    { "q": "tour eiffell", "wd": "Q243", "group": "faute" },
-    { "q": "grnd palai", "wd": "Q457318", "group": "faute" },
-    { "q": "grand palai", "wd": "Q457318", "group": "faute" },
-    { "q": "sacre coeur", "wd": "Q28785", "group": "faute" },
-    { "q": "sacré coeur", "wd": "Q28785", "group": "faute" },
-    { "q": "musee dorsay", "wd": "Q23402", "group": "faute" },
-    { "q": "chatelet", "wd": "Q800627", "group": "faute" },
-    { "q": "pantheon", "wd": "Q188856", "group": "faute" },
-    { "q": "panteon", "wd": "Q188856", "group": "faute" },
-    { "q": "elisée", "wd": "Q188190", "group": "faute" },
-    { "q": "louvres", "wd": "Q19675", "group": "faute" },
-    { "q": "invalide", "wd": "Q188977", "group": "faute" },
-    { "q": "opera garnier", "wd": "Q187840", "group": "faute" },
-    { "q": "pompidou", "wd": "Q178065", "group": "faute" },
-    { "q": "luxembourg jardin", "wd": "Q309458", "group": "faute" },
-    { "q": "buttes chaumont", "wd": "Q532113", "group": "faute" },
-    { "q": "pere lachaise", "wd": "Q311", "group": "faute" },
-    { "q": "cafe de flore", "wd": "Q1025686", "group": "faute" },
-    { "q": "shakespear and co", "wd": "Q1503157", "group": "faute" },
-    { "q": "arc de triomf", "wd": "Q64436", "group": "faute" },
-    { "q": "montmartre sacré coeur", "wd": "Q28785", "group": "faute" },
-    { "q": "gare de lyon paris", "wd": "Q747541", "group": "faute" },
-    { "q": "orsé", "wd": "Q23402", "group": "faute" },
-    { "q": "musée d orsay", "wd": "Q23402", "group": "faute" },
-    { "q": "catacombe", "wd": "Q28924", "group": "faute" },
-
-    { "q": "pharmacie", "any": { "tag": "amenity=pharmacy" }, "group": "categorie" },
-    { "q": "boulangerie", "any": { "tag": "shop=bakery" }, "group": "categorie" },
-    { "q": "supermarché", "any": { "tag": "shop=supermarket" }, "group": "categorie" },
-    { "q": "toilettes", "any": { "tag": "amenity=toilets" }, "group": "categorie" },
-    { "q": "distributeur", "any": { "tag": "amenity=atm" }, "group": "categorie" },
-    { "q": "musée", "any": { "tag": "tourism=museum" }, "group": "categorie" },
-    { "q": "parc", "any": { "tag": "leisure=park" }, "group": "categorie" },
-    { "q": "cinéma", "any": { "tag": "amenity=cinema" }, "group": "categorie" },
-    { "q": "restaurant végétarien", "any": { "diet": true }, "group": "categorie" },
-    { "q": "vegan", "any": { "diet": true }, "group": "categorie" },
-    { "q": "restaurant italien", "any": { "tag": "cuisine=italian" }, "group": "categorie" },
-    { "q": "hôpital", "any": { "tag": "amenity=hospital" }, "group": "categorie" },
-    { "q": "piscine", "any": { "tag": "leisure=swimming_pool" }, "group": "categorie" },
-    { "q": "monoprix", "any": { "brand": "Monoprix" }, "group": "categorie" },
-    { "q": "franprix", "any": { "brand": "Franprix" }, "group": "categorie" }
-  ]
+ "about": "Recherches de référence pour mesurer la qualité de la recherche (Paris). « wd » : le lieu attendu (identifiant Wikidata, retrouvé dans nos tuiles) ; « name » + « near » : lieu attendu sans Wikidata ; « any » : n'importe quel lieu de ce type autour du point de départ. « at » : point de départ de la recherche (défaut : centre de Paris). Groupes : seance = tapé pendant les tests utilisateurs ; faute = faute de frappe ou de mémoire. Groupe « controle » : ajouté après le réglage de la nouvelle recherche, jamais utilisé pour la régler (mesure honnête).",
+ "at": {
+  "lat": 48.8566,
+  "lon": 2.3522
+ },
+ "queries": [
+  {
+   "q": "grand palais",
+   "wd": "Q457318",
+   "group": "seance"
+  },
+  {
+   "q": "élysée",
+   "wd": "Q188190",
+   "group": "seance"
+  },
+  {
+   "q": "elysee",
+   "wd": "Q188190",
+   "group": "seance"
+  },
+  {
+   "q": "panthéon",
+   "wd": "Q188856",
+   "group": "seance"
+  },
+  {
+   "q": "gare de lyon",
+   "wd": "Q747541",
+   "group": "seance"
+  },
+  {
+   "q": "musées",
+   "any": {
+    "tag": "tourism=museum"
+   },
+   "group": "seance"
+  },
+  {
+   "q": "tour eiffel",
+   "wd": "Q243",
+   "group": "monument"
+  },
+  {
+   "q": "louvre",
+   "wd": "Q19675",
+   "group": "monument"
+  },
+  {
+   "q": "musée du louvre",
+   "wd": "Q19675",
+   "group": "monument"
+  },
+  {
+   "q": "musée d'orsay",
+   "wd": "Q23402",
+   "group": "monument"
+  },
+  {
+   "q": "orsay",
+   "wd": "Q23402",
+   "group": "monument"
+  },
+  {
+   "q": "notre-dame",
+   "wd": "Q2981",
+   "group": "monument"
+  },
+  {
+   "q": "notre dame de paris",
+   "wd": "Q2981",
+   "group": "monument"
+  },
+  {
+   "q": "sacré-cœur",
+   "wd": "Q28785",
+   "group": "monument"
+  },
+  {
+   "q": "arc de triomphe",
+   "wd": "Q64436",
+   "group": "monument"
+  },
+  {
+   "q": "opéra garnier",
+   "wd": "Q187840",
+   "group": "monument"
+  },
+  {
+   "q": "opéra bastille",
+   "wd": "Q638423",
+   "group": "monument"
+  },
+  {
+   "q": "invalides",
+   "wd": "Q188977",
+   "group": "monument"
+  },
+  {
+   "q": "place de la concorde",
+   "wd": "Q189503",
+   "group": "monument"
+  },
+  {
+   "q": "jardin du luxembourg",
+   "wd": "Q309458",
+   "group": "monument"
+  },
+  {
+   "q": "luxembourg",
+   "wd": "Q309458",
+   "group": "monument"
+  },
+  {
+   "q": "buttes-chaumont",
+   "wd": "Q532113",
+   "group": "monument"
+  },
+  {
+   "q": "centre pompidou",
+   "wd": "Q178065",
+   "group": "monument"
+  },
+  {
+   "q": "beaubourg",
+   "wd": "Q178065",
+   "group": "monument"
+  },
+  {
+   "q": "philharmonie",
+   "wd": "Q3378907",
+   "group": "monument"
+  },
+  {
+   "q": "catacombes",
+   "wd": "Q28924",
+   "group": "monument"
+  },
+  {
+   "q": "parc monceau",
+   "wd": "Q1414059",
+   "group": "monument"
+  },
+  {
+   "q": "jardin des plantes",
+   "wd": "Q730948",
+   "group": "monument"
+  },
+  {
+   "q": "saint-sulpice",
+   "wd": "Q295844",
+   "group": "monument"
+  },
+  {
+   "q": "musée rodin",
+   "wd": "Q650519",
+   "group": "monument"
+  },
+  {
+   "q": "musée picasso",
+   "wd": "Q743206",
+   "group": "monument"
+  },
+  {
+   "q": "orangerie",
+   "wd": "Q726781",
+   "group": "monument"
+  },
+  {
+   "q": "sainte-chapelle",
+   "wd": "Q193193",
+   "group": "monument"
+  },
+  {
+   "q": "conciergerie",
+   "wd": "Q138101",
+   "group": "monument"
+  },
+  {
+   "q": "place des vosges",
+   "wd": "Q898629",
+   "group": "monument"
+  },
+  {
+   "q": "père lachaise",
+   "wd": "Q311",
+   "group": "monument"
+  },
+  {
+   "q": "parc de la villette",
+   "wd": "Q246448",
+   "group": "monument"
+  },
+  {
+   "q": "bois de boulogne",
+   "wd": "Q209626",
+   "group": "monument"
+  },
+  {
+   "q": "fondation louis vuitton",
+   "wd": "Q3075489",
+   "group": "monument"
+  },
+  {
+   "q": "palais de tokyo",
+   "wd": "Q1535247",
+   "group": "monument"
+  },
+  {
+   "q": "institut du monde arabe",
+   "wd": "Q860166",
+   "group": "monument"
+  },
+  {
+   "q": "moulin rouge",
+   "wd": "Q151030",
+   "group": "monument"
+  },
+  {
+   "q": "roland garros",
+   "wd": "Q1613027",
+   "group": "monument"
+  },
+  {
+   "q": "parc des princes",
+   "wd": "Q193431",
+   "group": "monument"
+  },
+  {
+   "q": "accor arena",
+   "wd": "Q537720",
+   "group": "monument"
+  },
+  {
+   "q": "bercy",
+   "wd": "Q537720",
+   "group": "monument",
+   "note": "ancien nom de l'Accor Arena ; ambigu (quartier, ministère)"
+  },
+  {
+   "q": "gare du nord",
+   "wd": "Q745942",
+   "group": "gare"
+  },
+  {
+   "q": "gare de l'est",
+   "wd": "Q1494172",
+   "group": "gare"
+  },
+  {
+   "q": "gare montparnasse",
+   "wd": "Q631114",
+   "group": "gare"
+  },
+  {
+   "q": "montparnasse",
+   "wd": "Q631114",
+   "group": "gare"
+  },
+  {
+   "q": "saint-lazare",
+   "wd": "Q747506",
+   "group": "gare"
+  },
+  {
+   "q": "gare saint lazare",
+   "wd": "Q747506",
+   "group": "gare"
+  },
+  {
+   "q": "châtelet",
+   "wd": "Q800627",
+   "group": "gare"
+  },
+  {
+   "q": "chatelet les halles",
+   "wd": "Q800627",
+   "group": "gare"
+  },
+  {
+   "q": "bibliothèque françois mitterrand",
+   "wd": "Q2856214",
+   "group": "gare"
+  },
+  {
+   "q": "café de flore",
+   "wd": "Q1025686",
+   "group": "commerce"
+  },
+  {
+   "q": "deux magots",
+   "wd": "Q1147912",
+   "group": "commerce"
+  },
+  {
+   "q": "shakespeare and company",
+   "wd": "Q1503157",
+   "group": "commerce"
+  },
+  {
+   "q": "bon marché",
+   "wd": "Q1200698",
+   "group": "commerce"
+  },
+  {
+   "q": "galeries lafayette",
+   "wd": "Q218613",
+   "group": "commerce"
+  },
+  {
+   "q": "hôpital necker",
+   "wd": "Q3145188",
+   "group": "commerce"
+  },
+  {
+   "q": "sorbonne université",
+   "wd": "Q41497113",
+   "group": "commerce"
+  },
+  {
+   "q": "mavrommatis",
+   "name": "Mavrommatis",
+   "near": [
+    2.3517,
+    48.8403
+   ],
+   "group": "commerce"
+  },
+  {
+   "q": "tour eifel",
+   "wd": "Q243",
+   "group": "faute"
+  },
+  {
+   "q": "tour eiffell",
+   "wd": "Q243",
+   "group": "faute"
+  },
+  {
+   "q": "grnd palai",
+   "wd": "Q457318",
+   "group": "faute"
+  },
+  {
+   "q": "grand palai",
+   "wd": "Q457318",
+   "group": "faute"
+  },
+  {
+   "q": "sacre coeur",
+   "wd": "Q28785",
+   "group": "faute"
+  },
+  {
+   "q": "sacré coeur",
+   "wd": "Q28785",
+   "group": "faute"
+  },
+  {
+   "q": "musee dorsay",
+   "wd": "Q23402",
+   "group": "faute"
+  },
+  {
+   "q": "chatelet",
+   "wd": "Q800627",
+   "group": "faute"
+  },
+  {
+   "q": "pantheon",
+   "wd": "Q188856",
+   "group": "faute"
+  },
+  {
+   "q": "panteon",
+   "wd": "Q188856",
+   "group": "faute"
+  },
+  {
+   "q": "elisée",
+   "wd": "Q188190",
+   "group": "faute"
+  },
+  {
+   "q": "louvres",
+   "wd": "Q19675",
+   "group": "faute"
+  },
+  {
+   "q": "invalide",
+   "wd": "Q188977",
+   "group": "faute"
+  },
+  {
+   "q": "opera garnier",
+   "wd": "Q187840",
+   "group": "faute"
+  },
+  {
+   "q": "pompidou",
+   "wd": "Q178065",
+   "group": "faute"
+  },
+  {
+   "q": "luxembourg jardin",
+   "wd": "Q309458",
+   "group": "faute"
+  },
+  {
+   "q": "buttes chaumont",
+   "wd": "Q532113",
+   "group": "faute"
+  },
+  {
+   "q": "pere lachaise",
+   "wd": "Q311",
+   "group": "faute"
+  },
+  {
+   "q": "cafe de flore",
+   "wd": "Q1025686",
+   "group": "faute"
+  },
+  {
+   "q": "shakespear and co",
+   "wd": "Q1503157",
+   "group": "faute"
+  },
+  {
+   "q": "arc de triomf",
+   "wd": "Q64436",
+   "group": "faute"
+  },
+  {
+   "q": "montmartre sacré coeur",
+   "wd": "Q28785",
+   "group": "faute"
+  },
+  {
+   "q": "gare de lyon paris",
+   "wd": "Q747541",
+   "group": "faute"
+  },
+  {
+   "q": "orsé",
+   "wd": "Q23402",
+   "group": "faute"
+  },
+  {
+   "q": "musée d orsay",
+   "wd": "Q23402",
+   "group": "faute"
+  },
+  {
+   "q": "catacombe",
+   "wd": "Q28924",
+   "group": "faute"
+  },
+  {
+   "q": "pharmacie",
+   "any": {
+    "tag": "amenity=pharmacy"
+   },
+   "group": "categorie"
+  },
+  {
+   "q": "boulangerie",
+   "any": {
+    "tag": "shop=bakery"
+   },
+   "group": "categorie"
+  },
+  {
+   "q": "supermarché",
+   "any": {
+    "tag": "shop=supermarket"
+   },
+   "group": "categorie"
+  },
+  {
+   "q": "toilettes",
+   "any": {
+    "tag": "amenity=toilets"
+   },
+   "group": "categorie"
+  },
+  {
+   "q": "distributeur",
+   "any": {
+    "tag": "amenity=atm"
+   },
+   "group": "categorie"
+  },
+  {
+   "q": "musée",
+   "any": {
+    "tag": "tourism=museum"
+   },
+   "group": "categorie"
+  },
+  {
+   "q": "parc",
+   "any": {
+    "tag": "leisure=park"
+   },
+   "group": "categorie"
+  },
+  {
+   "q": "cinéma",
+   "any": {
+    "tag": "amenity=cinema"
+   },
+   "group": "categorie"
+  },
+  {
+   "q": "restaurant végétarien",
+   "any": {
+    "diet": true
+   },
+   "group": "categorie"
+  },
+  {
+   "q": "vegan",
+   "any": {
+    "diet": true
+   },
+   "group": "categorie"
+  },
+  {
+   "q": "restaurant italien",
+   "any": {
+    "tag": "cuisine=italian"
+   },
+   "group": "categorie"
+  },
+  {
+   "q": "hôpital",
+   "any": {
+    "tag": "amenity=hospital"
+   },
+   "group": "categorie"
+  },
+  {
+   "q": "piscine",
+   "any": {
+    "tag": "leisure=swimming_pool"
+   },
+   "group": "categorie"
+  },
+  {
+   "q": "monoprix",
+   "any": {
+    "brand": "Monoprix"
+   },
+   "group": "categorie"
+  },
+  {
+   "q": "franprix",
+   "any": {
+    "brand": "Franprix"
+   },
+   "group": "categorie"
+  },
+  {
+   "q": "musée carnavalet",
+   "wd": "Q640447",
+   "group": "controle"
+  },
+  {
+   "q": "carnavalet",
+   "wd": "Q640447",
+   "group": "controle"
+  },
+  {
+   "q": "jardin des tuileries",
+   "wd": "Q818517",
+   "group": "controle"
+  },
+  {
+   "q": "tuileries",
+   "wd": "Q818517",
+   "group": "controle"
+  },
+  {
+   "q": "tuilleries",
+   "wd": "Q818517",
+   "group": "controle"
+  },
+  {
+   "q": "pont neuf",
+   "wd": "Q335277",
+   "group": "controle"
+  },
+  {
+   "q": "hôtel de ville",
+   "wd": "Q640968",
+   "group": "controle"
+  },
+  {
+   "q": "gare d'austerlitz",
+   "wd": "Q734017",
+   "group": "controle"
+  },
+  {
+   "q": "austerlitz",
+   "wd": "Q734017",
+   "group": "controle"
+  },
+  {
+   "q": "place de la république",
+   "wd": "Q175055",
+   "group": "controle"
+  },
+  {
+   "q": "republique",
+   "wd": "Q175055",
+   "group": "controle"
+  },
+  {
+   "q": "trocadéro",
+   "wd": "Q1272925",
+   "group": "controle"
+  },
+  {
+   "q": "trocadero",
+   "wd": "Q1272925",
+   "group": "controle"
+  },
+  {
+   "q": "musée marmottan",
+   "wd": "Q1327886",
+   "group": "controle"
+  },
+  {
+   "q": "marmottan",
+   "wd": "Q1327886",
+   "group": "controle"
+  },
+  {
+   "q": "jacquemart andré",
+   "wd": "Q1165526",
+   "group": "controle"
+  },
+  {
+   "q": "jaquemart andre",
+   "wd": "Q1165526",
+   "group": "controle"
+  },
+  {
+   "q": "samaritaine",
+   "wd": "Q1583780",
+   "group": "controle"
+  },
+  {
+   "q": "parc montsouris",
+   "wd": "Q1538929",
+   "group": "controle"
+  },
+  {
+   "q": "montsouri",
+   "wd": "Q1538929",
+   "group": "controle"
+  },
+  {
+   "q": "parc de bercy",
+   "wd": "Q945251",
+   "group": "controle"
+  },
+  {
+   "q": "musée grévin",
+   "wd": "Q1265070",
+   "group": "controle"
+  },
+  {
+   "q": "grevin",
+   "wd": "Q1265070",
+   "group": "controle"
+  },
+  {
+   "q": "cité des sciences",
+   "wd": "Q1094338",
+   "group": "controle"
+  },
+  {
+   "q": "musée de cluny",
+   "wd": "Q1124095",
+   "group": "controle"
+  },
+  {
+   "q": "cluny",
+   "wd": "Q1124095",
+   "group": "controle"
+  },
+  {
+   "q": "théâtre du châtelet",
+   "wd": "Q1469315",
+   "group": "controle"
+  },
+  {
+   "q": "le procope",
+   "wd": "Q751293",
+   "group": "controle"
+  },
+  {
+   "q": "procope",
+   "wd": "Q751293",
+   "group": "controle"
+  },
+  {
+   "q": "hôpital saint-louis",
+   "wd": "Q1569396",
+   "group": "controle"
+  },
+  {
+   "q": "église de la madeleine",
+   "wd": "Q330564",
+   "group": "controle"
+  },
+  {
+   "q": "la madeleine",
+   "wd": "Q330564",
+   "group": "controle"
+  },
+  {
+   "q": "pont alexandre iii",
+   "wd": "Q390418",
+   "group": "controle"
+  },
+  {
+   "q": "pont alexandre 3",
+   "wd": "Q390418",
+   "group": "controle"
+  },
+  {
+   "q": "musée de l'armée",
+   "wd": "Q1996069",
+   "group": "controle"
+  },
+  {
+   "q": "fleuriste",
+   "any": {
+    "tag": "shop=florist"
+   },
+   "group": "controle"
+  },
+  {
+   "q": "librairie",
+   "any": {
+    "tag": "shop=books"
+   },
+   "group": "controle"
+  },
+  {
+   "q": "laverie",
+   "any": {
+    "tag": "shop=laundry"
+   },
+   "group": "controle"
+  },
+  {
+   "q": "coiffeur",
+   "any": {
+    "tag": "shop=hairdresser"
+   },
+   "group": "controle"
+  },
+  {
+   "q": "pharmacie de garde",
+   "any": {
+    "tag": "amenity=pharmacy"
+   },
+   "group": "controle"
+  }
+ ]
 }

@@ -44,6 +44,9 @@ jobs:
       - if: steps.fresh.outputs.skip != 'true'
         run: python app/scripts/build_places.py paris.osm.pbf --out out/places --facades facades.json --extras extras.json
       - if: steps.fresh.outputs.skip != 'true'
+        name: Index de recherche (recherche sur le téléphone, notoriété QRank lue dans extras.json)
+        run: python app/scripts/build_search.py out/places --extras extras.json
+      - if: steps.fresh.outputs.skip != 'true'
         name: "Garde-fou : si l'extrait paraît tronqué ou vide, on ne publie pas"
         run: python -c "import json,sys; i=json.load(open('out/places/index.json')); n=len(i['tiles']); print(n,'tuiles'); sys.exit(0 if n >= 50 else 1)"
       - if: steps.fresh.outputs.skip != 'true'

@@ -1,0 +1,54 @@
+# Recherche
+
+## Le problème (tests utilisateurs du 15/10/2026)
+
+Le souci est double, et chaque moitié a sa propre solution :
+
+1. **Lenteur.** Photon (instance publique de komoot) a mis 12 à 13 s à répondre vers 21 h 20, contre 0,9 à 2,1 s vers 0 h 30. L'app attendait 4 s avant de se rabattre sur une recherche de secours médiocre.
+   - Hypothèse : une surcharge du service partagé en soirée. Elle n'est pas prouvée ; la sonde (`app/scripts/sonde_services.py`, toutes les 15 min) mesure ce temps de réponse heure par heure.
+2. **Pertinence.** P6 et P7 ont insisté sur la qualité de la recherche de Google Maps. Exemples :
+   - « élysée » donnait un salon de massage avant le palais ;
+   - « grand palais » donnait des bureaux ;
+   - des arrêts de bus et des stations de taxi apparaissaient dans les résultats.
+
+## La solution : chercher sur le téléphone
+
+Un **index des 71 000 lieux nommés de Paris**, préparé chaque nuit et téléchargé une fois sur le téléphone (≈ 1,6 Mo compressé), est chargé dès qu'on touche la barre de recherche.
+
+- **Fautes de frappe tolérées** : une lettre fausse, en trop ou inversée ; deux lettres pour les mots longs. Les élisions sont comprises (« dorsay » trouve « d'Orsay »).
+- **Notoriété** : [QRank](https://qrank.toolforge.org/) mesure les vues Wikipédia de l'entité Wikidata du lieu sur un an. Ces données sont dans le domaine public (CC0) et mises à jour chaque semaine.
+  - Un lieu connu passe devant un homonyme proche.
+  - Le fichier complet fait 125 Mo ; on n'en garde que les 4 500 lieux parisiens qui ont un identifiant Wikidata, dans `extras.json`.
+- **Doublons fusionnés** : même identifiant Wikidata, ou même nom à moins de 200 m. Une gare donne un seul résultat, pas ses quais et ses entrées.
+- **Type de lieu** : une gare, un musée ou un parc passent avant un parking ou des bureaux. Les entrées de métro, les quais, les taxis et les stations Vélib sont écartés.
+- **Recherches par type** : « pharmacie », « restaurant italien », « vegan », « toilettes »… donnent les lieux de ce type les plus proches, lus dans nos tuiles.
+- **Photon reste consulté** pour ce que l'index n'a pas (rues sans numéro, quartiers, lieux absents de nos données). Ses réponses s'ajoutent sous les nôtres quand elles arrivent, sans faire attendre les premières.
+
+## Mesure
+
+Le jeu de référence compte 144 recherches (`app/tests/search/reference.json`) ; la mesure se lance avec `npm run search-eval`.
+
+| | Bon lieu en 1er | Dans les 3 premiers | Temps médian |
+|---|---|---|---|
+| Recherche sur le téléphone | **90 %** | **97 %** | **0,014 s** |
+| Photon (ancienne recherche) | 76 % | 85 % | 1,5 s |
+| Ancien secours local | 56 % | 67 % | 0,04 s |
+
+⚠️ **Honnêteté de la mesure** : la recherche a été réglée en regardant 104 de ces recherches.
+- Les **40 du groupe « contrôle »** ont été écrites après le réglage et n'ont pas servi à régler. Sur ce groupe : **93 %** en premier pour nous, **90 %** pour Photon.
+- Sur les lieux connus, sans faute, l'écart avec Photon est donc faible.
+- Le vrai gain porte sur :
+  - les fautes de frappe : 81 % contre 73 % ;
+  - les types de lieux : 100 % contre 33 % (réglés sur ce jeu) ;
+  - les recherches des tests utilisateurs : 6 sur 6 contre 4 sur 6 ;
+  - la vitesse.
+
+## Fabrication
+
+- `app/scripts/build_extras.py` (chaque lundi) : notoriété QRank des lieux qui ont un identifiant Wikidata (clé `qrank` d'`extras.json`).
+- `app/scripts/build_search.py` (chaque nuit, après les tuiles) : écrit `data/places/search.json`.
+- `app/src/lib/searchindex.js` contient la recherche, `searchintent.js` les types de lieux et `geocode.js` l'assemblage avec Photon et le géocodeur de l'État.
+
+## Passage à l'échelle
+
+Un index par ville, ou par tuile pour le monde entier, sur le modèle des tuiles de lieux. QRank couvre toute la planète.

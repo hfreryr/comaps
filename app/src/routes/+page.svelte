@@ -282,7 +282,10 @@
       controller = new AbortController();
       try {
         const c = map?.getCenter();
-        results = await search(q, c ? { lat: c.lat, lon: c.lng } : PARIS, controller.signal);
+        // résultats du téléphone tout de suite, complétés par Photon quand il répond (geocode.js)
+        const ctl = controller;
+        const early = (r) => { if (!ctl.signal.aborted) { results = r; active = -1; } };
+        results = await search(q, c ? { lat: c.lat, lon: c.lng } : PARIS, controller.signal, early);
         active = -1;
       } catch (e) {
         if (e.name !== 'AbortError') {
