@@ -92,6 +92,12 @@ const tests = {
     assert((det.match(/Source : Overture Maps/g) || []).length === 2, `source non indiquée : ${det}`);
     assert(!errors.length, errors.join(' | '));
     await ctx.close();
+    // Square Léo Ferré : horaires absents d'OSM, donnés par la Ville de Paris pour la saison en cours
+    ({ p, ctx, errors } = await page({}, '#carte=18/48.849688/2.380574&lieu=way/25423021'));
+    await p.waitForSelector('.sheet h1', { timeout: 15000 }); await p.waitForTimeout(2000);
+    const sq = await p.$eval('.sheet', (e) => e.innerText);
+    assert(/18:30|18 h 30/.test(sq) && /Source : Ville de Paris/.test(sq), `horaires de la Ville absents : ${sq.slice(0, 300)}`);
+    await ctx.close();
     // Panthéon : rien de complété, aucune mention de source
     ({ p, ctx, errors } = await page({}, '#carte=18/48.846219/2.346008&lieu=way/16407465'));
     await p.waitForSelector('.sheet h1', { timeout: 15000 }); await p.waitForTimeout(2000);

@@ -10,7 +10,7 @@
   // État et actions de la page (voir le bloc « app » de +page.svelte)
   const app = getContext('app');
   // Sources des compléments hors OSM (app/scripts/build_extras.py) ; une source inconnue n'est pas affichée
-  const SOURCES = { overture: () => tx('source.overture') };
+  const SOURCES = { overture: () => tx('source.overture'), paris: () => tx('source.paris') };
 </script>
 
 {#snippet transitBlock()}
@@ -107,6 +107,7 @@
           <table class="week"><tbody>
             {#each app.week as d}<tr class:today={d.today}><th>{d.day}</th><td>{d.text}</td></tr>{/each}
           </tbody></table>
+          {#if app.info?.sources?.opening_hours}<p class="details-src">{@render src(app.info.sources.opening_hours)}</p>{/if}
         </section>
       {:else if app.info?.expectsHours && !app.isStation}
         <section class="psec">
@@ -155,7 +156,7 @@
         <p class="contrib">{tx('fiche.lieu_introuvable')}</p>
       {/if}
       <p class="contrib">
-        {#if app.osmDate}{tx('fiche.donnees_openstreetmap_du', { osmDate: app.osmDate })} {/if}{tx('fiche.une_info_manque_ou_est_fausse')}
+        {#if app.osmDate}{tx('fiche.donnees_openstreetmap_du', { osmDate: app.osmDate })}{' '}{/if}{tx('fiche.une_info_manque_ou_est_fausse')}
         {#if app.osmEditUrl}<a href={app.osmEditUrl} target="_blank" rel="noopener">{tx('fiche.completez_la_sur_openstreetmap')}</a>{:else}<a href={app.osmNoteUrl} target="_blank" rel="noopener">{tx('fiche.signalez_la_sur_openstreetmap')}</a>{/if}{tx('fiche.la_carte_libre_que_nous_utilisons')}
       </p>
 {/snippet}
@@ -348,7 +349,8 @@
   .details dt { font-size: 13px; color: var(--muted); }
   .details dd { margin: 2px 0 0; font-size: 15.5px; overflow-wrap: anywhere; }
   .details a { color: var(--accent); text-decoration: none; }
-  .details .src { display: block; font-size: 12.5px; color: var(--muted); margin-top: 1px; }
+  .details .src, .details-src .src { display: block; font-size: 12.5px; color: var(--muted); margin-top: 1px; }
+  .details-src { margin: 6px 0 0; }
   .sc-note { margin: 14px 0 0; font-size: 14.5px; color: var(--muted); }
   .end-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 22px; }
   .end-btn { display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 46px; border: 0; border-radius: 14px; background: var(--fill);

@@ -11,9 +11,12 @@ Règles :
   - rien de ce fichier n'est envoyé dans OSM.
 
 Sources branchées :
-  - overture : site web et téléphone (Overture Maps Foundation, CDLA-Permissive 2.0), lus par HTTPS sans identifiants.
+  - overture : site web et téléphone (Overture Maps Foundation, CDLA-Permissive 2.0), lus par HTTPS sans identifiants ;
+  - paris : horaires des parcs, squares, piscines, bibliothèques, musées et mairies (Ville de Paris, ODbL), seulement
+    pour la période en vigueur (horaires d'été, d'hiver…).
 
-Sortie : extras.json = {"<id codé comme dans les tuiles>": {"website": [valeur, source], "phone": [valeur, source]}, …}
+Sortie : extras.json = {"places": {"<id codé comme dans les tuiles>": {"website": [valeur, source],
+                                     "opening_hours": [valeur, source, fin de validité AAAA-MM-JJ], …}, …}}
 Usage :  python app/scripts/build_extras.py paris.osm.pbf --out extras.json [--overture-release 2026-09-23.1]
 """
 import argparse, json, math, re, sys, time, unicodedata, urllib.request
@@ -115,26 +118,128 @@ def overture_places(release, bbox):
     """).fetchall()
 
 
-def match_overture(items, rows):
-    """Associe chaque lieu Overture au lieu OSM le plus proche portant le même nom (40 m au plus)."""
+def match_rows(items, rows, radius, keep):
+    """Associe chaque ligne (nom, lat, lon, …) au lieu OSM le plus proche portant le même nom, à `radius` m au plus,
+    parmi les lieux retenus par `keep`. Renvoie {index du lieu OSM : [(distance, ligne), …]}."""
     grid = defaultdict(list)
     for i, (oid, lon, lat, tags) in enumerate(items):
-        if tags.get("name") and completable(tags):
+        if tags.get("name") and keep(tags):
             grid[(int(lat * 1000), int(lon * 1000))].append(i)
+    reach = max(1, math.ceil(radius / 70))  # une case de la grille ≈ 74 m de large, 111 m de haut
     found = {}
-    for name, lat, lon, websites, phones, conf in rows:
+    for row in rows:
+        name, lat, lon = row[0], row[1], row[2]
         best = None
         gi, gj = int(lat * 1000), int(lon * 1000)
-        for a in (-1, 0, 1):
-            for b in (-1, 0, 1):
+        for a in range(-reach, reach + 1):
+            for b in range(-reach, reach + 1):
                 for i in grid.get((gi + a, gj + b), ()):
                     oid, olon, olat, tags = items[i]
                     d = meters(lat, lon, olat, olon)
-                    if d <= 40 and same_name(name, tags["name"]) and (best is None or d < best[0]):
+                    if d <= radius and same_name(name, tags["name"]) and (best is None or d < best[0]):
                         best = (d, i)
         if best:
-            found.setdefault(best[1], []).append((best[0], websites or [], phones or []))
+            found.setdefault(best[1], []).append((best[0], row))
     return found
+
+
+def match_overture(items, rows):
+    """Lieux Overture (nom, lat, lon, sites, téléphones, confiance) : même nom à 40 m au plus."""
+    found = match_rows(items, rows, 40, completable)
+    return {i: [(d, r[3] or [], r[4] or []) for d, r in c] for i, c in found.items()}
+
+
+# ——— Ville de Paris : horaires des parcs, squares, piscines, bibliothèques, musées, mairies (ODbL) ———
+PARIS_API = "https://opendata.paris.fr/api/explore/v2.1/catalog/datasets/{}/exports/json"
+PARIS_SETS = ("ilots-de-fraicheur-espaces-verts-frais", "ilots-de-fraicheur-equipements-activites")
+PARIS_TYPES = {"Promenades ouvertes", "Bois", "Jardinets décoratifs", "Jardins grandes institutions", "Piscine", "Bibliothèque",
+               "Musée", "Mairie d'arrondissement", "Bains-douches", "Baignade extérieure"}
+DAYS = (("lundi", "Mo"), ("mardi", "Tu"), ("mercredi", "We"), ("jeudi", "Th"), ("vendredi", "Fr"), ("samedi", "Sa"), ("dimanche", "Su"))
+SPAN = re.compile(r"(\d{1,2})\s*[h:H]\s*(\d{2})?\s*[-–]\s*(\d{1,2})\s*[h:H]\s*(\d{2})?")
+
+
+def paris_keep(tags):
+    """Lieux OSM que la Ville décrit : parcs et jardins, piscines, bibliothèques, musées, mairies, bains-douches."""
+    return tags.get("leisure") in ("park", "garden", "sports_centre", "swimming_pool", "nature_reserve") or tags.get("amenity") in (
+        "library", "townhall", "public_bath", "shower") or tags.get("tourism") == "museum"
+
+
+def day_hours(text):
+    """« 07h00 - 08h30 / 11h30 - 13h30 » → « 07:00-08:30,11:30-13:30 » ; « - » ou « Fermé » → « off » ; illisible → None."""
+    t = (text or "").strip()
+    if t in ("-", "–") or t.lower().startswith("ferm"):
+        return "off"
+    parts = [p.strip() for p in t.split("/")]
+    spans = []
+    for p in parts:
+        m = SPAN.fullmatch(p)
+        if not m:
+            return None
+        h1, m1, h2, m2 = int(m[1]), int(m[2] or 0), int(m[3]), int(m[4] or 0)
+        if h1 > 24 or h2 > 24:
+            return None
+        spans.append(f"{h1:02d}:{m1:02d}-{h2:02d}:{m2:02d}")
+    return ",".join(spans) or None
+
+
+def paris_opening_hours(rec):
+    """Horaires de la semaine au format OSM (« Mo-Fr 08:00-21:30; Sa,Su 09:00-21:30 »), ou None si incomplets."""
+    if rec.get("ouvert_24h") == "Oui":
+        return "24/7"
+    week = []
+    for fr, osm in DAYS:
+        v = day_hours(rec.get(f"horaires_{fr}"))
+        if v is None:
+            return None
+        week.append((osm, v))
+    if all(v == "off" for _, v in week):
+        return None
+    groups = []  # jours consécutifs aux mêmes horaires
+    for osm, v in week:
+        if groups and groups[-1][2] == v:
+            groups[-1][1] = osm
+        else:
+            groups.append([osm, osm, v])
+    out = []
+    for a, b, v in groups:
+        if v == "off":
+            continue
+        days = a if a == b else (f"{a},{b}" if [d for _, d in DAYS].index(b) - [d for _, d in DAYS].index(a) == 1 else f"{a}-{b}")
+        out.append(f"{days} {v}")
+    return "; ".join(out)
+
+
+def paris_period(text, today):
+    """Période de validité « du 01/10/26 au 24/10/26 » → date de fin (AAAA-MM-JJ) si elle couvre aujourd'hui ;
+    None si la période est passée ou à venir ; "" s'il n'y a pas de période."""
+    m = re.search(r"du (\d\d)/(\d\d)/(\d\d) au (\d\d)/(\d\d)/(\d\d)", text or "")
+    if not m:
+        return ""
+    start = f"20{m[3]}-{m[2]}-{m[1]}"
+    end = f"20{m[6]}-{m[5]}-{m[4]}"
+    return end if start <= today <= end else None
+
+
+def paris_rows(records, today):
+    """Lignes (nom, lat, lon, horaires, fin de validité) des lieux de la Ville aux horaires lisibles et en vigueur."""
+    rows = []
+    for r in records:
+        if r.get("type") not in PARIS_TYPES or not r.get("geo_point_2d") or not r.get("nom"):
+            continue
+        until = paris_period(r.get("horaires_periode"), today)
+        hours = paris_opening_hours(r)
+        if until is None or not hours:
+            continue
+        g = r["geo_point_2d"]
+        rows.append((r["nom"], g["lat"], g["lon"], hours, until))
+    return rows
+
+
+def paris_records():
+    out = []
+    for name in PARIS_SETS:
+        out += json.load(urllib.request.urlopen(PARIS_API.format(name), timeout=120))
+    return out
 
 
 def main():
@@ -176,9 +281,25 @@ def main():
             extras[str(oid)]["phone"] = [tel, "overture"]
             stats["tel"] += 1
 
-    Path(args.out).write_text(json.dumps({"v": 1, "built": time.strftime("%Y-%m-%d"), "overture": release, "places": extras},
+    today = time.strftime("%Y-%m-%d")
+    try:
+        prows = paris_rows(paris_records(), today)
+    except Exception as e:  # une source en panne ne bloque pas les autres
+        print("Ville de Paris ignorée :", e, file=sys.stderr)
+        prows = []
+    for i, cands in match_rows(items, prows, 150, paris_keep).items():
+        oid, lon, lat, tags = items[i]
+        if "opening_hours" in tags:
+            continue
+        _, (name, _, _, hours, until) = min(cands, key=lambda c: c[0])
+        extras[str(oid)]["opening_hours"] = [hours, "paris", until] if until else [hours, "paris"]
+        stats["horaires"] += 1
+
+    Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+    Path(args.out).write_text(json.dumps({"v": 1, "built": today, "overture": release, "places": extras},
                                          ensure_ascii=False, separators=(",", ":")))
-    print(f"compléments : {stats['site']} sites, {stats['tel']} téléphones, pour {len(extras)} lieux, en {time.time() - t0:.0f} s")
+    print(f"compléments : {stats['site']} sites, {stats['tel']} téléphones, {stats['horaires']} horaires, "
+          f"pour {len(extras)} lieux, en {time.time() - t0:.0f} s")
 
 
 if __name__ == "__main__":
