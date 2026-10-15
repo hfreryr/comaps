@@ -166,3 +166,31 @@ def test_lieux_cherches():
     assert not wanted({"amenity": "restaurant", "opening_hours": "Mo-Su 12:00-22:00"})
     assert not wanted({"amenity": "bank"})
     assert similar("Restaurant Petrus", "Petrus Paris") and not similar("Café de Paris", "Paris Brasserie")
+
+
+# ——— Rythme des lectures et archive Common Crawl ———
+from build_sitehours import due, norm_path, reg_candidates, host_of
+
+
+def test_rythme_des_lectures():
+    assert due(None, "2026-10-15")
+    assert not due({"checked": "2026-10-01", "hours": "Mo-Fr 09:00-18:00"}, "2026-10-15")   # 14 jours : trop tôt
+    assert due({"checked": "2026-09-10", "hours": "Mo-Fr 09:00-18:00"}, "2026-10-15")       # 35 jours : on relit
+    assert not due({"checked": "2026-08-01", "hours": None}, "2026-10-15")                  # sans horaires : 75 jours, trop tôt
+    assert due({"checked": "2026-07-01", "hours": None}, "2026-10-15")                      # 106 jours : on relit
+    assert due({"checked": "2026-09-10", "hours": None, "via": "échec"}, "2026-10-15")      # injoignable : réessai à 28 jours
+    assert not due({"checked": "2026-10-08", "hours": None, "via": "échec"}, "2026-10-15")
+
+
+def test_adresses_archive():
+    assert norm_path("") == "/" and norm_path("/fr/") == "/fr" and norm_path("/") == "/"
+    assert host_of("https://www.Resto.fr/menu") == "www.resto.fr" and host_of("resto.fr") == "resto.fr"
+    assert reg_candidates("resto.fr") == {"resto.fr"}
+    assert reg_candidates("boutique.marque.co.uk") == {"co.uk", "marque.co.uk"}
+
+
+def test_cle_archive():
+    from build_sitehours import surt
+    assert surt("https://www.Resto.fr/") == "fr,resto)/"
+    assert surt("resto.fr") == "fr,resto)/"
+    assert surt("https://www.5asec.fr/fr/Magasin/pressing/") == "fr,5asec)/fr/magasin/pressing"

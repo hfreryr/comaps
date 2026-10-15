@@ -65,3 +65,12 @@ Principe retenu par le porteur du projet : **ce qui est frugal et passe à l'éc
 3. Les règles de rapprochement des noms à adapter par langue (aujourd'hui : français).
 
 Scripts : `pipeline/mesures_sources/cc_dom.py`, `cc_hours.py`.
+
+### Mis en place le 15/10/2026 (`build_sitehours.py`)
+
+- **Common Crawl d'abord** (2 dernières copies) : présence des domaines par l'index en colonnes, puis l'index compact pour trouver la page exacte du lieu, puis la page elle-même dans l'archive. Seulement la page exacte : pour une chaîne, la page d'accueil donnerait les horaires du siège.
+- **Visite du site ensuite**, seulement si l'archive ne l'a pas, avec la question « la page a-t-elle changé ? ».
+- **Rythme** : un site n'est pas relu avant 28 jours s'il publie ses horaires (ou s'il était injoignable), 90 jours sinon. L'état est gardé dans `data/sitehours.json`.
+
+Essai sur 400 sites parisiens : semaine 1, **115 lus dans l'archive sans visite**, 285 visites tentées au lieu de 400 (**−29 %**), **26 horaires** (24 avec les seules visites) ; semaine 2, **aucune visite**, horaires conservés, 46 s de calcul.
+
