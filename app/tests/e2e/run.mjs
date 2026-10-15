@@ -139,6 +139,18 @@ const tests = {
     assert(!errors.length, errors.join(' | '));
     await ctx.close();
   },
+  async 'exemples de recherche : toucher « restaurant ouvert demain dans le 8e » lance la recherche'() {
+    const { p, ctx, errors } = await page();
+    await p.click('#search'); await p.waitForSelector('.results li.example', { timeout: 5000 });
+    assert((await p.locator('.results li.example').count()) === 3, 'exemples absents');
+    await p.dispatchEvent('.results li.example button >> nth=0', 'mousedown'); await p.waitForTimeout(2500);
+    assert((await p.$eval('#search', (e) => e.value)) === 'restaurant ouvert demain dans le 8e', 'texte non repris');
+    assert(/8e arrondissement/.test(await p.$eval('.results li.opt', (e) => e.innerText)), 'suggestion sans le 8e');
+    await pick(p); await p.waitForTimeout(6000);
+    assert(/ouverts? demain/.test(await p.$eval('.sheet .kind', (e) => e.textContent)), 'filtre « demain » non appliqué');
+    assert(!errors.length, errors.join(' | '));
+    await ctx.close();
+  },
   async 'adresse via Géoplateforme'() {
     const { p, ctx } = await page();
     await p.fill('#search', '57 rue de rennes'); await p.waitForSelector('.results li.opt', { timeout: 30000 });

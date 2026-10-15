@@ -96,7 +96,7 @@
   .lens { width: 20px; height: 20px; justify-self: center; color: var(--muted); stroke-width: 2.2; }
   input {
     border: 0; background: none; font: inherit; font-size: 17px; color: var(--ink);
-    padding: 12px 0; min-width: 0; outline: none; width: 100%;
+    padding: 12px 16px 12px 0; min-width: 0; outline: none; width: 100%;   /* marge à droite : le texte ne touche plus le bord */
   }
   input::placeholder { color: var(--muted); }
   input::-webkit-search-cancel-button { display: none; }
