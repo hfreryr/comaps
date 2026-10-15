@@ -139,6 +139,18 @@ const tests = {
     assert(!errors.length, errors.join(' | '));
     await ctx.close();
   },
+  async 'exemples de recherche : toucher « restaurant ouvert demain dans le 8e » lance la recherche'() {
+    const { p, ctx, errors } = await page();
+    await p.click('#search'); await p.waitForSelector('.results li.example', { timeout: 5000 });
+    assert((await p.locator('.results li.example').count()) === 3, 'exemples absents');
+    await p.dispatchEvent('.results li.example button >> nth=0', 'mousedown'); await p.waitForTimeout(2500);
+    assert((await p.$eval('#search', (e) => e.value)) === 'restaurant ouvert demain dans le 8e', 'texte non repris');
+    assert(/8e arrondissement/.test(await p.$eval('.results li.opt', (e) => e.innerText)), 'suggestion sans le 8e');
+    await pick(p); await p.waitForTimeout(6000);
+    assert(/ouverts? demain/.test(await p.$eval('.sheet .kind', (e) => e.textContent)), 'filtre « demain » non appliqué');
+    assert(!errors.length, errors.join(' | '));
+    await ctx.close();
+  },
   async 'adresse via Géoplateforme'() {
     const { p, ctx } = await page();
     await p.fill('#search', '57 rue de rennes'); await p.waitForSelector('.results li.opt', { timeout: 30000 });
@@ -247,6 +259,15 @@ const tests = {
     assert(!errors.length, errors.join(' | '));
     await ctx.close();
   },
+  async 'raccourcis : 5 par défaut, bouton « + » visible sans faire défiler'() {
+    const { p, ctx, errors } = await page();
+    const chips = await p.$$eval('.chips .chip', (els) => els.map((e) => e.textContent.trim()));
+    assert(chips.join('|') === 'Mes lieux|Restaurants|Cafés|Métro|Pharmacies', `raccourcis par défaut : ${chips.join(', ')}`);
+    const b = await p.$eval('.chip.add', (e) => e.getBoundingClientRect());
+    assert(b.right <= 390 && b.left >= 0 && b.width > 20, `bouton + hors de l'écran : ${JSON.stringify(b)}`);
+    assert(!errors.length, errors.join(' | '));
+    await ctx.close();
+  },
   async 'Maison et raccourcis personnalisés'() {
     const { p, ctx, errors } = await page();
     await p.fill('#search', "Ed's rue Muller"); await p.waitForSelector('.results li.opt button', { timeout: 20000 }); await pick(p); await p.waitForTimeout(3000);
@@ -254,7 +275,7 @@ const tests = {
     await p.click('.pmenu button:has-text("Définir comme Maison")'); await p.waitForTimeout(500);
     assert(/Maison enregistré/.test(await p.textContent('.toast')), 'Maison non enregistrée');
     await p.click('.close'); await p.waitForTimeout(500);
-    await p.click('.chip.edit'); await p.waitForTimeout(800);
+    await p.click('.chip.add'); await p.waitForTimeout(800);
     await p.click('.ce-toggle[aria-label="Afficher Cafés"]');
     await p.fill('input[aria-label="Nom du raccourci Restaurants"]', 'Restos'); await p.press('input[aria-label="Nom du raccourci Restaurants"]', 'Tab');
     await p.click('section[aria-label="Personnaliser les raccourcis"] .close'); await p.waitForTimeout(500);
@@ -334,6 +355,27 @@ const tests = {
     assert(Math.hypot(first[0] - mid[0], first[1] - mid[1]) < 0.0005, `le tracé ne commence pas à la position : ${first} / ${mid}`);
     await p.click('.nav-end'); await p.waitForTimeout(800);
     assert((await p.locator('.nav-top').count()) === 0, 'guidage non terminé');
+    assert(!errors.length, errors.join(' | '));
+    await ctx.close();
+  },
+  async 'guidage sans localisation : on passe les étapes à la main'() {
+    const { p, ctx, errors } = await page({ permissions: [], geolocation: undefined });
+    await p.click('.chip:has-text("Restaurants")'); await p.waitForTimeout(6000);
+    await p.click('.nearby li button >> nth=0'); await p.waitForTimeout(3000);
+    await p.click('.action.primary'); await p.waitForTimeout(2000);
+    // pas de position : on choisit le départ à la main
+    if (!(await p.$('#field-from'))) await p.click('.field-btn >> nth=0');
+    await p.fill('#field-from', '57 rue de rennes'); await p.waitForSelector('.results li.opt:has-text("Rennes") button', { timeout: 30000 });
+    await p.dispatchEvent('.results li.opt:has-text("Rennes") button >> nth=0', 'mousedown'); await p.waitForTimeout(6000);
+    await p.click('.mode-tabs .mode-tab >> nth=0'); await p.waitForTimeout(4000);
+    await p.click('.sum-actions .go'); await p.waitForSelector('.nav-manual', { timeout: 8000 });
+    const before = await p.$eval('.nav-text', (e) => e.textContent);
+    await p.click('.nav-manual button[aria-label="Étape suivante"]'); await p.waitForTimeout(900);
+    const after = await p.$eval('.nav-text', (e) => e.textContent);
+    assert(before !== after, `l'étape ne change pas : ${before}`);
+    await p.click('.nav-manual button[aria-label="Étape précédente"]'); await p.waitForTimeout(900);
+    assert((await p.$eval('.nav-text', (e) => e.textContent)) === before, 'retour à l\'étape précédente impossible');
+    await p.click('.nav-end');
     assert(!errors.length, errors.join(' | '));
     await ctx.close();
   },

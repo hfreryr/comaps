@@ -90,6 +90,12 @@ Synthèse complète dans Notion (« Synthèse des séances »). Corrigé et test
 - **Preuve de non-pistage** : « 0 traceur · 0 cookie · code ouvert · Vérifier » sous la recherche, section « Vérifiez vous-même » dans Qui voit quoi ; un test e2e vérifie l'affirmation (aucun cookie, aucun service hors de la liste).
 - **Résumé d'un trajet en transports** : place dans la rame et sortie à l'arrivée, sans faire défiler.
 - **Photos** : 1 200 px sur téléphone (au lieu de 2 400).
+- **Raccourcis** (décision du 15/10) : bouton « + » fixé à droite de la rangée (le crayon n'était pas vu), 5 raccourcis par défaut (Mes lieux, Restaurants, Cafés, Métro, Pharmacies).
+- **Recherche** : exemples touchables à l'ouverture (« restaurant ouvert demain dans le 8e »…), texte de la barre recentré.
+- **Guidage sans localisation** : flèches pour passer les étapes à la main tant qu'aucune position n'arrive.
+- **Transports** : prix estimé (tickets à l'unité IDFM 2026, `fares.js`, tarifs dans le profil de ville), choix des modes (Tous, Métro, Métro et RER, Bus et tram ; paramètre `transitModes` de Transitous), 2 prochains passages dans la liste des stations.
+- **Calcul de nuit** : second lancement de secours à 05:15 UTC, sans effet si les données du jour sont déjà en ligne.
+- **Horaires manquants** : mesure et plan dans `docs/chantier-horaires.md` (52 % des restaurants, cafés, bars et boulangeries sans horaires ; 9 % d'entre eux seulement ont un site web).
 - Écartés, avec justification dans la synthèse : notes et avis (aucune source ouverte compatible pour l'instant), affluence en direct (calculée par Google à partir du pistage de position), compteur « traceurs évités » (trompeur : nous n'en bloquons pas, nous n'en avons pas), menu « burger ».
 
 ## Fiche lieu (13/10/2026)

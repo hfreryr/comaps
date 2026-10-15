@@ -445,7 +445,7 @@
 
 
   let transitPref = $state('all');   // modes de transport en commun choisis (tous, métro, métro et RER, bus et tram)
-  let lastFix = null;
+  let lastFix = $state(null);   // dernière position reçue pendant le guidage (sans elle : étapes à la main)
 
 
 
@@ -669,7 +669,7 @@
   const { say, isolate, closeTop, onPopState, onKeyDown, undoToast, showMe } = createScreen(app);
   const { setHeading, onOrientation, startCompass, startWatch, stopWatch, getPosition, startupLocate, locError, locDetail, locate, pickOnMap } = createLocation(app);
   const { startDirections, closeDirections, pointOf, setPoint, addStop, removeStop, editField, useMyPosition, swap, computeRoutes, chooseMode, sheetToTop, pickStreet, pickTransit, setTransitPref } = createDirections(app);
-  const { speak, transitSteps, startNav, onFix, updateNav, reroute, endNav } = createNav(app);
+  const { speak, transitSteps, startNav, onFix, updateNav, stepBy, reroute, endNav } = createNav(app);
   const { importFile } = createImport(app);
 </script>
 
@@ -681,7 +681,7 @@
 
   <MapControls />
   {#if nav && navBanner}
-    <NavView {nav} {navBanner} {navRemaining} {to} {navFollow} bind:navList bind:voice {endNav}
+    <NavView {nav} {navBanner} {navRemaining} {to} {navFollow} bind:navList bind:voice {endNav} manual={!lastFix} {stepBy}
       recenter={() => { navFollow = true; updateNav(); }} />
   {/if}
   <StreetThumb />
