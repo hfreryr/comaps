@@ -146,6 +146,26 @@ const tests = {
     assert(!errors.length, errors.join(' | '));
     await ctx.close();
   },
+  async 'recherche sur le téléphone : instantanée malgré Photon lent, fautes tolérées, types de lieux'() {
+    const { p, ctx, errors } = await page();
+    // Photon répond en 10 s, comme le soir du 15/10/2026 : nos résultats doivent s'afficher sans l'attendre
+    await p.route('**/photon.komoot.io/**', async (r) => { await new Promise((ok) => setTimeout(ok, 10000)); r.abort().catch(() => {}); });
+    await p.click('#search'); await p.waitForTimeout(1500);       // l'index se charge dès que l'on touche la barre
+    const t0 = Date.now();
+    await p.fill('#search', 'grnd palai'); await p.waitForSelector('.results li.opt button', { timeout: 5000 });
+    const ms = Date.now() - t0;
+    const first = await p.$eval('.results li.opt', (e) => e.innerText);
+    assert(/^Grand Palais\b/.test(first) && /Musée/.test(first), `premier résultat : ${first}`);
+    assert(ms < 2500, `résultats en ${ms} ms`);
+    await p.fill('#search', 'élysée'); await p.waitForTimeout(1200);
+    assert(/Palais de l'Élysée/.test(await p.$eval('.results li.opt', (e) => e.innerText)), 'élysée : pas le palais en premier');
+    await p.fill('#search', 'pharmacie'); await p.waitForTimeout(1500);
+    // (la première ligne est le raccourci « Pharmacies, les plus proches », déjà présent avant)
+    const metas = (await p.$$eval('.results li.opt .r-meta', (els) => els.map((e) => e.textContent))).filter((m) => !/plus proches/.test(m));
+    assert(metas.length >= 3 && metas.every((m) => /Pharmacie/i.test(m)), `pharmacie : ${metas.join(' | ')}`);
+    assert(!errors.length, errors.join(' | '));
+    await ctx.close();
+  },
   async 'choisir « Paris 8e » cadre la zone et garde les raccourcis'() {
     const { p, ctx, errors } = await page();
     await p.fill('#search', 'paris 8e'); await p.waitForSelector('.results li.opt button', { timeout: 30000 });
