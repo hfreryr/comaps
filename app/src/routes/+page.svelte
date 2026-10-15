@@ -444,6 +444,7 @@
 
 
 
+  let when = $state(null);           // heure du trajet : null (maintenant) ou { t, arrive } (when.js)
   let transitPref = $state('all');   // modes de transport en commun choisis (tous, métro, métro et RER, bus et tram)
   let lastFix = $state(null);   // dernière position reçue pendant le guidage (sans elle : étapes à la main)
 
@@ -527,6 +528,7 @@
   // <app> État et actions partagés avec les composants et modules de l'écran (getContext('app')). Bloc généré.
   const app = {
     get transitPref() { return transitPref; }, set transitPref(v) { transitPref = v; }, get setTransitPref() { return setTransitPref; },
+    get when() { return when; }, set when(v) { when = v; }, get setWhen() { return setWhen; },
     get setListStyle() { return setListStyle; },
     get BACKUP_KEY() { return BACKUP_KEY; }, get BIKE_COLOR() { return BIKE_COLOR; }, get FAVS_KEY() { return FAVS_KEY; },
     get LISTS_KEY() { return LISTS_KEY; }, get NAV() { return NAV; }, get PINS_KEY() { return PINS_KEY; },
@@ -668,7 +670,7 @@
   const { clearSearch, hitFilter, catIcon, applyHit, displayName, collectCategory, applyOpenFilter, setOpenAt, momentFrom, quickMoment, nearView, reloadCategoryHere, pickCategory, clearCategory, dist, openCategoryFromSearch, onKey, pickResult } = createSearch(app);
   const { say, isolate, closeTop, onPopState, onKeyDown, undoToast, showMe } = createScreen(app);
   const { setHeading, onOrientation, startCompass, startWatch, stopWatch, getPosition, startupLocate, locError, locDetail, locate, pickOnMap } = createLocation(app);
-  const { startDirections, closeDirections, pointOf, setPoint, addStop, removeStop, editField, useMyPosition, swap, computeRoutes, chooseMode, sheetToTop, pickStreet, pickTransit, setTransitPref } = createDirections(app);
+  const { startDirections, closeDirections, pointOf, setPoint, addStop, removeStop, editField, useMyPosition, swap, computeRoutes, chooseMode, sheetToTop, pickStreet, pickTransit, setTransitPref, setWhen } = createDirections(app);
   const { speak, transitSteps, startNav, onFix, updateNav, stepBy, reroute, endNav } = createNav(app);
   const { importFile } = createImport(app);
 </script>
@@ -699,7 +701,7 @@
     <ChipsEditor />
   {:else if directions && !editing && !nav}
     <RouteSheet {from} {to} {mode} {routes} {picked} {pickedStreet} {showVia} {legExits}
-      {chooseMode} {pickStreet} {pickTransit} {startNav} {addStop} {computeRoutes} {transitPref} {setTransitPref} />
+      {chooseMode} {pickStreet} {pickTransit} {startNav} {addStop} {computeRoutes} {transitPref} {setTransitPref} {when} />
   {:else if place && !directions}
     <PlaceSheet />
   {:else if category && !directions}

@@ -21,8 +21,12 @@ export const usesLineTwice = (it) => {
 /** Heure d'arrivée « ressentie » : chaque correspondance compte pour TRANSFER_PENALTY_MIN minutes. */
 export const score = (it) => +it.end + transfers(it) * TRANSFER_PENALTY_MIN * 60000;
 
+/** « Arriver à » : le départ le plus tardif est le meilleur ; chaque correspondance l'avance de TRANSFER_PENALTY_MIN. */
+export const scoreArrive = (it) => -it.start + transfers(it) * TRANSFER_PENALTY_MIN * 60000;
+
 /** Trie les propositions (une par combinaison de lignes) et écarte les allers-retours s'il existe autre chose. */
-export function rankTransit(options) {
+export function rankTransit(options, arrive = false) {
   const sane = options.filter((it) => !usesLineTwice(it));
-  return (sane.length ? sane : options).slice().sort((a, b) => score(a) - score(b) || a.end - b.end);
+  const by = arrive ? (a, b) => scoreArrive(a) - scoreArrive(b) || b.start - a.start : (a, b) => score(a) - score(b) || a.end - b.end;
+  return (sane.length ? sane : options).slice().sort(by);
 }

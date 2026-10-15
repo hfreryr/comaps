@@ -6,12 +6,13 @@
   import { draggable } from '#lib/sheet.js';
   import { MODE_NAMES, fmtDuration, fmtTime, fmtDistance } from '#lib/routing.js';
   import { placeLabel } from '#lib/rame.js';
-  import { MODES, arrival, inMinutes, badge, streetOpts, altTag, exitPhrase } from '#lib/routeview.js';
+  import { MODES, arrival, departure, inMinutes, badge, streetOpts, altTag, exitPhrase } from '#lib/routeview.js';
   import ModeIcon from './ModeIcon.svelte';
   import LegChain from './LegChain.svelte';
+  import WhenPicker from './WhenPicker.svelte';
 
   let { from, to, mode, routes, picked, pickedStreet, showVia, legExits,
-    chooseMode, pickStreet, pickTransit, startNav, addStop, computeRoutes, transitPref = 'all', setTransitPref } = $props();
+    chooseMode, pickStreet, pickTransit, startNav, addStop, computeRoutes, transitPref = 'all', setTransitPref, when = null } = $props();
   const current = $derived(routes[mode]);
 </script>
 
@@ -32,6 +33,7 @@
       </button>
     {/each}
   </div>
+  <WhenPicker />
   {#if mode === 'transit' && setTransitPref}
     <!-- choisir ses modes (P4 : « je ne peux pas sélectionner uniquement le métro ») -->
     <div class="t-prefs" role="radiogroup" aria-label={tx('itin.modes_de_transport')}>
@@ -62,7 +64,8 @@
     <div class="sum" data-peek-end>
       <div class="sum-text">
         <span class="sum-dur">{fmtDuration(sel.duration)}</span>
-        <span class="sum-sub">{tx('itin.arrivee', { arrival: arrival(sel.duration), fmtDistance: fmtDistance(sel.distance) })}</span>
+        <span class="sum-sub">{when?.arrive ? tx('itin.partez_a', { depart: departure(sel.duration, when), fmtDistance: fmtDistance(sel.distance) })
+          : tx('itin.arrivee', { arrival: arrival(sel.duration, when), fmtDistance: fmtDistance(sel.distance) })}</span>
         <span class="sum-tag" class:best={pickedStreet === 0}>{pickedStreet === 0 ? (opts.length > 1 ? tx('itin.le_plus_rapide') : '') : altTag(sel, opts[0])}</span>
       </div>
       <div class="sum-actions">
@@ -79,7 +82,8 @@
           {#if i !== pickedStreet}
             <li><button onclick={() => pickStreet(i)}>
               <span class="alt-dur">{fmtDuration(r.duration)}</span>
-              <span class="alt-sub">{tx('itin.arrivee_2', { arrival: arrival(r.duration), fmtDistance: fmtDistance(r.distance), etiquette: i === 0 ? tx('itin.le_plus_rapide_2') : altTag(r, opts[0]).toLowerCase() })}</span>
+              <span class="alt-sub">{when?.arrive ? tx('itin.partez_a_2', { depart: departure(r.duration, when), fmtDistance: fmtDistance(r.distance), etiquette: i === 0 ? tx('itin.le_plus_rapide_2') : altTag(r, opts[0]).toLowerCase() })
+                : tx('itin.arrivee_2', { arrival: arrival(r.duration, when), fmtDistance: fmtDistance(r.distance), etiquette: i === 0 ? tx('itin.le_plus_rapide_2') : altTag(r, opts[0]).toLowerCase() })}</span>
             </button></li>
           {/if}
         {/each}
@@ -106,7 +110,7 @@
           <LegChain it={it} />
           <span class="sum-dur small">{fmtDuration(it.duration)}</span>
         </span>
-        <span class="sum-sub"><strong>{fmtTime(it.board.start)}</strong> à {it.board.from}{#if it.board.realTime}{' '}<span class="live" title={tx('itin.horaire_en_temps_reel')}>●</span>{' '}{:else} · {/if}{inMinutes(it.board.start)}</span>
+        <span class="sum-sub"><strong>{fmtTime(it.board.start)}</strong> à {it.board.from}{#if it.board.realTime}{' '}<span class="live" title={tx('itin.horaire_en_temps_reel')}>●</span>{' '}{:else if inMinutes(it.board.start)} · {/if}{inMinutes(it.board.start)}</span>
         <span class="sum-sub">{#if it.next.length}{tx('itin.puis', { horaires: it.next.map(fmtTime).join(' · '), suite: ' · ' })}{/if}{tx('itin.arrivee_4', { fmtTime: fmtTime(it.end) })}{#if tripFare(it.legs) != null}<span title={tx('itin.prix_detail')}>{tx('itin.prix', { prix: fmtEuros(tripFare(it.legs)) })}</span>{/if}</span>
         <!-- l'info la plus attendue (test P3) dès le résumé : où se placer dans la rame et quelle sortie prendre à l'arrivée -->
         {#each [it.legs.map((leg, li) => ({ leg, tip: legExits[`${picked}|${li}|${leg.to}`] })).filter((x) => x.tip?.exit || x.tip?.place).at(-1)] as last}

@@ -2,6 +2,7 @@
 import { tx } from '#lib/i18n/index.js';
 import { fmtTime, fmtDistance } from './routing.js';
 import { exitLabel } from './exits.js';
+import { startOf, endOf } from './when.js';
 
 export const MODES = [
   { id: 'walk', label: tx('itin.a_pied_2') },
@@ -9,10 +10,13 @@ export const MODES = [
   { id: 'transit', label: tx('carte.transports') },
   { id: 'car', label: tx('itin.voiture') }
 ];
-export const arrival = (seconds) => fmtTime(new Date(Date.now() + seconds * 1000));
+/** Heure d'arrivée (et de départ) d'un trajet de « seconds », maintenant ou à l'heure choisie (when.js). */
+export const arrival = (seconds, when = null) => fmtTime(new Date(endOf(when, seconds)));
+export const departure = (seconds, when = null) => fmtTime(new Date(startOf(when, seconds)));
 export const inMinutes = (d) => {
   const m = Math.round((d - Date.now()) / 60000);
-  return m <= 0 ? tx('horaires.maintenant') : m < 60 ? tx('itin.dans_min', { m }) : tx('itin.a', { fmtTime: fmtTime(d) });
+  // au-delà d'une heure (départ choisi plus tard), l'heure affichée juste avant suffit
+  return m <= 0 ? tx('horaires.maintenant') : m < 60 ? tx('itin.dans_min', { m }) : '';
 };
 const PREFIX = { SUBWAY: 'M', METRO: 'M', TRAM: 'T', BUS: tx('itin.bus'), REGIONAL_RAIL: 'RER', SUBURBAN: 'RER' };
 export const badge = (leg) => `${PREFIX[leg.mode] ? PREFIX[leg.mode] + ' ' : ''}${leg.line}`.trim();

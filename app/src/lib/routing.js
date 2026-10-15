@@ -175,14 +175,18 @@ export async function trafficEstimate(from, to, when = new Date()) {
 /** Choix des modes de transport en commun (Transitous, paramètre transitModes vérifié le 15/10/2026). */
 export const TRANSIT_PREFS = { all: null, metro: ['SUBWAY'], rail: ['SUBWAY', 'RAIL'], road: ['BUS', 'TRAM'] };
 
-/** Transports en commun : plusieurs propositions, triées par heure d'arrivée. modes : null (tous) ou liste Transitous. */
-export async function transitRoutes(from, to, signal, when = new Date(), modes = null) {
+/**
+ * Transports en commun : plusieurs propositions, triées par heure d'arrivée. modes : null (tous) ou liste Transitous.
+ * arrive : « when » est l'heure d'arrivée souhaitée (paramètre arriveBy de Transitous, vérifié le 16/10/2026).
+ */
+export async function transitRoutes(from, to, signal, when = new Date(), modes = null, arrive = false) {
   const url = new URL(TRANSITOUS);
   url.search = new URLSearchParams({
     fromPlace: `${from.lat},${from.lon}`,
     toPlace: `${to.lat},${to.lon}`,
     time: when.toISOString(),
     numItineraries: '10',
+    ...(arrive ? { arriveBy: 'true' } : {}),
     ...(modes ? { transitModes: modes.join(',') } : {})
   });
   const res = await fetch(url, { signal });
@@ -221,11 +225,13 @@ export async function transitRoutes(from, to, signal, when = new Date(), modes =
     // une même combinaison de lignes = une seule proposition, avec ses prochains départs
     const key = it.legs.filter((l) => l.mode !== 'WALK').map((l) => `${l.mode}:${l.line}`).join('>');
     const g = groups.get(key);
+    // « arriver à » : on garde le départ le plus tardif de chaque combinaison (les autres arrivent bien plus tôt)
     if (!g) { it.next = []; groups.set(key, it); }
+    else if (arrive) { if (it.board.start > g.board.start) { it.next = []; groups.set(key, it); } }
     else if (g.next.length < 3 && +it.board.start !== +g.board.start) g.next.push(it.board.start);
   }
   // le plus simple d'abord, sauf si une correspondance fait vraiment gagner du temps (transitrank.js)
-  return rankTransit([...groups.values()]).slice(0, 4);
+  return rankTransit([...groups.values()], arrive).slice(0, 4);
 }
 
 /**
@@ -233,26 +239,26 @@ export async function transitRoutes(from, to, signal, when = new Date(), modes =
  * à l'heure où l'on y arrive (1 min plus tard). Transitous ne sait pas passer par un point : on enchaîne.
  * Un tronçon sans transport utile se fait à pied.
  */
-export async function transitWithStop(from, via, to, signal, when = new Date(), modes = null) {
-  const segment = async (a, b, t) => {
-    const list = await transitRoutes(a, b, signal, t, modes).catch((e) => { if (e.name === 'AbortError') throw e; return []; });
-    if (list.length) return list;
-    const w = await streetRoute(a, b, 'walk', signal);
-    const start = new Date(t), end = new Date(+t + w.duration * 1000);
-    return [{ duration: w.duration, start, end, board: null, next: [],
-      legs: [{ mode: 'WALK', from: a.label || tx('recherche.depart'), to: b.label, start, end, duration: w.duration, distance: w.distance, coords: w.coords }] }];
-  };
+export async function transitWithStop(from, via, to, signal, when = new Date(), modes = null, arrive = false) {
+  // « arriver à » : on part de la fin (arrêt → arrivée), puis départ → arrêt en arrivant 1 min avant
+  if (arrive) {
+    const seg = (a, b, t) => transitWithStopSegment(a, b, t, signal, modes, true);
+    const lasts = (await seg(via, to, when)).slice(0, 3);
+    const out = [];
+    for (const s of lasts) {
+      const f = (await seg(from, via, new Date(+s.start - 60000)))[0];
+      if (f) out.push(joinAtStop(f, s, via));
+    }
+    return rankTransit(out.filter((it) => it.board), true);
+  }
+  const segment = async (a, b, t) => transitWithStopSegment(a, b, t, signal, modes, false);
   const firsts = (await segment(from, via, when)).slice(0, 3);
   const out = [];
   const seen = new Set();
   for (const f of firsts) {
     const s = (await segment(via, to, new Date(+f.end + 60000)))[0];
     if (!s) continue;
-    const it = {
-      start: f.start, end: s.end, duration: (s.end - f.start) / 1000, next: [],
-      legs: [...f.legs, { mode: 'STOP', from: via.label, start: f.end, end: s.start, duration: (s.start - f.end) / 1000, coords: [] }, ...s.legs]
-    };
-    it.board = it.legs.find((l) => l.mode !== 'WALK' && l.mode !== 'STOP') || null;
+    const it = joinAtStop(f, s, via);
     if (!it.board) continue;
     const key = it.legs.map((l) => `${l.mode}:${l.line || ''}`).join('>') + +it.end;
     if (seen.has(key)) continue;
@@ -260,6 +266,26 @@ export async function transitWithStop(from, via, to, signal, when = new Date(), 
     out.push(it);
   }
   return rankTransit(out);
+}
+
+/** Un tronçon : transports, ou à pied s'il n'y a rien d'utile. arrive : t est l'heure d'arrivée. */
+async function transitWithStopSegment(a, b, t, signal, modes, arrive) {
+  const list = await transitRoutes(a, b, signal, t, modes, arrive).catch((e) => { if (e.name === 'AbortError') throw e; return []; });
+  if (list.length) return list;
+  const w = await streetRoute(a, b, 'walk', signal);
+  const start = new Date(arrive ? +t - w.duration * 1000 : +t), end = new Date(+start + w.duration * 1000);
+  return [{ duration: w.duration, start, end, board: null, next: [],
+    legs: [{ mode: 'WALK', from: a.label || tx('recherche.depart'), to: b.label, start, end, duration: w.duration, distance: w.distance, coords: w.coords }] }];
+}
+
+/** Deux tronçons bout à bout, avec l'arrêt entre les deux. */
+function joinAtStop(f, s, via) {
+  const it = {
+    start: f.start, end: s.end, duration: (s.end - f.start) / 1000, next: [],
+    legs: [...f.legs, { mode: 'STOP', from: via.label, start: f.end, end: s.start, duration: (s.start - f.end) / 1000, coords: [] }, ...s.legs]
+  };
+  it.board = it.legs.find((l) => l.mode !== 'WALK' && l.mode !== 'STOP') || null;
+  return it;
 }
 
 // ——— Prochains passages à une station ———
