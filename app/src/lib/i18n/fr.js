@@ -498,7 +498,7 @@ export default {
   'position.touchez_la_fleche_pour_vous': 'Touchez la flèche pour vous localiser.',
   'position.votre_position_reste_sur_votre': 'Votre position reste sur votre téléphone.',
   'position.localisation_impossible_la_page_est': 'Localisation impossible : la page n\'est pas sécurisée. Ouvrez https://untrackedmaps.app.',
-  'position.iphone_refuse_la_localisation_a_app': 'L\'iPhone refuse la localisation à l\'app installée sur l\'écran d\'accueil (problème connu des versions récentes d\'iOS). En attendant, ouvrez untrackedmaps.app dans Safari : la localisation y fonctionne.',
+  'position.iphone_refuse_la_localisation_a_app': 'L\'iPhone refuse la localisation à l\'app installée (bug de certains iPhone récents). Pour le corriger : Réglages → Général → Transférer ou réinitialiser → Réinitialiser → Réinitialiser localisation et confidentialité (vos apps redemanderont leurs autorisations). Sinon, ouvrez untrackedmaps.app dans Safari.',
   'position.localisation_refusee_autorisez_la': 'Localisation refusée. Autorisez-la dans les réglages du navigateur.',
   'position.position_pas_encore_trouvee_delai': 'Position pas encore trouvée (délai dépassé). Réessayez, idéalement près d\'une fenêtre.',
   'position.position_introuvable_verifiez_que_le': 'Position introuvable : vérifiez que le Service de localisation du téléphone est activé.',
