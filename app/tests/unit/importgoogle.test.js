@@ -39,3 +39,12 @@ test('fichier quelconque : rien d’importé, pas de plantage', async () => {
   const r = await readGoogleExport(new File(['bonjour'], 'notes.json'));
   assert.deepEqual(r.places, []);
 });
+
+test('avis Google : ignorés (ce ne sont pas des lieux enregistrés)', async () => {
+  const r = await readGoogleExport(new File([JSON.stringify(geo)], 'Avis.json'));
+  assert.deepEqual(r.places, []);
+});
+test('fichier seul (pas une archive) : pas d’alerte « listes absentes »', async () => {
+  const r = await readGoogleExport(new File([JSON.stringify(geo)], 'Saved Places.json'));
+  assert.equal(r.listsMissing, false);
+});

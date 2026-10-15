@@ -16,7 +16,7 @@
       <h1>{tx('import.vos_lieux_google_maps')}</h1>
       <p class="kind">{tx('import.recuperez_vos_lieux_enregistres')}</p>
       <ol class="howto">
-        <li>{tx('import.ouvrez')} <a href="https://takeout.google.com/" target="_blank" rel="noopener">{tx('import.takeout_google_com')}</a>{tx('import.touchez_tout_deselectionner_puis')} <strong>{tx('import.maps_vos_adresses')}</strong>.</li>
+        <li>{tx('import.ouvrez')} <a href="https://takeout.google.com/" target="_blank" rel="noopener">{tx('import.takeout_google_com')}</a>{tx('import.touchez_tout_deselectionner_puis')} <strong>{tx('import.enregistre_vos_listes')}</strong>{tx('import.vos_listes_et')} <strong>{tx('import.maps_vos_adresses')}</strong>.</li>
         <li>{tx('import.touchez_etape_suivante_puis_creer')}</li>
         <li>{tx('import.telechargez_le_fichier_zip_puis')}</li>
       </ol>

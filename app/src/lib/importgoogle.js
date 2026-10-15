@@ -5,7 +5,11 @@
 //
 // Formats acceptés : l'archive .zip telle que Google la fournit, ou les fichiers qu'elle contient
 // (« Lieux enregistrés.json » / « Saved Places.json », « Adresses avec libellé.json » /
-// « Labeled places.json », listes « Enregistrées/*.csv »).
+// « Labeled places.json », listes « Enregistré/*.csv »).
+//
+// ⚠️ Google range les listes (Favoris, À visiter, vos listes) dans un produit Takeout à part, « Enregistré »
+// (« Saved »), et non dans « Maps (vos adresses) », qui ne contient que les lieux suivis, les adresses
+// avec libellé et les avis. Les listes n'ont pas de position : seulement le nom et un lien Google.
 import { tx } from '#lib/i18n/index.js';
 
 /** Lit une archive .zip (méthodes « stockée » et « deflate ») : [{ name, text() }] */
@@ -112,16 +116,23 @@ export async function readGoogleExport(file) {
   if (file.size > 300e6) throw new Error('taille');
   const buf = await file.arrayBuffer();
   const u8 = new Uint8Array(buf, 0, 4);
-  const files = u8[0] === 0x50 && u8[1] === 0x4b
-    ? (await unzip(buf)).filter((f) => /\.(json|csv)$/i.test(f.name) && /maps|adresses|places|lieux|enregistr|saved/i.test(f.name))
+  const isZip = u8[0] === 0x50 && u8[1] === 0x4b;
+  const files = isZip
+    ? (await unzip(buf)).filter((f) => /\.csv$/i.test(f.name) || (/\.json$/i.test(f.name) && /maps|adresses|places|lieux|enregistr|saved/i.test(f.name)))
     : [{ name: file.name, text: async () => new TextDecoder().decode(buf) }];
   const all = [];
+  let lists = 0;
   for (const f of files) {
-    const text = await f.text().catch(() => '');
-    // chaque liste Google (« Lieux favoris », « À visiter », vos listes…) est un fichier .csv à son nom
     const base = f.name.split('/').pop().replace(/\.(csv|json)$/i, '');
-    if (/\.csv$/i.test(f.name)) all.push(...fromCsv(text, base));
-    else {
+    // les avis laissés sur Google Maps ne sont pas des lieux enregistrés
+    if (/^(avis|reviews?)$/i.test(base)) continue;
+    const text = await f.text().catch(() => '');
+    // chaque liste Google (« Favoris », « À visiter », vos listes…) est un fichier .csv à son nom
+    if (/\.csv$/i.test(f.name)) {
+      const rows = fromCsv(text, base);
+      if (rows.length) lists++;
+      all.push(...rows);
+    } else {
       try {
         // « Lieux enregistrés.json » / « Saved Places.json » : les lieux suivis (étoile) de Google
         const starred = /saved places|lieux enregistr/i.test(base) ? tx('import.lieux_suivis') : '';
@@ -129,7 +140,8 @@ export async function readGoogleExport(file) {
       } catch { /* fichier ignoré */ }
     }
   }
-  const out = { places: [] };
+  // archive sans aucune liste : le produit « Enregistré » n'a sans doute pas été coché
+  const out = { places: [], listsMissing: isZip && !lists };
   const seen = new Set();
   for (const p of all) {
     if (!p.name && !p.address) continue;
