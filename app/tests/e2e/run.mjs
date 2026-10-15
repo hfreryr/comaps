@@ -477,6 +477,27 @@ const tests = {
     assert(!errors.length, errors.join(' | '));
     await ctx.close();
   },
+  async 'transports : arriver demain à 9 h (heure de départ choisie)'() {
+    const { p, ctx, errors } = await page({ geolocation: { latitude: 48.8867, longitude: 2.3431 } });
+    await p.fill('#search', '57 rue de rennes'); await p.waitForSelector('.results li.opt button', { timeout: 30000 }); await pick(p); await p.waitForTimeout(2500);
+    await p.click('.action.primary'); await p.waitForTimeout(2000);
+    await p.click('.mode-tabs .mode-tab >> nth=2'); await p.waitForSelector('.route-sheet .sum.transit', { timeout: 25000 });
+    assert(/Partir maintenant/.test(await p.textContent('.when-btn')), 'bouton « Partir maintenant » absent');
+    await p.click('.when-btn'); await p.click('.seg-btn:has-text("Arriver à")');
+    // « demain » selon l'heure du téléphone simulé (le fuseau du navigateur peut différer de celui de la machine)
+    const day = await p.evaluate(() => { const d = new Date(Date.now() + 864e5); const pad = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; });
+    await p.fill('.when-field input', `${day}T09:00`);
+    await p.click('.when-ok');
+    assert(/Arrivée demain à 09:00/.test(await p.textContent('.when-btn')), 'heure choisie non affichée : ' + await p.textContent('.when-btn'));
+    await p.waitForSelector('.route-sheet .sum.transit', { timeout: 25000 }); await p.waitForTimeout(1000);
+    const sum = await p.$eval('.route-sheet .sum', (e) => e.innerText);
+    const arr = /Arrivée (\d\d):(\d\d)/.exec(sum);
+    assert(arr && +arr[1] * 60 + +arr[2] <= 9 * 60 && +arr[1] >= 7, `arrivée hors de 7 h – 9 h : ${sum}`);
+    await p.click('.mode-tabs .mode-tab >> nth=0'); await p.waitForTimeout(1500);
+    assert(/Partez à \d\d:\d\d/.test(await p.$eval('.route-sheet .sum', (e) => e.innerText)), 'heure de départ à pied absente');
+    assert(!errors.length, errors.join(' | '));
+    await ctx.close();
+  },
   async 'la liste se recharge quand on déplace la carte'() {
     const { p, ctx } = await page({ viewport: { width: 1280, height: 800 }, isMobile: false, hasTouch: false });
     await p.click('.chip:has-text("Restaurants")'); await p.waitForTimeout(4000);

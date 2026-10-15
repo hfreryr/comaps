@@ -16,6 +16,7 @@ export function createDirections(app) {
     app.placeMarker(app.to.lon, app.to.lat);
     app.via = null;
     app.showVia = false;
+    app.when = null;                       // chaque nouvel itinéraire part « maintenant »
     app.routes = { walk: null, bike: null, transit: null };
     app.picked = 0;
     try {
@@ -95,10 +96,13 @@ export function createDirections(app) {
     run('walk', () => streetRoute(app.from, app.to, 'walk', signal, v));
     run('bike', () => streetRoute(app.from, app.to, 'bike', signal, v));
     const modes = TRANSIT_PREFS[app.transitPref] || null;
-    run('transit', () => (v ? transitWithStop(app.from, v, app.to, signal, new Date(), modes) : transitRoutes(app.from, app.to, signal, new Date(), modes)));
+    // heure choisie (when.js) : maintenant, partir à, ou arriver à
+    const w = app.when, at = new Date(w ? w.t : Date.now()), arrive = !!w?.arrive;
+    run('transit', () => (v ? transitWithStop(app.from, v, app.to, signal, at, modes, arrive) : transitRoutes(app.from, app.to, signal, at, modes, arrive)));
     run('car', async () => {
       const r = await streetRoute(app.from, app.to, 'car', signal, v);
-      const t = await trafficEstimate(app.from, app.to);
+      // trafic habituel à l'heure du départ (pour « arriver à » : départ estimé sans trafic, à l'heure près)
+      const t = await trafficEstimate(app.from, app.to, new Date(arrive ? +at - r.duration * 1000 : +at));
       const withTraffic = (x) => ({ ...x, freeDuration: x.duration, duration: x.duration * t.factor, traffic: t.label });
       return { ...withTraffic(r), alts: r.alts.map(withTraffic) };
     });
@@ -130,5 +134,11 @@ export function createDirections(app) {
     app.picked = 0;
     computeRoutes();
   }
-  return { startDirections, closeDirections, pointOf, setPoint, addStop, removeStop, editField, useMyPosition, swap, computeRoutes, chooseMode, sheetToTop, pickStreet, pickTransit, setTransitPref };
+  /** Heure du trajet : null (maintenant) ou { t, arrive } (WhenPicker). */
+  function setWhen(w) {
+    app.when = w;
+    app.picked = 0;
+    computeRoutes();
+  }
+  return { startDirections, closeDirections, pointOf, setPoint, addStop, removeStop, editField, useMyPosition, swap, computeRoutes, chooseMode, sheetToTop, pickStreet, pickTransit, setTransitPref, setWhen };
 }
