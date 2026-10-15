@@ -25,6 +25,7 @@
 
       {#if !app.showList && !app.place}
         <!-- masqués quand une fiche lieu est ouverte : ils ne servent pas à ce moment-là et cachent la carte -->
+        <div class="chips-row">
         <nav class="chips" aria-label={tx('recherche.categories')}>
           {#each app.chipList as c (c.key)}
             <button class="chip" class:on={app.category?.key === c.key} onclick={() => app.pickCategory(c)} style:--fam={app.famColor(c)} aria-pressed={app.category?.key === c.key}>
@@ -32,10 +33,12 @@
               {:else}<span class="chip-dot" aria-hidden="true"></span>{/if}{c.label}
             </button>
           {/each}
-          <button class="chip edit" class:on-edit={app.editChips} onclick={() => { app.editChips = !app.editChips; app.importOpen = false; }} aria-label={tx('recherche.personnaliser_les_raccourcis')} aria-expanded={app.editChips}>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4" /></svg>
-          </button>
         </nav>
+        <!-- toujours visible, hors du défilement : invite à choisir ses raccourcis (le crayon en bout de rangée passait inaperçu, tests P3 et P4) -->
+        <button class="chip add" class:on-edit={app.editChips} onclick={() => { app.editChips = !app.editChips; app.importOpen = false; }} aria-label={tx('recherche.personnaliser_les_raccourcis')} aria-expanded={app.editChips}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+        </button>
+        </div>
       {/if}
     </header>
   {:else if !app.nav}
@@ -152,10 +155,13 @@
   .rm-stop { width: 44px; height: 44px; }
   .chip-heart { width: 15px; height: 15px; fill: var(--fam); stroke: none; }
   .chip.on .chip-heart { fill: #fff; }
-  .chip.edit.on-edit { background: var(--accent-btn); color: #fff; }
+  /* rangée : raccourcis qui défilent + bouton « + » fixe à droite */
+  .chips-row { display: flex; align-items: flex-start; gap: 6px; }
+  .chips-row .chips { flex: 1; min-width: 0; margin-right: 0; }
+  .chip.add { flex: none; width: 32px; padding: 0; justify-content: center; color: var(--accent); }
+  .chip.add svg { width: 18px; height: 18px; stroke-width: 2.2; }
+  .chip.add.on-edit { background: var(--accent-btn); color: #fff; }
   .opill.on { background: var(--accent-btn); border-color: var(--accent-btn); color: #fff; }
-  .chip.edit { padding: 0 12px; color: var(--muted); }
-  .chip.edit svg { width: 17px; height: 17px; }
 
   /* ——— Grand écran : panneaux à gauche ——— */
   @media (min-width: 768px) {
@@ -164,6 +170,8 @@
     .top { padding: 16px 16px 0; display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px; right: 76px; }
     .top.dir { flex-direction: column; flex-wrap: nowrap; right: auto; }
     .search, .dir-card { width: 400px; flex: none; }
+    .chips-row { flex: 1; min-width: 0; }
     .chips { flex: 1; min-width: 0; flex-wrap: wrap; overflow: visible; margin: 0; padding: 6px 0 0; -webkit-mask-image: none; mask-image: none; }
+    .chip.add { margin-top: 6px; }
   }
 </style>
