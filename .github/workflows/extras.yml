@@ -14,7 +14,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1 (désigné par empreinte : un outil tiers modifié ne passerait pas)
         with: { ref: main }
@@ -27,6 +27,8 @@ jobs:
           curl -sSfL -o paris.osm.pbf $B/paris.osm.pbf
           curl -sSfL $B/paris.osm.pbf.md5 | awk '{print $1"  paris.osm.pbf"}' | md5sum -c -
       - run: python app/scripts/build_extras.py paris.osm.pbf --out out/extras.json
+      - name: Horaires publiés par les sites des lieux (schema.org, robots.txt respecté)
+        run: python app/scripts/build_sitehours.py paris.osm.pbf --extras out/extras.json || echo "sites ignorés (le reste est publié)"
       - name: "Garde-fou : pas de publication si les compléments paraissent vides"
         run: python -c "import json,sys; n=len(json.load(open('out/extras.json'))['places']); print(n,'lieux complétés'); sys.exit(0 if n >= 1000 else 1)"
       - name: Publier dans gh-pages/data/extras.json
