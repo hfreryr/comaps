@@ -2,6 +2,7 @@
      puis étapes et autres itinéraires en tirant la fiche. Modèle : Google Maps et Plans (voir docs/espace-ecran.md). -->
 <script>
   import { tx } from '#lib/i18n/index.js';
+  import { tripFare, fmtEuros } from '#lib/fares.js';
   import { draggable } from '#lib/sheet.js';
   import { MODE_NAMES, fmtDuration, fmtTime, fmtDistance } from '#lib/routing.js';
   import { placeLabel } from '#lib/rame.js';
@@ -10,7 +11,7 @@
   import LegChain from './LegChain.svelte';
 
   let { from, to, mode, routes, picked, pickedStreet, showVia, legExits,
-    chooseMode, pickStreet, pickTransit, startNav, addStop, computeRoutes } = $props();
+    chooseMode, pickStreet, pickTransit, startNav, addStop, computeRoutes, transitPref = 'all', setTransitPref } = $props();
   const current = $derived(routes[mode]);
 </script>
 
@@ -31,6 +32,14 @@
       </button>
     {/each}
   </div>
+  {#if mode === 'transit' && setTransitPref}
+    <!-- choisir ses modes (P4 : « je ne peux pas sélectionner uniquement le métro ») -->
+    <div class="t-prefs" role="radiogroup" aria-label={tx('itin.modes_de_transport')}>
+      {#each [['all', tx('itin.tous')], ['metro', tx('itin.metro')], ['rail', tx('itin.metro_et_rer')], ['road', tx('itin.bus_et_tram')]] as [id, label]}
+        <button class="t-pref" class:on={transitPref === id} role="radio" aria-checked={transitPref === id} onclick={() => setTransitPref(id)}>{label}</button>
+      {/each}
+    </div>
+  {/if}
   {#if !from}
     <p class="empty" data-peek-end>{tx('itin.choisissez_un_point_de_depart_pour')}</p>
   {:else if !current || current.status === 'loading'}
@@ -98,7 +107,7 @@
           <span class="sum-dur small">{fmtDuration(it.duration)}</span>
         </span>
         <span class="sum-sub"><strong>{fmtTime(it.board.start)}</strong> à {it.board.from}{#if it.board.realTime}{' '}<span class="live" title={tx('itin.horaire_en_temps_reel')}>●</span>{' '}{:else} · {/if}{inMinutes(it.board.start)}</span>
-        <span class="sum-sub">{#if it.next.length}{tx('itin.puis', { horaires: it.next.map(fmtTime).join(' · '), suite: ' · ' })}{/if}{tx('itin.arrivee_4', { fmtTime: fmtTime(it.end) })}</span>
+        <span class="sum-sub">{#if it.next.length}{tx('itin.puis', { horaires: it.next.map(fmtTime).join(' · '), suite: ' · ' })}{/if}{tx('itin.arrivee_4', { fmtTime: fmtTime(it.end) })}{#if tripFare(it.legs) != null}<span title={tx('itin.prix_detail')}>{tx('itin.prix', { prix: fmtEuros(tripFare(it.legs)) })}</span>{/if}</span>
         <!-- l'info la plus attendue (test P3) dès le résumé : où se placer dans la rame et quelle sortie prendre à l'arrivée -->
         {#each [it.legs.map((leg, li) => ({ leg, tip: legExits[`${picked}|${li}|${leg.to}`] })).filter((x) => x.tip?.exit || x.tip?.place).at(-1)] as last}
           {#if last?.tip?.place}<span class="sum-tip"><span class="car-ic" aria-hidden="true"></span>{tx('itin.montez', { placeLabel: placeLabel(last.tip.place), suite: '' })}</span>{/if}
@@ -216,4 +225,7 @@
   .alt-sub { font-size: var(--fs-small); color: var(--muted); font-variant-numeric: tabular-nums; }
   /* étapes du trajet en transport : pleine largeur de la fiche, sans fond */
   .route-sheet :global(.legs) { margin: 0 calc(-1 * var(--gutter)); padding: 4px var(--gutter) 6px; background: none; }
+  .t-prefs { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 10px 16px 2px; margin: 0 -16px; }
+  .t-pref { flex: none; height: 30px; padding: 0 12px; border-radius: 15px; border: 1px solid var(--line); background: var(--card); color: var(--ink); font: inherit; font-size: 13.5px; font-weight: 500; cursor: pointer; }
+  .t-pref.on { background: var(--accent-btn); border-color: var(--accent-btn); color: #fff; }
 </style>

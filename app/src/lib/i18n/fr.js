@@ -187,6 +187,12 @@ export default {
   'fiche.sortie': 'Sortie {ref}',
   'fiche.lieux_recents_effaces': 'Lieux récents effacés',
   // ——— Itinéraire ———
+  'itin.modes_de_transport': 'Modes de transport',
+  'itin.tous': 'Tous',
+  'itin.metro_et_rer': 'Métro et RER',
+  'itin.bus_et_tram': 'Bus et tram',
+  'itin.prix': ' · {prix}',
+  'itin.prix_detail': 'Prix estimé avec des tickets à l\'unité, plein tarif (Île-de-France Mobilités, 2026)',
   'itin.a_station_sortie': 'À {station}, {sortie}',
   'itin.mode_de_deplacement': 'Mode de déplacement',
   'itin.calcul_en_cours': 'Calcul en cours',
