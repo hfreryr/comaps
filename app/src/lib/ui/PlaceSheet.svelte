@@ -9,6 +9,14 @@
 
   // État et actions de la page (voir le bloc « app » de +page.svelte)
   const app = getContext('app');
+  // menu « ⋯ » : se ferme quand on touche ailleurs (P5 ne savait pas le refermer)
+  let fabBar = $state();
+  $effect(() => {
+    if (!app.placeMenu) return;
+    const away = (e) => { if (fabBar && !fabBar.contains(e.target)) app.placeMenu = false; };
+    document.addEventListener('pointerdown', away, true);
+    return () => document.removeEventListener('pointerdown', away, true);
+  });
   // Sources des compléments hors OSM (app/scripts/build_extras.py) ; une source inconnue n'est pas affichée
   const SOURCES = { overture: () => tx('source.overture'), paris: () => tx('source.paris'), atp: () => tx('source.atp'), annuaire: () => tx('source.annuaire'), site: () => tx('source.site') };
 </script>
@@ -229,7 +237,7 @@
       {/if}
 
       <!-- Barre flottante : favori, listes, plus -->
-      <div class="fab-bar">
+      <div class="fab-bar" bind:this={fabBar}>
         {#if app.placeMenu}
           <div class="pmenu" role="menu">
             {#if !app.isStation}
@@ -253,8 +261,9 @@
           <button class:on={app.inFav} onclick={app.favTap} aria-pressed={app.inFav} aria-label={app.inFav ? tx('fiche.retirer_de', { name: app.listOf('fav').name }) : tx('fiche.ajouter_a', { name: app.listOf('fav').name })}>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.3l-1.3-1.2C6 14.9 3 12.2 3 8.9 3 6.2 5.1 4 7.8 4c1.5 0 3 .7 4.2 1.9C13.2 4.7 14.7 4 16.2 4 18.9 4 21 6.2 21 8.9c0 3.3-3 6-7.7 10.2z" /></svg>
           </button>
-          <button class:on={app.isFav && app.savedEntry.lists.some((x) => x !== 'fav')} onclick={() => (app.listPicker = true)} aria-label={tx('fiche.ajouter_a_une_liste')}>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+          <!-- listes : un signet (comme « Enregistrer » ailleurs) plutôt qu'un « + » qui changeait de couleur (P5) -->
+          <button class:saved={app.isFav && app.savedEntry.lists.some((x) => x !== 'fav')} onclick={() => (app.listPicker = true)} aria-label={tx('fiche.ajouter_a_une_liste')}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.5 4h9a1 1 0 0 1 1 1v15l-5.5-3.8L6.5 20V5a1 1 0 0 1 1-1z" /></svg>
           </button>
           <button onclick={() => (app.placeMenu = !app.placeMenu)} aria-expanded={app.placeMenu} aria-label={tx('fiche.plus_options')}>
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="1.4" class="solid" /><circle cx="12" cy="12" r="1.4" class="solid" /><circle cx="18" cy="12" r="1.4" class="solid" /></svg>
@@ -369,6 +378,7 @@
   .fab .solid { fill: currentColor; stroke: none; }
   .fab button.on { color: var(--fav); }
   .fab button.on path { fill: currentColor; }
+  .fab button.saved path { fill: currentColor; }
   .pmenu { position: absolute; bottom: 62px; right: -6px; min-width: 220px; background: var(--card); border-radius: 14px; overflow: hidden;
     box-shadow: 0 6px 24px rgb(0 0 0 / 0.2), 0 0 0 0.5px rgb(0 0 0 / 0.08); }
   .pmenu button { display: block; width: 100%; text-align: left; border: 0; background: none; font: inherit; font-size: 15.5px; color: var(--ink);

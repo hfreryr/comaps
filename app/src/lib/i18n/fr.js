@@ -30,7 +30,7 @@ export default {
   'resultats.exemple_2': 'boulangerie ouverte dimanche',
   'resultats.exemple_3': 'métro le plus proche',
   'resultats.preuve': '0 traceur · 0 cookie · code ouvert ·',
-  'resultats.verifier': 'Vérifier',
+  'resultats.verifier': 'En savoir plus ›',
   'resultats.ville_ou_arrondissement': 'Ville ou arrondissement',
   'resultats.liste_aria': 'Résultats de la recherche',
   'resultats.ou_touchez_la_carte_pour_choisir_un': 'Ou touchez la carte pour choisir un point.',
@@ -254,6 +254,8 @@ export default {
   'itin.a_pied': 'à pied',
   'itin.le_plus_rapide': 'Le plus rapide',
   'itin.le_plus_rapide_2': 'le plus rapide',
+  'itin.le_plus_simple': 'Le plus simple',
+  'itin.etiquette_puis': '{etiquette} · {suite}',
   'itin.estimation_avec_le': 'Estimation avec le {traffic}',
   'itin.estimation_sur_route_fluide': 'Estimation sur route fluide',
   'itin.sur_place': ' · {fmtDuration} sur place',
@@ -302,6 +304,7 @@ export default {
   'guidage.recentrer': 'Recentrer',
   'guidage.etapes_du_trajet': 'Étapes du trajet',
   'guidage.voir_les_etapes': 'Voir les étapes',
+  'guidage.fermer_les_etapes': 'Fermer les étapes',
   'guidage.fin': 'Fin',
 
   'guidage.arrive': 'Arrivé',
@@ -401,8 +404,9 @@ export default {
   // ——— Écran principal ———
   'ecran.carte': 'Carte',
 
-  'ecran.infos_verifiees_en': 'Infos vérifiées en {when}',
-  'ecran.infos_non_verifiees_depuis': 'Infos non vérifiées depuis {getFullYear}',
+  // « vérifié par qui ? » (P6), « pas comparable à des avis » (P5) : on dit qui, et ce que c'est
+  'ecran.infos_verifiees_en': 'Infos confirmées en {when} par un contributeur OpenStreetMap',
+  'ecran.infos_non_verifiees_depuis': 'Infos pas reconfirmées depuis {getFullYear}',
   'ecran.distance': 'Distance',
   'ecran.oui': 'Oui',
   'ecran.partiel': 'Partiel',
@@ -521,6 +525,10 @@ export default {
   'position.votre_position_reste_sur_votre': 'Votre position reste sur votre téléphone.',
   'position.localisation_impossible_la_page_est': 'Localisation impossible : la page n\'est pas sécurisée. Ouvrez https://untrackedmaps.app.',
   'position.iphone_refuse_la_localisation_a_app': 'L\'iPhone refuse la localisation à l\'app installée (bug de certains iPhone récents). Pour le corriger : Réglages → Général → Transférer ou réinitialiser → Réinitialiser → Réinitialiser localisation et confidentialité (vos apps redemanderont leurs autorisations). Sinon, ouvrez untrackedmaps.app dans Safari.',
+  'position.nav_chrome': 'Chrome',
+  'position.nav_firefox': 'Firefox',
+  'position.nav_edge': 'Edge',
+  'position.iphone_navigateur_refuse': 'Localisation refusée. Sur iPhone : Réglages → Confidentialité et sécurité → Service de localisation → {navigateur} → « Lorsque l\'app est active », puis rouvrez la page.',
   'position.localisation_refusee_autorisez_la': 'Localisation refusée. Autorisez-la dans les réglages du navigateur.',
   'position.position_pas_encore_trouvee_delai': 'Position pas encore trouvée (délai dépassé). Réessayez, idéalement près d\'une fenêtre.',
   'position.position_introuvable_verifiez_que_le': 'Position introuvable : vérifiez que le Service de localisation du téléphone est activé.',

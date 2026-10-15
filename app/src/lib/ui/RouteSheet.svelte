@@ -6,7 +6,7 @@
   import { draggable } from '#lib/sheet.js';
   import { MODE_NAMES, fmtDuration, fmtTime, fmtDistance } from '#lib/routing.js';
   import { placeLabel } from '#lib/rame.js';
-  import { MODES, arrival, departure, inMinutes, badge, streetOpts, altTag, exitPhrase } from '#lib/routeview.js';
+  import { MODES, arrival, departure, inMinutes, transitTags, badge, streetOpts, altTag, exitPhrase } from '#lib/routeview.js';
   import ModeIcon from './ModeIcon.svelte';
   import LegChain from './LegChain.svelte';
   import WhenPicker from './WhenPicker.svelte';
@@ -104,6 +104,7 @@
     </ol>
   {:else}
     {@const it = current.data[picked] || current.data[0]}
+    {@const tags = transitTags(current.data)}
     <div class="sum transit" data-peek-end>
       <div class="sum-text">
         <span class="opt-top">
@@ -112,6 +113,7 @@
         </span>
         <span class="sum-sub"><strong>{fmtTime(it.board.start)}</strong> à {it.board.from}{#if it.board.realTime}{' '}<span class="live" title={tx('itin.horaire_en_temps_reel')}>●</span>{' '}{:else if inMinutes(it.board.start)} · {/if}{inMinutes(it.board.start)}</span>
         <span class="sum-sub">{#if it.next.length}{tx('itin.puis', { horaires: it.next.map(fmtTime).join(' · '), suite: ' · ' })}{/if}{tx('itin.arrivee_4', { fmtTime: fmtTime(it.end) })}{#if tripFare(it.legs) != null}<span title={tx('itin.prix_detail')}>{tx('itin.prix', { prix: fmtEuros(tripFare(it.legs)) })}</span>{/if}</span>
+        {#if tags[picked]}<span class="sum-tag best">{tags[picked]}</span>{/if}
         <!-- l'info la plus attendue (test P3) dès le résumé : où se placer dans la rame et quelle sortie prendre à l'arrivée -->
         {#each [it.legs.map((leg, li) => ({ leg, tip: legExits[`${picked}|${li}|${leg.to}`] })).filter((x) => x.tip?.exit || x.tip?.place).at(-1)] as last}
           {#if last?.tip?.place}<span class="sum-tip"><span class="car-ic" aria-hidden="true"></span>{tx('itin.montez', { placeLabel: placeLabel(last.tip.place), suite: '' })}</span>{/if}
@@ -182,7 +184,8 @@
           {#if i !== picked}
             <li><button onclick={() => pickTransit(i)}>
               <span class="opt-top"><LegChain it={o} /><span class="alt-dur">{fmtDuration(o.duration)}</span></span>
-              <span class="alt-sub">{tx('itin.a_arrivee', { fmtTime: fmtTime(o.board.start), from: o.board.from, fmtTime2: fmtTime(o.end) })}</span>
+              <span class="alt-sub">{tags[i] ? tx('itin.etiquette_puis', { etiquette: tags[i], suite: tx('itin.a_arrivee', { fmtTime: fmtTime(o.board.start), from: o.board.from, fmtTime2: fmtTime(o.end) }) })
+                : tx('itin.a_arrivee', { fmtTime: fmtTime(o.board.start), from: o.board.from, fmtTime2: fmtTime(o.end) })}</span>
             </button></li>
           {/if}
         {/each}

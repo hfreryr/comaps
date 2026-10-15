@@ -19,6 +19,18 @@ export const inMinutes = (d) => {
   return m <= 0 ? tx('horaires.maintenant') : m < 60 ? tx('itin.dans_min', { m }) : '';
 };
 const PREFIX = { SUBWAY: 'M', METRO: 'M', TRAM: 'T', BUS: tx('itin.bus'), REGIONAL_RAIL: 'RER', SUBURBAN: 'RER' };
+/**
+ * Étiquettes des propositions en transports : « Le plus rapide » (arrivée la plus tôt) et « Le plus simple »
+ * (moins de correspondances), comme Citymapper. Une proposition qui est les deux est « Le plus rapide ».
+ */
+export function transitTags(list) {
+  const rides = (it) => it.legs.filter((l) => l.mode !== 'WALK' && l.mode !== 'STOP').length;
+  if (list.length < 2) return list.map(() => '');
+  const fastest = list.reduce((b, it, i) => (it.end < list[b].end ? i : b), 0);
+  const fewest = list.reduce((b, it, i) => (rides(it) < rides(list[b]) ? i : b), 0);
+  return list.map((_, i) => (i === fastest ? tx('itin.le_plus_rapide')
+    : i === fewest && rides(list[i]) < rides(list[fastest]) ? tx('itin.le_plus_simple') : ''));
+}
 export const badge = (leg) => `${PREFIX[leg.mode] ? PREFIX[leg.mode] + ' ' : ''}${leg.line}`.trim();
 export const streetOpts = (r) => (r ? [r, ...(r.alts || [])] : []);
 // « 3 min de plus » ; à durée affichée égale : la différence de distance (sinon « 1 min de plus » sous deux « 22 min »)

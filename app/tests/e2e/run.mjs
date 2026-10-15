@@ -518,6 +518,23 @@ const tests = {
     assert(!errors.length, errors.join(' | '));
     await ctx.close();
   },
+  async 'petits retours P5-P7 : position refusée expliquée, menu ⋯ refermé en touchant ailleurs, signet des listes'() {
+    // position refusée au démarrage (P6, P7) : un message, une seule fois
+    let { p, ctx } = await page({ permissions: [] });
+    await p.waitForTimeout(1500);
+    assert(/Localisation refusée/.test(await p.textContent('.toast').catch(() => '')), 'refus de position non expliqué');
+    await p.reload({ waitUntil: 'networkidle' }); await p.waitForTimeout(2500);
+    assert(!/Localisation refusée/.test(await p.textContent('.toast', { timeout: 500 }).catch(() => '')), 'message répété à chaque ouverture');
+    await ctx.close();
+    ({ p, ctx } = await page());
+    await p.fill('#search', 'Panthéon'); await p.waitForSelector('.results li.opt button', { timeout: 15000 }); await pick(p);
+    await p.waitForSelector('.fab', { timeout: 10000 });
+    assert(await p.$('.fab button[aria-label="Ajouter à une liste"] svg path[d^="M7.5 4h9"]'), 'icône signet absente');
+    await p.click('.fab button[aria-label="Plus d\'options"]'); await p.waitForSelector('.pmenu');
+    await p.mouse.click(195, 200); await p.waitForTimeout(400);
+    assert(!(await p.$('.pmenu')), 'le menu ⋯ reste ouvert après un toucher ailleurs');
+    await ctx.close();
+  },
   async 'la liste se recharge quand on déplace la carte'() {
     const { p, ctx } = await page({ viewport: { width: 1280, height: 800 }, isMobile: false, hasTouch: false });
     await p.click('.chip:has-text("Restaurants")'); await p.waitForTimeout(4000);

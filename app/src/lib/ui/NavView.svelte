@@ -47,6 +47,10 @@
 {/if}
 {#if navList}
   <section class="sheet nav-list" aria-label={tx('guidage.etapes_du_trajet')}>
+    <!-- P6 ne savait pas comment refermer la liste : une croix, comme sur les autres fiches -->
+    <button class="close" onclick={() => (navList = false)} aria-label={tx('guidage.fermer_les_etapes')}>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" /></svg>
+    </button>
     <h1>{tx('itin.etapes')}</h1>
     <ol class="steps">
       {#each nav.steps as st, i}
@@ -59,7 +63,7 @@
   </section>
 {/if}
 <div class="nav-bottom">
-  <button class="nav-eta" onclick={() => (navList = !navList)} aria-expanded={navList} aria-label={tx('guidage.voir_les_etapes')}>
+  <button class="nav-eta" onclick={() => (navList = !navList)} aria-expanded={navList} aria-label={navList ? tx('guidage.fermer_les_etapes') : tx('guidage.voir_les_etapes')}>
     <strong>{navBanner.arrived ? tx('guidage.arrive') : navRemaining.eta}</strong>
     <span>{navBanner.arrived ? to.label : `${navRemaining.min} · ${navRemaining.km}`}</span>
   </button>
@@ -104,6 +108,12 @@
   .nav-recenter svg { width: 16px; height: 16px; }
   .nav-list { bottom: calc(72px + env(safe-area-inset-bottom)); border-radius: 22px 22px 0 0; z-index: 4; }
   .nav-list h1 { margin-top: 8px; }
+  .close {
+    position: absolute; top: 14px; right: 14px; width: 32px; height: 32px; border-radius: 50%;
+    border: 0; background: var(--fill); cursor: pointer; display: grid; place-items: center; color: var(--muted);
+  }
+  .close svg { width: 16px; height: 16px; stroke-width: 2.4; fill: none; stroke: currentColor; stroke-linecap: round; }
+  .close::after { content: ''; position: absolute; inset: -6px; }
   h1 { font-size: 24px; line-height: 1.2; font-weight: 700; letter-spacing: -0.02em; margin: 2px 44px 2px 0; }
   .why { display: block; font-size: 13px; color: var(--muted); margin-top: 2px; line-height: 1.35; }
   .steps li.done { color: var(--faint); }

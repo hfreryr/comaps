@@ -79,12 +79,20 @@ export function createLocation(app) {
       );
     });
   }
+  // Position refusée à l'ouverture : on le dit une fois, avec la marche à suivre (P6 et P7, iPhone avec Chrome
+  // et Firefox : la carte restait sur Paris sans explication). Ensuite, plus rien : le refus peut être voulu.
+  function sayRefusedOnce(e) {
+    if (app.showPromise) return;                          // (l'écran de bienvenue passe d'abord)
+    let told = false;
+    try { told = localStorage.getItem('position-refus-dit') === '1'; localStorage.setItem('position-refus-dit', '1'); } catch { /* rien */ }
+    if (!told) app.say(locError(e), { label: tx('itin.reessayer'), run: locate });
+  }
   // À l'ouverture, comme les cartes de référence : on se centre sur vous si vous l'acceptez.
-  // Refus ou erreur : la carte reste sur Paris, sans message d'erreur.
+  // Refus : un message, une seule fois. Autre erreur : la carte reste sur Paris, sans message.
   async function startupLocate() {
     try {
       const perm = await navigator.permissions?.query({ name: 'geolocation' }).catch(() => null);
-      if (perm?.state === 'denied') return;
+      if (perm?.state === 'denied') { sayRefusedOnce({ code: 1 }); return; }
       // App installée sur l'écran d'accueil : iOS peut refuser (et mémoriser le refus) une demande faite sans
       // geste de l'utilisateur. On attend donc qu'il touche le bouton de localisation la première fois.
       const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
@@ -100,16 +108,20 @@ export function createLocation(app) {
       const p = await getPosition();
       // (pas si la personne a déjà choisi quoi regarder entre-temps : position arrivée tard)
       if (!app.place && !app.category && !app.directions && !app.viewChosen) { app.followMode = 'follow'; app.map.flyTo({ center: [p.lon, p.lat], zoom: 15.5, duration: 900 }); }
-    } catch { /* on reste sur Paris */ }
+    } catch (e) {
+      if (e?.code === 1) sayRefusedOnce(e);                // sinon on reste sur Paris, sans message
+    }
   }
   // Un message qui dit la vraie cause (refus, page non sécurisée, signal introuvable, délai dépassé)
   function locError(e) {
     if (!window.isSecureContext) return tx('position.localisation_impossible_la_page_est');
     if (e?.code === 1) {
       const app = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
-      return app
-        ? tx('position.iphone_refuse_la_localisation_a_app')
-        : tx('position.localisation_refusee_autorisez_la');
+      if (app) return tx('position.iphone_refuse_la_localisation_a_app');
+      // iPhone avec Chrome, Firefox ou Edge : l'autorisation se donne dans les réglages de l'iPhone, pas du navigateur
+      const ua = navigator.userAgent;
+      const other = /CriOS/.test(ua) ? tx('position.nav_chrome') : /FxiOS/.test(ua) ? tx('position.nav_firefox') : /EdgiOS/.test(ua) ? tx('position.nav_edge') : null;
+      return other ? tx('position.iphone_navigateur_refuse', { navigateur: other }) : tx('position.localisation_refusee_autorisez_la');
     }
     if (e?.code === 3) return tx('position.position_pas_encore_trouvee_delai');
     if (e?.code === 2) return tx('position.position_introuvable_verifiez_que_le');
