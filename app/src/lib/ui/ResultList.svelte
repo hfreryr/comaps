@@ -29,6 +29,18 @@
       <li class="note">{tx('resultats.tapez_adresse_de_votre_puis', { lieu: app.assigning === 'home' ? tx('resultats.maison') : tx('resultats.travail') })}
         <button class="link" onmousedown={(e) => { e.preventDefault(); app.assigning = null; }}>{tx('resultats.annuler')}</button></li>
     {/if}
+    {#if app.activeQuery.trim().length < 2 && !app.editing && !app.assigning}
+      <!-- exemples touchables : on ne devine pas qu'on peut écrire « restaurant ouvert demain dans le 8e » (retour du porteur) -->
+      <li class="note recents-head"><span>{tx('resultats.essayez')}</span></li>
+      {#each [tx('resultats.exemple_1'), tx('resultats.exemple_2'), tx('resultats.exemple_3')] as ex}
+        <li class="opt example">
+          <button onmousedown={(e) => { e.preventDefault(); app.query = ex; }}>
+            <span class="r-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5" /><path d="M15.5 15.5 20 20" /></svg></span>
+            <span class="r-text"><span class="r-name">{ex}</span></span>
+          </button>
+        </li>
+      {/each}
+    {/if}
     {#if app.activeQuery.trim().length < 2 && app.favorites.length}
       <li class="note recents-head"><span>{tx('resultats.mes_lieux')}</span>
         {#if !app.editing}<button class="link" onmousedown={(e) => { e.preventDefault(); app.focused = false; document.activeElement?.blur(); app.pickCategory(ALL_CATEGORIES[0]); }}>{tx('resultats.tout_voir')}</button>{/if}</li>

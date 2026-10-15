@@ -11,7 +11,7 @@ export default {
   'promesse.compris': 'Compris',
 
   // ——— Barre de recherche et départ / arrivée ———
-  'recherche.rechercher_un_lieu_ou_une_adresse': 'Rechercher un lieu ou une adresse',
+  'recherche.rechercher_un_lieu_ou_une_adresse': 'Rechercher un lieu, une adresse',
   'recherche.effacer_la_recherche': 'Effacer la recherche',
   'recherche.categories': 'Catégories',
   'recherche.personnaliser_les_raccourcis': 'Personnaliser les raccourcis',
@@ -25,6 +25,10 @@ export default {
   'recherche.depart': 'Départ',
   'recherche.arrivee': 'Arrivée',
   // ——— Résultats de recherche ———
+  'resultats.essayez': 'Essayez',
+  'resultats.exemple_1': 'restaurant ouvert demain dans le 8e',
+  'resultats.exemple_2': 'boulangerie ouverte dimanche',
+  'resultats.exemple_3': 'métro le plus proche',
   'resultats.preuve': '0 traceur · 0 cookie · code ouvert ·',
   'resultats.verifier': 'Vérifier',
   'resultats.ville_ou_arrondissement': 'Ville ou arrondissement',
