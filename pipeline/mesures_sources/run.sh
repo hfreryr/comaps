@@ -21,3 +21,7 @@ for d in ilots-de-fraicheur-espaces-verts-frais ilots-de-fraicheur-equipements-a
 python3 "$HERE/mesure_paris.py"
 curl -s "https://api-lannuaire.service-public.fr/api/explore/v2.1/catalog/datasets/api-lannuaire-administration/exports/json?where=plage_ouverture%20is%20not%20null%20and%20search(adresse%2C%22Paris%22)&select=nom,type_organisme,pivot,adresse,plage_ouverture" -o annuaire75.json
 python3 "$HERE/mesure_annuaire.py"
+# Common Crawl : présence des sites dans la dernière copie, puis horaires lisibles dans les pages archivées (≈ 10 min)
+CRAWL=$(curl -s https://index.commoncrawl.org/collinfo.json | python3 -c "import json,sys; print(json.load(sys.stdin)[0]['id'])")
+curl -s "https://data.commoncrawl.org/crawl-data/$CRAWL/cc-index-table.paths.gz" | gunzip | grep subset=warc > cc_files.txt
+python3 "$HERE/cc_dom.py" && python3 "$HERE/cc_hours.py"

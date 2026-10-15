@@ -132,3 +132,37 @@ def test_annuaire():
 def test_annuaire_permanence_ecartee():
     p = {"nom_jour_debut": "Jeudi", "nom_jour_fin": "Jeudi", "valeur_heure_debut_1": "09:00:00", "valeur_heure_fin_1": "17:00:00"}
     assert annuaire_hours([p]) is None
+
+
+# ——— Horaires publiés par les sites des lieux (schema.org) ———
+from build_sitehours import week_to_osm, from_spec, from_text, hours_in, wanted, similar
+
+
+def test_semaine_vers_osm():
+    w = [["12:00-14:30", "19:00-22:30"]] * 5 + [["19:00-23:00"], []]
+    assert week_to_osm(w) == "Mo-Fr 12:00-14:30,19:00-22:30; Sa 19:00-23:00"
+    assert week_to_osm([[]] * 7) is None
+
+
+def test_specification_schema_org():
+    spec = [{"@type": "OpeningHoursSpecification", "dayOfWeek": ["https://schema.org/Monday", "Tuesday"], "opens": "12:00:00", "closes": "14:30"},
+            {"dayOfWeek": "Saturday", "opens": "19:00", "closes": "00:00"},
+            {"dayOfWeek": "Sunday", "opens": "10:00", "closes": "12:00", "validFrom": "2026-12-25", "validThrough": "2026-12-25"}]
+    assert from_spec(spec) == "Mo,Tu 12:00-14:30; Sa 19:00-24:00"
+    assert from_text(["Mo-Fr 09:00-18:00", "Sa 10:00-12:00"]) == "Mo-Fr 09:00-18:00; Sa 10:00-12:00"
+
+
+def test_page_du_lieu():
+    page = ('<html><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Restaurant",'
+            '"name":"Le Grand Pan","openingHours":"Mo-Fr 12:00-14:00,19:30-23:00"}]}</script></html>')
+    assert hours_in(page, "Le Grand Pan") == "Mo-Fr 12:00-14:00,19:30-23:00"
+    assert hours_in(page, "Chez Paul") is None                   # nom différent : horaires d'un autre établissement
+    bad = page.replace("Mo-Fr 12:00-14:00,19:30-23:00", "Lundi midi")
+    assert hours_in(bad, "Le Grand Pan") is None                 # format illisible : rien plutôt que faux
+
+
+def test_lieux_cherches():
+    assert wanted({"amenity": "restaurant"}) and wanted({"shop": "bakery"})
+    assert not wanted({"amenity": "restaurant", "opening_hours": "Mo-Su 12:00-22:00"})
+    assert not wanted({"amenity": "bank"})
+    assert similar("Restaurant Petrus", "Petrus Paris") and not similar("Café de Paris", "Paris Brasserie")

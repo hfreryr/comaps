@@ -29,6 +29,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from build_places import Places  # mêmes lieux et mêmes identifiants que les tuiles
 
 OVERTURE = "https://overturemaps-us-west-2.s3.amazonaws.com"
+UA = "UntrackedMapsBot/0.1 (+https://untrackedmaps.app/confidentialite)"
 # Plateformes et sites génériques : pas le site du lieu (et rien de Google)
 NOT_A_SITE = re.compile(r"google\.|goo\.gl|tripadvisor|thefork|lafourchette|ubereats|deliveroo|just-?eat|pagesjaunes|yelp\.|"
                         r"privateaser|4sq\.com|foursquare|eater\.space|menuonline|wiicmenu|cityvox|yespark|zenpark|"
@@ -402,9 +403,13 @@ def main():
     try:
         zp = args.atp
         if not zp:
-            run = json.load(urllib.request.urlopen(ATP_LATEST, timeout=60))
+            # sans identifiant explicite, le serveur d'All The Places répond 403 (constaté le 15/10/2026 sur GitHub)
+            get = lambda u: urllib.request.urlopen(urllib.request.Request(u, headers={"User-Agent": UA}), timeout=600)
+            run = json.load(get(ATP_LATEST))
             zp = "atp.zip"
-            urllib.request.urlretrieve(run["output_url"], zp)
+            with get(run["output_url"]) as r, open(zp, "wb") as f:
+                while chunk := r.read(1 << 20):
+                    f.write(chunk)
         arows = atp_rows(zp, bbox)
         print(f"All The Places : {len(arows)} lieux dans la zone", file=sys.stderr)
         for i, cands in match_atp(items, arows).items():

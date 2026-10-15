@@ -98,6 +98,11 @@ const tests = {
     const sq = await p.$eval('.sheet', (e) => e.innerText);
     assert(/18:30|18 h 30/.test(sq) && /Source : Ville de Paris/.test(sq), `horaires de la Ville absents : ${sq.slice(0, 300)}`);
     await ctx.close();
+    // Le Grand Pan : horaires lus sur le site du restaurant (schema.org)
+    ({ p, ctx, errors } = await page({}, '#carte=18/48.833064/2.305725&lieu=node/556461131'));
+    await p.waitForSelector('.sheet h1', { timeout: 15000 }); await p.waitForTimeout(2000);
+    assert(/Source : site du lieu/.test(await p.$eval('.sheet', (e) => e.innerText)), 'source « site du lieu » absente');
+    await ctx.close();
     // Panthéon : rien de complété, aucune mention de source
     ({ p, ctx, errors } = await page({}, '#carte=18/48.846219/2.346008&lieu=way/16407465'));
     await p.waitForSelector('.sheet h1', { timeout: 15000 }); await p.waitForTimeout(2000);
