@@ -1,0 +1,32 @@
+# Sonde des services extérieurs (recherche, adresses, itinéraires, transports) : toutes les 15 minutes, on mesure le
+# temps de réponse de chacun et on l'ajoute à sonde/services.csv sur la branche « sonde ».
+# But : savoir si un service ralentit à certaines heures (lenteur de la recherche pendant les tests du 15/10/2026).
+# Aucune donnée d'utilisateur : des requêtes fixes, envoyées par GitHub.
+name: Sonde des services (15 min)
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+concurrency:
+  group: sonde
+  cancel-in-progress: false
+permissions:
+  contents: write
+jobs:
+  sonde:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+        with: { ref: main, path: code }
+      - name: Mesures
+        run: python code/app/scripts/sonde_services.py > mesures.csv && cat mesures.csv
+      - name: Ajouter à la branche « sonde »
+        run: |
+          git -C code fetch --depth=1 origin sonde && git -C code worktree add ../sonde origin/sonde || {
+            git -C code worktree add --orphan -b sonde ../sonde; }
+          mkdir -p sonde/sonde
+          [ -f sonde/sonde/services.csv ] || echo "date_utc,service,requete,code,secondes" > sonde/sonde/services.csv
+          cat mesures.csv >> sonde/sonde/services.csv
+          cd sonde && git add sonde/services.csv
+          git -c user.name=untracked-bot -c user.email=bot@untrackedmaps.app commit -qm "Sonde $(date -u +%FT%H:%M)" && git push -q origin HEAD:sonde
