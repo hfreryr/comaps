@@ -27,4 +27,8 @@ Retour des tests (P1, P4) : « beaucoup de fiches sans horaires ». Mesuré dans
 2. Rédiger l'annonce au forum OSM France pour la voie 1 (micro-question), puisque c'est elle qui compte le plus, et la mise en relecture de 2 semaines.
 3. Vérifier licence et usages pour la voie 2.
 
-Décisions attendues du porteur : ordre ci-dessus, et texte de l'annonce au forum.
+## Mise à jour du 15/10 (soir)
+
+- Décision du porteur : **ne compter sur aucune contribution** pour le prototype ; toutes les sources ouvertes au coût faible sont à prendre.
+- Mesures de toutes les sources : [`sources-donnees.md`](sources-donnees.md). Overture **n'a pas d'horaires**, mais donne des sites web : les restos sans horaires avec un site passent de 927 à 4 316, dont ≈ 32 % affichent leurs horaires en page d'accueil.
+- L'annonce au forum du 13/10 couvre déjà les questions sur place avec compte OSM (à partir du 27/10). Un compte partagé pour tous les utilisateurs est exclu (précédent de Bing Map Builder, bloqué ; règle du projet). Les notes OSM anonymes n'ajoutent rien tant qu'un bénévole ne les traite pas.
