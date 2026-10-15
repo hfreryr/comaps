@@ -10,7 +10,7 @@
   // État et actions de la page (voir le bloc « app » de +page.svelte)
   const app = getContext('app');
   // Sources des compléments hors OSM (app/scripts/build_extras.py) ; une source inconnue n'est pas affichée
-  const SOURCES = { overture: () => tx('source.overture'), paris: () => tx('source.paris') };
+  const SOURCES = { overture: () => tx('source.overture'), paris: () => tx('source.paris'), atp: () => tx('source.atp'), annuaire: () => tx('source.annuaire') };
 </script>
 
 {#snippet transitBlock()}

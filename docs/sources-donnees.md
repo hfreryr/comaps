@@ -43,7 +43,7 @@ Mesures faites sur l'extrait OSM de Paris (73 441 lieux nommés), scripts dans `
 
 1. ✅ Overture : sites et téléphones (PR #37) — 8 477 sites et 14 215 téléphones après appariement prudent.
 2. ✅ Ville de Paris : parcs et piscines — 379 horaires (320 parcs, 25 jardins, 30 piscines…), seulement pour la période en cours.
-3. All The Places et annuaire de l'administration.
+3. ✅ All The Places et annuaire de l'administration — enseignes : 209 horaires, 457 sites, 941 téléphones (horaires au format OSM vérifié, parkings et consignes exclus) ; annuaire : 23 horaires de services publics (mairies, PMI, tribunaux), en écartant les « sur rendez-vous », les permanences d'un ou deux jours et les adresses partagées par plusieurs services aux horaires différents.
 4. Sites des commerçants : données structurées d'abord, textes ensuite.
 
 Décision attendue du porteur : afficher dans l'app des informations qui ne viennent pas d'OSM, avec leur source (condition de tout ce qui précède).

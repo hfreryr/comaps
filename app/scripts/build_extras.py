@@ -12,6 +12,8 @@ Règles :
 
 Sources branchées :
   - overture : site web et téléphone (Overture Maps Foundation, CDLA-Permissive 2.0), lus par HTTPS sans identifiants ;
+  - atp : horaires, site et téléphone publiés par les enseignes sur leurs propres sites (All The Places, CC0) ;
+  - annuaire : horaires des services publics (annuaire de l'administration, service-public.fr, Licence Ouverte 2.0) ;
   - paris : horaires des parcs, squares, piscines, bibliothèques, musées et mairies (Ville de Paris, ODbL), seulement
     pour la période en vigueur (horaires d'été, d'hiver…).
 
@@ -228,10 +230,137 @@ def paris_rows(records, today):
             continue
         until = paris_period(r.get("horaires_periode"), today)
         hours = paris_opening_hours(r)
-        if until is None or not hours:
+        if until is None or not hours or not valid_hours(hours):
             continue
         g = r["geo_point_2d"]
         rows.append((r["nom"], g["lat"], g["lon"], hours, until))
+    return rows
+
+
+_D = r"(?:Mo|Tu|We|Th|Fr|Sa|Su|PH)"
+_DAYSPEC = rf"{_D}(?:-{_D})?(?:,{_D}(?:-{_D})?)*"
+_T = r"(?:[01]\d|2[0-4]):[0-5]\d"
+_RULE = re.compile(rf"(?:{_DAYSPEC}\s+)?(?:{_T}-{_T}(?:,{_T}-{_T})*|off|closed)")
+
+
+def valid_hours(oh):
+    """Horaires au format OSM simple que la fiche sait lire, sans plages qui se chevauchent ; sinon on écarte."""
+    if oh == "24/7":
+        return True
+    for rule in (r.strip() for r in (oh or "").split(";")):
+        if not _RULE.fullmatch(rule):
+            return False
+        spans = sorted(re.findall(rf"({_T})-({_T})", rule))
+        if any(b[0] < a[1] for a, b in zip(spans, spans[1:])):
+            return False
+    return bool(oh)
+
+
+# ——— All The Places : ce que les enseignes publient sur leurs sites (CC0) ———
+ATP_LATEST = "https://data.alltheplaces.xyz/runs/latest.json"
+ATP_SKIP = re.compile(r"park|stasher|bagbnb|nannybag|bounce|charg|ev_|lime|velib|cityscoot|indigo|onepark|zenpark|yespark|saemes|effia", re.I)
+COORD = re.compile(rb'"coordinates":\s*\[\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)')
+
+
+def atp_rows(zip_path, bbox):
+    """Lignes (nom, lat, lon, propriétés) des lieux All The Places de la zone, lues sans tout charger en mémoire."""
+    import zipfile
+    w, s, e, n = bbox
+    rows = []
+    with zipfile.ZipFile(zip_path) as z:
+        for info in z.infolist():
+            if not info.filename.endswith(".geojson") or ATP_SKIP.search(info.filename):
+                continue
+            with z.open(info) as f:
+                for line in f:
+                    m = COORD.search(line)
+                    if not m:
+                        continue
+                    lon, lat = float(m[1]), float(m[2])
+                    if not (s <= lat <= n and w <= lon <= e):
+                        continue
+                    try:
+                        p = json.loads(line.strip().rstrip(b",")).get("properties", {})
+                    except ValueError:
+                        continue
+                    name = p.get("name") or p.get("brand")
+                    if name and p.get("amenity") not in ("parking", "charging_station", "atm", "vending_machine", "parcel_locker", "bicycle_rental"):
+                        rows.append((name, lat, lon, p))
+    return rows
+
+
+def match_atp(items, rows):
+    """Même enseigne (brand:wikidata) à 80 m, sinon même nom à 40 m."""
+    by_brand = defaultdict(list)
+    for i, (oid, lon, lat, tags) in enumerate(items):
+        if tags.get("brand:wikidata"):
+            by_brand[tags["brand:wikidata"]].append(i)
+    found = {}
+    rest = []
+    for row in rows:
+        _, lat, lon, p = row
+        best = None
+        for i in by_brand.get(p.get("brand:wikidata"), ()):
+            d = meters(lat, lon, items[i][2], items[i][1])
+            if d <= 80 and (best is None or d < best[0]):
+                best = (d, i)
+        if best:
+            found.setdefault(best[1], []).append((best[0], row))
+        else:
+            rest.append(row)
+    for i, c in match_rows(items, rest, 40, completable).items():
+        found.setdefault(i, []).extend(c)
+    return found
+
+
+# ——— Annuaire de l'administration (service-public.fr, Licence Ouverte 2.0) ———
+ANNUAIRE = ("https://api-lannuaire.service-public.fr/api/explore/v2.1/catalog/datasets/api-lannuaire-administration/exports/json"
+            "?where=plage_ouverture%20is%20not%20null%20and%20search(adresse%2C%22Paris%22)&select=nom,adresse,plage_ouverture")
+JOURS = {"Lundi": 0, "Mardi": 1, "Mercredi": 2, "Jeudi": 3, "Vendredi": 4, "Samedi": 5, "Dimanche": 6}
+
+
+def annuaire_hours(plages):
+    """Plages de l'annuaire → horaires OSM ; None si une plage est « sur rendez-vous » ou illisible."""
+    week = [[] for _ in range(7)]
+    for p in plages:
+        if re.search(r"rendez|rdv", p.get("commentaire") or "", re.I):
+            return None
+        a, b = JOURS.get(p.get("nom_jour_debut")), JOURS.get(p.get("nom_jour_fin"))
+        if a is None or b is None or b < a:
+            return None
+        spans = []
+        for k in (1, 2):
+            h1, h2 = p.get(f"valeur_heure_debut_{k}") or "", p.get(f"valeur_heure_fin_{k}") or ""
+            if h1 and h2:
+                spans.append(f"{h1[:5]}-{h2[:5]}")
+        for d in range(a, b + 1):
+            week[d] += spans
+    # ouvert 1 ou 2 jours : en général la permanence d'un service hébergé là, pas les horaires du lieu
+    if sum(1 for d in week if d) < 3:
+        return None
+    rec = {f"horaires_{fr}": " / ".join(s.replace(":", "h").replace("-", " - ") for s in week[i]) or "-" for i, (fr, _) in enumerate(DAYS)}
+    return paris_opening_hours(rec)
+
+
+def annuaire_keep(tags):
+    """Services publics seulement (pas l'école ni le square qui partagent l'adresse d'une PMI)."""
+    return tags.get("amenity") in ("townhall", "police", "social_facility", "community_centre", "social_centre", "courthouse") or (
+        tags.get("office") == "government")
+
+
+def annuaire_rows(records):
+    rows = []
+    for r in records:
+        try:
+            plages = json.loads(r.get("plage_ouverture") or "[]")
+            adresses = json.loads(r.get("adresse") or "[]")
+        except ValueError:
+            continue
+        ad = next((a for a in adresses if a.get("type_adresse") == "Adresse" and (a.get("code_postal") or "").startswith("75")
+                   and a.get("latitude")), None)
+        hours = annuaire_hours(plages)
+        if ad and hours and r.get("nom"):
+            rows.append((r["nom"], float(ad["latitude"]), float(ad["longitude"]), hours))
     return rows
 
 
@@ -247,6 +376,7 @@ def main():
     ap.add_argument("pbf")
     ap.add_argument("--out", default="extras.json")
     ap.add_argument("--overture-release", help="version d'Overture (par défaut : la plus récente)")
+    ap.add_argument("--atp", help="archive output.zip d'All The Places déjà téléchargée (sinon : la plus récente)")
     args = ap.parse_args()
     t0 = time.time()
 
@@ -260,6 +390,35 @@ def main():
 
     extras = defaultdict(dict)
     stats = Counter()
+
+    def put(oid, key, value, source, until=None, has=False):
+        """Ajoute un complément si ni OSM ni une source précédente ne l'a déjà (ordre = ordre de confiance)."""
+        if has or key in extras[str(oid)]:
+            return
+        extras[str(oid)][key] = [value, source, until] if until else [value, source]
+        stats[f"{source}:{key}"] += 1
+
+    # 1. All The Places : publié par l'enseigne elle-même, le plus fiable
+    try:
+        zp = args.atp
+        if not zp:
+            run = json.load(urllib.request.urlopen(ATP_LATEST, timeout=60))
+            zp = "atp.zip"
+            urllib.request.urlretrieve(run["output_url"], zp)
+        arows = atp_rows(zp, bbox)
+        print(f"All The Places : {len(arows)} lieux dans la zone", file=sys.stderr)
+        for i, cands in match_atp(items, arows).items():
+            oid, lon, lat, tags = items[i]
+            _, (_, _, _, p) = min(cands, key=lambda c: c[0])
+            if valid_hours(p.get("opening_hours")):
+                put(oid, "opening_hours", p["opening_hours"], "atp", has="opening_hours" in tags)
+            if p.get("website") and not NOT_A_SITE.search(p["website"]):
+                put(oid, "website", p["website"], "atp", has=bool(tags.get("website") or tags.get("contact:website")))
+            tel = phone_fr(p.get("phone", "").split(";")[0])
+            if tel:
+                put(oid, "phone", tel, "atp", has=bool(tags.get("phone") or tags.get("contact:phone")))
+    except Exception as e:  # une source en panne ne bloque pas les autres
+        print("All The Places ignoré :", e, file=sys.stderr)
     release = args.overture_release or latest_release()
     rows = overture_places(release, bbox)
     print(f"Overture {release} : {len(rows)} lieux dans la zone", file=sys.stderr)
@@ -273,13 +432,11 @@ def main():
         has_site = tags.get("website") or tags.get("contact:website")
         has_phone = tags.get("phone") or tags.get("contact:phone")
         site = next((w for w in websites if not NOT_A_SITE.search(w) and site_use[w] <= 3 and site_of(tags["name"], w)), None)
-        if site and not has_site:
-            extras[str(oid)]["website"] = [site, "overture"]
-            stats["site"] += 1
+        if site:
+            put(oid, "website", site, "overture", has=bool(has_site))
         tel = next((p for p in map(phone_fr, phones) if p), None)
-        if tel and not has_phone:
-            extras[str(oid)]["phone"] = [tel, "overture"]
-            stats["tel"] += 1
+        if tel:
+            put(oid, "phone", tel, "overture", has=bool(has_phone))
 
     today = time.strftime("%Y-%m-%d")
     try:
@@ -289,17 +446,26 @@ def main():
         prows = []
     for i, cands in match_rows(items, prows, 150, paris_keep).items():
         oid, lon, lat, tags = items[i]
-        if "opening_hours" in tags:
-            continue
         _, (name, _, _, hours, until) = min(cands, key=lambda c: c[0])
-        extras[str(oid)]["opening_hours"] = [hours, "paris", until] if until else [hours, "paris"]
-        stats["horaires"] += 1
+        put(oid, "opening_hours", hours, "paris", until or None, has="opening_hours" in tags)
+
+    try:
+        arows = annuaire_rows(json.load(urllib.request.urlopen(ANNUAIRE, timeout=120)))
+    except Exception as e:
+        print("Annuaire ignoré :", e, file=sys.stderr)
+        arows = []
+    for i, cands in match_rows(items, arows, 80, annuaire_keep).items():
+        oid, lon, lat, tags = items[i]
+        # plusieurs services au même endroit (mairie : état civil, élections…) aux horaires différents : on s'abstient
+        if len({c[1][3] for c in cands}) > 1 or not valid_hours(cands[0][1][3]):
+            continue
+        put(oid, "opening_hours", cands[0][1][3], "annuaire", has="opening_hours" in tags)
+    extras = {k: v for k, v in extras.items() if v}
 
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
     Path(args.out).write_text(json.dumps({"v": 1, "built": today, "overture": release, "places": extras},
                                          ensure_ascii=False, separators=(",", ":")))
-    print(f"compléments : {stats['site']} sites, {stats['tel']} téléphones, {stats['horaires']} horaires, "
-          f"pour {len(extras)} lieux, en {time.time() - t0:.0f} s")
+    print("compléments : " + ", ".join(f"{k} {v}" for k, v in sorted(stats.items())) + f" ; {len(extras)} lieux, en {time.time() - t0:.0f} s")
 
 
 if __name__ == "__main__":
