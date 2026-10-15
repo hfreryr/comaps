@@ -337,6 +337,27 @@ const tests = {
     assert(!errors.length, errors.join(' | '));
     await ctx.close();
   },
+  async 'guidage sans localisation : on passe les étapes à la main'() {
+    const { p, ctx, errors } = await page({ permissions: [], geolocation: undefined });
+    await p.click('.chip:has-text("Restaurants")'); await p.waitForTimeout(6000);
+    await p.click('.nearby li button >> nth=0'); await p.waitForTimeout(3000);
+    await p.click('.action.primary'); await p.waitForTimeout(2000);
+    // pas de position : on choisit le départ à la main
+    if (!(await p.$('#field-from'))) await p.click('.field-btn >> nth=0');
+    await p.fill('#field-from', '57 rue de rennes'); await p.waitForSelector('.results li.opt:has-text("Rennes") button', { timeout: 30000 });
+    await p.dispatchEvent('.results li.opt:has-text("Rennes") button >> nth=0', 'mousedown'); await p.waitForTimeout(6000);
+    await p.click('.mode-tabs .mode-tab >> nth=0'); await p.waitForTimeout(4000);
+    await p.click('.sum-actions .go'); await p.waitForSelector('.nav-manual', { timeout: 8000 });
+    const before = await p.$eval('.nav-text', (e) => e.textContent);
+    await p.click('.nav-manual button[aria-label="Étape suivante"]'); await p.waitForTimeout(900);
+    const after = await p.$eval('.nav-text', (e) => e.textContent);
+    assert(before !== after, `l'étape ne change pas : ${before}`);
+    await p.click('.nav-manual button[aria-label="Étape précédente"]'); await p.waitForTimeout(900);
+    assert((await p.$eval('.nav-text', (e) => e.textContent)) === before, 'retour à l\'étape précédente impossible');
+    await p.click('.nav-end');
+    assert(!errors.length, errors.join(' | '));
+    await ctx.close();
+  },
   async 'page « Qui voit quoi » : on peut la faire défiler'() {
     const { p, ctx } = await page();
     await p.evaluate(() => { const a = document.createElement('a'); a.href = 'confidentialite'; a.id = 'qvq'; document.body.appendChild(a); a.click(); });

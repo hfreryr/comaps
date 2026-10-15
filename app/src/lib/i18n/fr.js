@@ -267,6 +267,10 @@ export default {
   'itin.a': 'à {fmtTime}',
   'itin.fluide': 'fluide',
   // ——— Guidage ———
+  'guidage.etapes_a_la_main': 'Passer les étapes à la main',
+  'guidage.position_indisponible': 'Position indisponible : passez les étapes à la main',
+  'guidage.etape_precedente': 'Étape précédente',
+  'guidage.etape_suivante': 'Étape suivante',
   'guidage.puis': 'Puis : {then}',
   'guidage.recentrer': 'Recentrer',
   'guidage.etapes_du_trajet': 'Étapes du trajet',
