@@ -2,7 +2,7 @@
 // Code sorti de +page.svelte : il lit et modifie l'état de l'écran par l'objet « app » (bloc « app » de la page).
 import { tx } from '#lib/i18n/index.js';
 import { empty } from '#lib/maplayers.js';
-import { streetRoute, trafficEstimate, transitRoutes, transitWithStop } from '#lib/routing.js';
+import { streetRoute, trafficEstimate, transitRoutes, transitWithStop, TRANSIT_PREFS } from '#lib/routing.js';
 import { tick } from 'svelte';
 
 /** @param {any} app */
@@ -94,7 +94,8 @@ export function createDirections(app) {
     const v = app.showVia ? app.via : null;
     run('walk', () => streetRoute(app.from, app.to, 'walk', signal, v));
     run('bike', () => streetRoute(app.from, app.to, 'bike', signal, v));
-    run('transit', () => (v ? transitWithStop(app.from, v, app.to, signal) : transitRoutes(app.from, app.to, signal)));
+    const modes = TRANSIT_PREFS[app.transitPref] || null;
+    run('transit', () => (v ? transitWithStop(app.from, v, app.to, signal, new Date(), modes) : transitRoutes(app.from, app.to, signal, new Date(), modes)));
     run('car', async () => {
       const r = await streetRoute(app.from, app.to, 'car', signal, v);
       const t = await trafficEstimate(app.from, app.to);
@@ -122,5 +123,12 @@ export function createDirections(app) {
     sheetToTop();
   }
 
-  return { startDirections, closeDirections, pointOf, setPoint, addStop, removeStop, editField, useMyPosition, swap, computeRoutes, chooseMode, sheetToTop, pickStreet, pickTransit };
+  /** Modes de transport en commun choisis (P4 : « je ne peux pas sélectionner uniquement le métro »). */
+  function setTransitPref(p) {
+    if (app.transitPref === p) return;
+    app.transitPref = p;
+    app.picked = 0;
+    computeRoutes();
+  }
+  return { startDirections, closeDirections, pointOf, setPoint, addStop, removeStop, editField, useMyPosition, swap, computeRoutes, chooseMode, sheetToTop, pickStreet, pickTransit, setTransitPref };
 }

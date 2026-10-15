@@ -394,10 +394,23 @@ const tests = {
     await p.click('.mode-tabs .mode-tab >> nth=2'); await p.waitForTimeout(12000);
     assert((await p.locator('.leg').count()) > 2, 'aucun itinéraire en transports');
     // si une sortie est conseillée (métro ou RER), le trajet à pied qui suit a été recalculé depuis cette sortie
-    if (await p.locator('.leg-exit').count()) assert((await p.locator('.leg-tip').count()) >= 1, 'sortie conseillée sans place dans la rame');
+    // (la place dans la rame n'existe que là où la RATP la publie : pas d'assertion, la sortie peut venir seule)
     if (await p.locator('.leg-exit').count()) assert(valhalla >= 4, `trajet à pied depuis la sortie non recalculé (${valhalla} appels Valhalla)`);
     // la sortie et la place dans la rame figurent aussi dans le résumé, visible sans faire défiler
     if (await p.locator('.leg-exit').count()) assert((await p.locator('.sum .sum-tip').count()) >= 1, 'sortie absente du résumé');
+    await ctx.close();
+  },
+  async 'transports : prix du trajet et choix des modes (« Bus et tram » seulement)'() {
+    const { p, ctx, errors } = await page({ geolocation: { latitude: 48.8867, longitude: 2.3431 } });
+    await p.fill('#search', '57 rue de rennes'); await p.waitForSelector('.results li.opt button', { timeout: 30000 }); await pick(p); await p.waitForTimeout(2500);
+    await p.click('.action.primary'); await p.waitForTimeout(2000);
+    await p.click('.mode-tabs .mode-tab >> nth=2'); await p.waitForSelector('.route-sheet .sum.transit', { timeout: 25000 });
+    assert(/\d,\d\d €/.test(await p.$eval('.route-sheet .sum', (e) => e.innerText)), 'prix absent du résumé');
+    await p.click('.t-pref:has-text("Bus et tram")'); await p.waitForTimeout(1000);
+    await p.waitForSelector('.route-sheet .sum.transit', { timeout: 25000 }); await p.waitForTimeout(1500);
+    const metas = await p.$$eval('.legs .leg:not(.walk):not(.stop)', (els) => els.map((e) => e.querySelector('.leg-meta')?.textContent || '').filter((t) => t.trim()));
+    assert(metas.length && metas.every((m) => /Bus|Tram/.test(m)), `autre mode que bus ou tram : ${metas.join(' | ')}`);
+    assert(!errors.length, errors.join(' | '));
     await ctx.close();
   },
   async 'la liste se recharge quand on déplace la carte'() {

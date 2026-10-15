@@ -188,7 +188,7 @@
                       <span class="n-dep">
                         <span class="badge small" class:round={l.mode === 'SUBWAY' || l.mode === 'METRO'} style:background={l.color} style:color={l.textColor}>{l.line}</span>
                         <span class="n-dir">{l.headsign}</span>
-                        <span class="n-time">{fmtWait(l.times[0], app.now)}</span>
+                        <span class="n-time">{l.times.slice(0, 2).map((d) => fmtWait(d, app.now)).join(" · ")}</span>
                       </span>
                     {/each}
                   {:else if sd?.status === 'loading'}

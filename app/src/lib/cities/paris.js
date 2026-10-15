@@ -22,5 +22,12 @@ export default {
   },
   // enrichissements locaux (fichiers dans static/data/) : sorties de métro (OSM), place dans la rame (RATP/IDFM), trafic (Ville de Paris)
   packs: { exits: 'exits.json', rame: 'rame.json', traffic: 'traffic-paris.json' },
-  transit: { stopIdPrefix: 'IDFM' }
+  transit: { stopIdPrefix: 'IDFM' },
+  // Prix des tickets à l'unité, plein tarif (Île-de-France Mobilités, en vigueur au 1er janvier 2026, vérifié le 15/10/2026 :
+  // iledefrance-mobilites.fr, bonjour-ratp.fr). Métro-Train-RER : 2 h, sans bus ni tram ; Bus-Tram : 1 h 30, correspondances bus/tram.
+  fares: {
+    rail: { price: 2.55, minutes: 120, modes: ['SUBWAY', 'METRO', 'RAIL', 'REGIONAL_RAIL', 'SUBURBAN', 'REGIONAL_FAST_RAIL', 'FUNICULAR'] },
+    road: { price: 2.05, minutes: 90, modes: ['BUS', 'TRAM', 'COACH', 'CABLE_CAR'] },
+    unsure: /a[ée]roport|orly|charles[ -]de[ -]gaulle|cdg|roissy/i    // aéroports : billet spécial, on n'affiche pas de prix
+  }
 };

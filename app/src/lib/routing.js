@@ -171,14 +171,18 @@ export async function trafficEstimate(from, to, when = new Date()) {
   return { factor, measured, label: weight ? tx('itin.trafic_habituel_le_vers_h', { level, jour, heure }) : null };
 }
 
-/** Transports en commun : plusieurs propositions, triées par heure d'arrivée. */
-export async function transitRoutes(from, to, signal, when = new Date()) {
+/** Choix des modes de transport en commun (Transitous, paramètre transitModes vérifié le 15/10/2026). */
+export const TRANSIT_PREFS = { all: null, metro: ['SUBWAY'], rail: ['SUBWAY', 'RAIL'], road: ['BUS', 'TRAM'] };
+
+/** Transports en commun : plusieurs propositions, triées par heure d'arrivée. modes : null (tous) ou liste Transitous. */
+export async function transitRoutes(from, to, signal, when = new Date(), modes = null) {
   const url = new URL(TRANSITOUS);
   url.search = new URLSearchParams({
     fromPlace: `${from.lat},${from.lon}`,
     toPlace: `${to.lat},${to.lon}`,
     time: when.toISOString(),
-    numItineraries: '10'
+    numItineraries: '10',
+    ...(modes ? { transitModes: modes.join(',') } : {})
   });
   const res = await fetch(url, { signal });
   if (!res.ok) throw new Error(`transitous-${res.status}`);
@@ -227,9 +231,9 @@ export async function transitRoutes(from, to, signal, when = new Date()) {
  * à l'heure où l'on y arrive (1 min plus tard). Transitous ne sait pas passer par un point : on enchaîne.
  * Un tronçon sans transport utile se fait à pied.
  */
-export async function transitWithStop(from, via, to, signal, when = new Date()) {
+export async function transitWithStop(from, via, to, signal, when = new Date(), modes = null) {
   const segment = async (a, b, t) => {
-    const list = await transitRoutes(a, b, signal, t).catch((e) => { if (e.name === 'AbortError') throw e; return []; });
+    const list = await transitRoutes(a, b, signal, t, modes).catch((e) => { if (e.name === 'AbortError') throw e; return []; });
     if (list.length) return list;
     const w = await streetRoute(a, b, 'walk', signal);
     const start = new Date(t), end = new Date(+t + w.duration * 1000);
