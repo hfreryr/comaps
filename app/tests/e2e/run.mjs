@@ -247,6 +247,15 @@ const tests = {
     assert(!errors.length, errors.join(' | '));
     await ctx.close();
   },
+  async 'raccourcis : 5 par défaut, bouton « + » visible sans faire défiler'() {
+    const { p, ctx, errors } = await page();
+    const chips = await p.$$eval('.chips .chip', (els) => els.map((e) => e.textContent.trim()));
+    assert(chips.join('|') === 'Mes lieux|Restaurants|Cafés|Métro|Pharmacies', `raccourcis par défaut : ${chips.join(', ')}`);
+    const b = await p.$eval('.chip.add', (e) => e.getBoundingClientRect());
+    assert(b.right <= 390 && b.left >= 0 && b.width > 20, `bouton + hors de l'écran : ${JSON.stringify(b)}`);
+    assert(!errors.length, errors.join(' | '));
+    await ctx.close();
+  },
   async 'Maison et raccourcis personnalisés'() {
     const { p, ctx, errors } = await page();
     await p.fill('#search', "Ed's rue Muller"); await p.waitForSelector('.results li.opt button', { timeout: 20000 }); await pick(p); await p.waitForTimeout(3000);
@@ -254,7 +263,7 @@ const tests = {
     await p.click('.pmenu button:has-text("Définir comme Maison")'); await p.waitForTimeout(500);
     assert(/Maison enregistré/.test(await p.textContent('.toast')), 'Maison non enregistrée');
     await p.click('.close'); await p.waitForTimeout(500);
-    await p.click('.chip.edit'); await p.waitForTimeout(800);
+    await p.click('.chip.add'); await p.waitForTimeout(800);
     await p.click('.ce-toggle[aria-label="Afficher Cafés"]');
     await p.fill('input[aria-label="Nom du raccourci Restaurants"]', 'Restos'); await p.press('input[aria-label="Nom du raccourci Restaurants"]', 'Tab');
     await p.click('section[aria-label="Personnaliser les raccourcis"] .close'); await p.waitForTimeout(500);
