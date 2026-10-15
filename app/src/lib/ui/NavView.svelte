@@ -5,7 +5,7 @@
   import { badge } from '#lib/routeview.js';
   import ModeIcon from './ModeIcon.svelte';
 
-  let { nav, navBanner, navRemaining, to, navFollow, navList = $bindable(), voice = $bindable(), endNav, recenter } = $props();
+  let { nav, navBanner, navRemaining, to, navFollow, navList = $bindable(), voice = $bindable(), endNav, recenter, manual = false, stepBy } = $props();
 </script>
 
 <div class="nav-top" class:arrived={navBanner.arrived} role="status" aria-live="polite">
@@ -29,6 +29,16 @@
     </span>
   </div>
   {#if navBanner.then && !navBanner.arrived}<p class="nav-then">{tx('guidage.puis', { then: navBanner.then })}</p>{/if}
+  {#if manual && !navBanner.arrived}
+    <!-- sans position, le guidage ne peut pas avancer seul : on passe les étapes à la main -->
+    <div class="nav-manual" role="group" aria-label={tx('guidage.etapes_a_la_main')}>
+      <span class="nav-manual-why">{tx('guidage.position_indisponible')}</span>
+      <button onclick={() => stepBy(-1)} disabled={nav.k === 0} aria-label={tx('guidage.etape_precedente')}>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg></button>
+      <button onclick={() => stepBy(1)} disabled={nav.k >= nav.steps.length - 1} aria-label={tx('guidage.etape_suivante')}>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg></button>
+    </div>
+  {/if}
 </div>
 {#if !navFollow}
   <button class="nav-recenter" onclick={recenter}>
@@ -98,4 +108,9 @@
   .why { display: block; font-size: 13px; color: var(--muted); margin-top: 2px; line-height: 1.35; }
   .steps li.done { color: var(--faint); }
   .steps li.now { font-weight: 700; color: var(--accent); }
+  .nav-manual { display: flex; align-items: center; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px solid rgb(255 255 255 / 0.2); }
+  .nav-manual-why { flex: 1; font-size: 13.5px; color: rgb(255 255 255 / 0.85); }
+  .nav-manual button { width: 44px; height: 40px; border: 0; border-radius: 12px; background: rgb(255 255 255 / 0.16); color: #fff; display: grid; place-items: center; cursor: pointer; }
+  .nav-manual button:disabled { opacity: 0.35; cursor: default; }
+  .nav-manual svg { width: 20px; height: 20px; stroke-width: 2.2; }
 </style>

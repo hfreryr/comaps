@@ -123,6 +123,22 @@ export function createNav(app) {
     app.offCount = p.off > cfg.off ? app.offCount + 1 : 0;
     if (app.offCount >= 3 && !app.rerouting) reroute();
   }
+  /** Sans position (localisation refusée ou indisponible) : passer d'une étape à l'autre à la main (test P3). */
+  function stepBy(d) {
+    if (!app.nav) return;
+    const last = app.nav.steps.length - 1;
+    const k = Math.max(0, Math.min(last, app.nav.k + d));
+    if (app.nav.kind === 'transit') { app.nav = { ...app.nav, k }; speak(app.nav.steps[k].text); return; }
+    const s = app.nav.steps[k].s;
+    app.nav = { ...app.nav, k, s };
+    const next = app.nav.steps[k + 1];
+    const at = app.nav.coords[Math.min(app.nav.coords.length - 1, next?.idx ?? app.nav.coords.length - 1)];
+    const color = app.nav.mode === 'bike' ? app.BIKE_COLOR : app.WALK_COLOR;
+    app.map.getSource('route')?.setData({ type: 'FeatureCollection', features: [app.line(remaining(app.nav, s), app.nav.mode, color, '#1B3F9E')] });
+    app.navFollow = false;
+    app.map.easeTo({ center: at, zoom: 17, pitch: 0, duration: 700 });
+    if (next) speak(next.speak || next.text);
+  }
   async function reroute() {
     app.rerouting = true;
     try {
@@ -156,5 +172,5 @@ export function createNav(app) {
     app.drawRoute();
   }
 
-  return { speak, transitSteps, startNav, onFix, updateNav, reroute, endNav };
+  return { speak, transitSteps, startNav, onFix, updateNav, stepBy, reroute, endNav };
 }
