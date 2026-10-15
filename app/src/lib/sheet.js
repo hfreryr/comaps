@@ -13,11 +13,13 @@ const TOP_GAP = 64;        // marge laissée en haut en plein écran, pour voir 
  *    s'arrête à l'aperçu et reste ouverte, comme la liste d'une catégorie dans les apps de référence) ;
  *  - start : hauteur d'ouverture, 'peek' | 'half' (défaut) ;
  *  - min : la fiche peut aussi se réduire à une fine bande (jusqu'à l'élément marqué data-min-end), pour voir
- *    presque toute la carte (aperçu d'un itinéraire, comme dans Plans et Maps).
+ *    presque toute la carte (aperçu d'un itinéraire, comme dans Plans et Maps) ;
+ *  - tease : à l'aperçu, hauteur (px) du contenu suivant laissée visible et coupée exprès, pour montrer qu'il y a
+ *    une suite à faire remonter (le haut des étapes sous « Aller » ; retour du porteur, 15/10).
  */
 export function draggable(node, params = {}) {
   const mobile = matchMedia('(max-width: 767px)');
-  let { key, onDismiss, start, min } = params;
+  let { key, onDismiss, start, min, tease = 0 } = params;
   let snap = start || 'half';
   let drag = null;
 
@@ -40,7 +42,7 @@ export function draggable(node, params = {}) {
     // des boutons d'action quand il y en a (titre, type, statut).
     const end = node.querySelector('[data-peek-end]');
     const actions = node.querySelector('.actions');
-    const peek = end ? end.offsetTop + end.offsetHeight + 10 : actions ? actions.offsetTop - 6 : PEEK;
+    const peek = end ? Math.min(n, end.offsetTop + end.offsetHeight + 10 + tease) : actions ? actions.offsetTop - 6 : PEEK;
     const minEnd = min && node.querySelector('[data-min-end]');
     const low = minEnd ? minEnd.offsetTop + minEnd.offsetHeight + 4 : null;
     return { min: low, peek: Math.min(peek, half), half, full };

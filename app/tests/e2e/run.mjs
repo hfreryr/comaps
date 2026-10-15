@@ -139,6 +139,23 @@ const tests = {
     assert(!errors.length, errors.join(' | '));
     await ctx.close();
   },
+  async 'exemples qui s\'écrivent dans la barre, une fois, puis texte habituel (rien si « réduire les animations »)'() {
+    const watch = () => { window.__ph = []; new MutationObserver((ms) => ms.forEach((m) => window.__ph.push(m.target.placeholder)))
+      .observe(document, { attributes: true, subtree: true, attributeFilter: ['placeholder'] }); };
+    for (const reduce of [false, true]) {
+      const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, locale: 'fr-FR', reducedMotion: reduce ? 'reduce' : 'no-preference' });
+      await ctx.addInitScript(() => localStorage.setItem('promesse-vue', '1'));
+      await ctx.addInitScript(watch);
+      const p = await ctx.newPage();
+      await p.goto(`http://localhost:${PORT}/`); await p.waitForTimeout(8000);
+      const seen = await p.evaluate(() => window.__ph);
+      const ph = await p.getAttribute('#search', 'placeholder');
+      assert(/^Rechercher un lieu/.test(ph), `texte final : ${ph}`);
+      if (reduce) assert(!seen.some((t) => /restaurant/.test(t)), 'animation jouée malgré « réduire les animations »');
+      else assert(seen.includes('restaurant ouvert demain dans le 8e') && seen.includes('boulangerie ouverte dimanche'), `exemples non écrits : ${seen.slice(-5)}`);
+      await ctx.close();
+    }
+  },
   async 'exemples de recherche : toucher « restaurant ouvert demain dans le 8e » lance la recherche'() {
     const { p, ctx, errors } = await page();
     await p.click('#search'); await p.waitForSelector('.results li.example', { timeout: 5000 });
@@ -204,6 +221,13 @@ const tests = {
     await p.click('.chip:has-text("Restaurants")'); await p.waitForTimeout(6000);
     await p.click('.nearby li button >> nth=0'); await p.waitForTimeout(3000);
     await p.click('.action.primary'); await p.waitForSelector('.route-sheet .mode-tabs', { timeout: 15000 }); await p.waitForTimeout(6000);
+    // à l'aperçu, la suite (titre des étapes ou des autres trajets) dépasse sous « Aller », coupée exprès :
+    // on comprend qu'il y a plus à voir (retour du porteur, 15/10)
+    const cut = await p.$eval('.route-sheet', (s) => {
+      const end = s.querySelector('[data-peek-end]'), next = end.nextElementSibling, b = s.getBoundingClientRect().bottom;
+      return { next: next.getBoundingClientRect().top, nextEnd: next.getBoundingClientRect().bottom, b, after: s.scrollHeight > s.clientHeight + 30 };
+    });
+    assert(cut.next < cut.b - 12 && cut.after, `rien ne dépasse sous « Aller » : ${JSON.stringify(cut)}`);
     // glisser du doigt (événements tactiles réels) depuis la poignée
     const cdp = await ctx.newCDPSession(p);
     const swipe = async (y0, y1) => {
