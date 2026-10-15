@@ -47,3 +47,21 @@ Mesures faites sur l'extrait OSM de Paris (73 441 lieux nommés), scripts dans `
 4. ✅ Sites des lieux : données structurées (schema.org) seulement, nom du site comparé au nom du lieu, robots.txt respecté (`build_sitehours.py`, chaque lundi). Essai sur 400 sites depuis notre environnement : 191 joignables, **23 horaires** (12 % des joignables), tous plausibles à la relecture. Sur ≈ 4 300 sites : ≈ 250 à 500 horaires attendus selon la part joignable depuis GitHub. La lecture du texte des pages (sans données structurées) n'est pas faite : plus d'erreurs possibles, à décider.
 
 Décision attendue du porteur : afficher dans l'app des informations qui ne viennent pas d'OSM, avec leur source (condition de tout ce qui précède).
+
+## Passer à l'échelle mondiale sans visiter les sites nous-mêmes (mesure du 15/10/2026)
+
+Principe retenu par le porteur du projet : **ce qui est frugal et passe à l'échelle**. Lire nous-mêmes chaque site chaque semaine fonctionne pour Paris (≈ 4 300 sites, ≈ 25 min), mais pas pour le monde (millions de sites, robot à héberger, blocages, règles par pays). Les archives du web existantes permettent d'éviter une partie des visites.
+
+| Archive | Ce qu'elle offre | Mesure sur nos sites parisiens | Verdict |
+|---|---|---|---|
+| **Common Crawl** (copie mensuelle de milliards de pages, accès libre) | Index en colonnes interrogeable sans compte ; une page se télécharge seule, par plage d'octets | Copie de septembre 2026 : **1 547 domaines sur 3 296 présents (47 %)** ; sur 150 tirés au hasard, 149 pages HTML (105 pages d'accueil), **16 avec des horaires lisibles (11 %)**, autant que la lecture en direct (12 %) | ✅ À utiliser en premier : ≈ 160 horaires à Paris sans aucune visite |
+| **Web Data Commons** (Université de Mannheim : données structurées extraites de Common Crawl) | Déjà extrait : 84 256 sites de restaurants et 1,46 million de sites de commerces dans le monde (édition 2024-12, la plus récente trouvée) | **176 domaines parisiens avec horaires** | ⚠️ Une édition par an : horaires trop anciens pour être affichés seuls ; utile pour repérer quels sites publient des horaires |
+| **Open Web Index** (projet européen OpenWebSearch.eu) | Index du web ouvert, européen | Non mesuré | ⛔ Licence « usage personnel, non commercial et recherche » : incompatible avec une reprise du produit (règle du projet) |
+| **HTTP Archive** | Copie mensuelle des pages d'accueil de millions de sites | Non mesuré | ⚠️ Données dans BigQuery (Google) : quota gratuit limité, et une dépendance à Google que le projet évite |
+
+**Architecture proposée, applicable partout** :
+1. Common Crawl d'abord (les 3 dernières copies mensuelles, pour couvrir plus de sites) : aucune visite.
+2. Notre robot seulement pour les sites absents de Common Crawl, et rarement : une fois par mois, une fois par trimestre pour les sites qui n'ont jamais publié d'horaires, en ne retéléchargeant que les pages modifiées.
+3. Les règles de rapprochement des noms à adapter par langue (aujourd'hui : français).
+
+Scripts : `pipeline/mesures_sources/cc_dom.py`, `cc_hours.py`.
