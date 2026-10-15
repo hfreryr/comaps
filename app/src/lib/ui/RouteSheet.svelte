@@ -15,7 +15,7 @@
   const current = $derived(routes[mode]);
 </script>
 
-<section class="sheet route-sheet" aria-label={tx('fiche.itineraire')} use:draggable={{ key: `${from?.lat},${to?.lat},${mode}`, start: 'peek', min: true }}>
+<section class="sheet route-sheet" aria-label={tx('fiche.itineraire')} use:draggable={{ key: `${from?.lat},${to?.lat},${mode}`, start: 'peek', min: true, tease: 58 }}>
   <button class="grip" aria-label={tx('liste.agrandir_la_fiche')}></button>
   <div class="mode-tabs" data-min-end role="tablist" aria-label={tx('itin.mode_de_deplacement')}>
     {#each MODES as m}

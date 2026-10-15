@@ -2,9 +2,23 @@
   import { tx } from '#lib/i18n/index.js';
   import { getContext } from 'svelte';
   import ResultList from '#lib/ui/ResultList.svelte';
+  import { playHint } from '#lib/typedhint.js';
 
   // État et actions de la page (voir le bloc « app » de +page.svelte)
   const app = getContext('app');
+
+  // Exemples qui s'écrivent dans la barre vide, une fois, à l'ouverture (après l'écran de la promesse s'il s'affiche)
+  const rest = tx('recherche.rechercher_un_lieu_ou_une_adresse');
+  let hint = $state(rest);
+  let stopHint = null, played = false;
+  $effect(() => {
+    if (played || app.showPromise || app.directions || app.query || app.focused) return;
+    played = true;
+    const reduce = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    stopHint = playHint([tx('resultats.exemple_1'), tx('resultats.exemple_2')], (t) => (hint = t), rest, { reduce });
+  });
+  $effect(() => { if ((app.focused || app.query || app.directions) && stopHint) { stopHint(); stopHint = null; } });
+  $effect(() => () => stopHint?.());
 </script>
 
 
@@ -12,7 +26,7 @@
     <header class="top">
       <div class="search" class:open={app.showList} bind:offsetHeight={app.searchH}>
         <svg class="lens" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="M15.5 15.5 20 20" /></svg>
-        <input id="search" type="search" placeholder={tx('recherche.rechercher_un_lieu_ou_une_adresse')} aria-label={tx('recherche.rechercher_un_lieu_ou_une_adresse')}
+        <input id="search" type="search" placeholder={hint} aria-label={tx('recherche.rechercher_un_lieu_ou_une_adresse')}
           autocomplete="off" enterkeyhint="search" bind:value={app.query}
           onfocus={() => { app.focused = true; app.editChips = false; app.importOpen = false; app.showModes = false; app.closePlace(); app.clearCategory(); }} onblur={() => setTimeout(() => (app.focused = false), 150)} onkeydown={app.onKey} />
         {#if app.query}

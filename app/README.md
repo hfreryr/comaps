@@ -82,7 +82,7 @@ Interdits par les règles du projet : Overpass (limites d'usage incompatibles av
 ## Retours des tests P3 et P4, et du porteur (15/10/2026)
 Synthèse complète dans Notion (« Synthèse des séances »). Corrigé et testé (un test e2e par point) :
 - **Guidage** : le tronçon parcouru disparaît du tracé ; le point de départ (rond bleu) n'est plus affiché sous la flèche (`remaining()` dans `nav.js`).
-- **Aperçu d'itinéraire** : la fiche se réduit à une fine bande (poignée + durées), option `min` de `sheet.js`.
+- **Aperçu d'itinéraire** : la fiche se réduit à une fine bande (poignée + durées), option `min` de `sheet.js` ; à l'aperçu, le haut des étapes dépasse sous « Aller », coupé exprès pour montrer qu'il y a une suite (option `tease`).
 - **Recherche de secours** : si Photon est en panne ou met plus de 4 s, la recherche par nom se fait dans nos données de lieux (`localsearch.js`).
 - **Zones** (« Paris 8e », un quartier) : la carte s'y cadre, sans fiche, les raccourcis restent disponibles.
 - **Listes** : « Enregistré dans … · Modifier » dans le menu ⋯ de la fiche ; pictogramme et couleur au choix (mode Modifier).
@@ -91,7 +91,7 @@ Synthèse complète dans Notion (« Synthèse des séances »). Corrigé et test
 - **Résumé d'un trajet en transports** : place dans la rame et sortie à l'arrivée, sans faire défiler.
 - **Photos** : 1 200 px sur téléphone (au lieu de 2 400).
 - **Raccourcis** (décision du 15/10) : bouton « + » fixé à droite de la rangée (le crayon n'était pas vu), 5 raccourcis par défaut (Mes lieux, Restaurants, Cafés, Métro, Pharmacies).
-- **Recherche** : exemples touchables à l'ouverture (« restaurant ouvert demain dans le 8e »…), texte de la barre recentré.
+- **Recherche** : exemples touchables à l'ouverture (« restaurant ouvert demain dans le 8e »…), texte de la barre recentré ; à l'ouverture de l'app, 2 exemples s'écrivent puis s'effacent dans la barre vide, une seule fois, en moins de 5 s (WCAG 2.2.2), arrêtés au premier toucher, absents si « réduire les animations » (`typedhint.js`).
 - **Guidage sans localisation** : flèches pour passer les étapes à la main tant qu'aucune position n'arrive.
 - **Transports** : prix estimé (tickets à l'unité IDFM 2026, `fares.js`, tarifs dans le profil de ville), choix des modes (Tous, Métro, Métro et RER, Bus et tram ; paramètre `transitModes` de Transitous), 2 prochains passages dans la liste des stations.
 - **Calcul de nuit** : second lancement de secours à 05:15 UTC, sans effet si les données du jour sont déjà en ligne.
