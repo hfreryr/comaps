@@ -83,6 +83,21 @@ const tests = {
     }
     assert(!bad.length, bad.join(' | '));
   },
+  async 'fiche : site et téléphone complétés hors OSM, avec leur source ; pas de source pour une info OSM'() {
+    // Mavrommatis : site et téléphone absents d'OSM, complétés depuis Overture (build_extras.py)
+    let { p, ctx, errors } = await page({}, '#carte=18/48.873115/2.330373&lieu=node/12728253708');
+    await p.waitForSelector('.sheet h1', { timeout: 15000 }); await p.waitForTimeout(2000);
+    const det = await p.$eval('.details', (e) => e.innerText);
+    assert(/mavrommatis\.com/.test(det) && /42 80 42 42/.test(det), `site ou téléphone absents : ${det}`);
+    assert((det.match(/Source : Overture Maps/g) || []).length === 2, `source non indiquée : ${det}`);
+    assert(!errors.length, errors.join(' | '));
+    await ctx.close();
+    // Panthéon : rien de complété, aucune mention de source
+    ({ p, ctx, errors } = await page({}, '#carte=18/48.846219/2.346008&lieu=way/16407465'));
+    await p.waitForSelector('.sheet h1', { timeout: 15000 }); await p.waitForTimeout(2000);
+    assert(!/Source :/.test(await p.$eval('.sheet', (e) => e.innerText)), 'source affichée pour une info OSM');
+    await ctx.close();
+  },
   async 'lien partagé vers un lieu : fiche complète ; lieu inexistant : message « introuvable »'() {
     // Panthéon : way 16407465 dans nos tuiles. Le lien porte le vrai numéro OSM (pas le numéro codé des tuiles).
     let { p, ctx, errors } = await page({}, '#carte=18/48.846219/2.346008&lieu=way/16407465');

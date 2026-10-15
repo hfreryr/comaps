@@ -1,0 +1,39 @@
+# Compléments hors OSM (sites, téléphones…) tirés de sources ouvertes, chaque semaine ; publiés dans data/extras.json du site.
+# La construction nocturne des lieux (places.yml) les lit depuis le site et les ajoute aux tuiles, avec leur source.
+# Sources et licences : docs/sources-donnees.md. Rien de ce fichier n'est envoyé dans OSM.
+name: Compléments des lieux (hebdo)
+on:
+  schedule:
+    - cron: '40 3 * * 1'
+  workflow_dispatch:
+concurrency:
+  group: extras
+  cancel-in-progress: false
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1 (désigné par empreinte : un outil tiers modifié ne passerait pas)
+        with: { ref: main }
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with: { python-version: '3.12' }
+      - run: pip install osmium==4.3.1 duckdb==1.5.6
+      - name: Extrait OSM de Paris (somme de contrôle vérifiée)
+        run: |
+          B=https://download.openstreetmap.fr/extracts/europe/france/ile_de_france
+          curl -sSfL -o paris.osm.pbf $B/paris.osm.pbf
+          curl -sSfL $B/paris.osm.pbf.md5 | awk '{print $1"  paris.osm.pbf"}' | md5sum -c -
+      - run: python app/scripts/build_extras.py paris.osm.pbf --out out/extras.json
+      - name: "Garde-fou : pas de publication si les compléments paraissent vides"
+        run: python -c "import json,sys; n=len(json.load(open('out/extras.json'))['places']); print(n,'lieux complétés'); sys.exit(0 if n >= 1000 else 1)"
+      - name: Publier dans gh-pages/data/extras.json
+        run: |
+          git fetch --depth=1 origin gh-pages
+          git worktree add pages origin/gh-pages
+          mkdir -p pages/data && cp out/extras.json pages/data/extras.json
+          cd pages && git add -A data/extras.json
+          git -c user.name=untracked-bot -c user.email=bot@untrackedmaps.app commit -qm "Compléments des lieux du $(date -u +%F)" || exit 0
+          git push origin HEAD:gh-pages

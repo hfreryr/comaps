@@ -11,6 +11,8 @@ Sortie : static/data/places/14/{x}/{y}.json  (zoom 14 ≈ 2,4 km de côté à Pa
          static/data/places/index.json      (tuiles disponibles, date de l'extrait)
 
 Format d'une tuile : {"v":1,"t":[[id, lon, lat, {tags}, devanture?], …]}  devanture = [idPhoto, hôte, azimut, cap, distance, licence, auteur, date]
+  Compléments hors OSM (build_extras.py, --extras) : ajoutés aux étiquettes seulement si OSM ne les a pas, avec leur
+  source dans l'étiquette "_src" ({"website": "overture"}), que la fiche affiche.
   id = identifiant OSM × 10 + (1 nœud, 2 chemin, 3 relation), le même codage que dans les tuiles de la carte.
 
 Usage :  python app/scripts/build_places.py data/paris-latest.osm.pbf [--out app/static/data/places] [--zoom 14]
@@ -91,13 +93,35 @@ class Places(osmium.SimpleHandler):
             return
 
 
+def add_extras(tags, extra):
+    """Comble les manques d'OSM (jamais de remplacement) et note la source de chaque complément."""
+    if not extra:
+        return False
+    alt = {"website": "contact:website", "phone": "contact:phone"}
+    added = False
+    for k, (value, source) in extra.items():
+        if k in tags or alt.get(k) in tags:
+            continue
+        tags[k] = value
+        tags.setdefault("_src", {})[k] = source
+        added = True
+    return added
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("pbf")
     ap.add_argument("--out", default="app/static/data/places")
     ap.add_argument("--zoom", type=int, default=14)
     ap.add_argument("--facades", help="facades.json (build_facades.py) : photo de devanture ajoutée en 5e position de chaque lieu")
+    ap.add_argument("--extras", help="extras.json (build_extras.py) : compléments hors OSM, avec leur source")
     args = ap.parse_args()
+    extras = {}
+    if args.extras:
+        try:
+            extras = json.load(open(args.extras)).get("places", {})
+        except Exception as e:
+            print("compléments ignorés :", e, file=sys.stderr)
     facades = {}
     if args.facades:
         try:
@@ -113,10 +137,12 @@ def main():
         for p in sorted(out.rglob("*"), reverse=True):
             p.unlink() if p.is_file() else p.rmdir()
     sizes = []
-    nf = 0
+    nf = ne = 0
     for (x, y), items in h.tiles.items():
         items.sort(key=lambda it: it[0])
         for it in items:
+            if add_extras(it[3], extras.get(str(it[0]))):
+                ne += 1
             f = facades.get(str(it[0]))
             if f:
                 it.append(f)
@@ -131,7 +157,7 @@ def main():
         "source": os.path.basename(args.pbf), "tiles": sorted(f"{x}/{y}" for x, y in h.tiles),
     }
     (out / "index.json").write_text(json.dumps(index, separators=(",", ":")))
-    print(f"{nf} devantures ; " + f"{h.count} lieux dans {len(h.tiles)} tuiles (zoom {args.zoom}), {sum(sizes)/1e6:.1f} Mo bruts, "
+    print(f"{nf} devantures ; {ne} lieux complétés hors OSM ; " + f"{h.count} lieux dans {len(h.tiles)} tuiles (zoom {args.zoom}), {sum(sizes)/1e6:.1f} Mo bruts, "
           f"tuile médiane {sorted(sizes)[len(sizes)//2]/1e3:.0f} Ko, en {time.time()-t0:.0f} s")
 
 
