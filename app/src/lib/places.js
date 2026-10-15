@@ -77,6 +77,8 @@ export function fromTags(t) {
     hours: t.opening_hours,
     phone: t.phone || t['contact:phone'],
     website: t.website || t['contact:website'],
+    // compléments hors OSM (sites, téléphones…) : leur source, affichée sous l'information (docs/sources-donnees.md)
+    sources: t._src || {},
     wheelchair: t.wheelchair,
     checkDate: t.check_date || t['check_date:opening_hours'],
     kind: kindOf(t),

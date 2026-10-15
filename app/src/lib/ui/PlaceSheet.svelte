@@ -9,6 +9,8 @@
 
   // État et actions de la page (voir le bloc « app » de +page.svelte)
   const app = getContext('app');
+  // Sources des compléments hors OSM (app/scripts/build_extras.py) ; une source inconnue n'est pas affichée
+  const SOURCES = { overture: () => tx('source.overture') };
 </script>
 
 {#snippet transitBlock()}
@@ -77,6 +79,10 @@
       {/if}
 
 {/snippet}
+{#snippet src(source)}
+  <!-- information qui ne vient pas d'OSM : on dit d'où elle vient (règle du projet) -->
+  {#if SOURCES[source]}<span class="src">{tx('fiche.source', { source: SOURCES[source]() })}</span>{/if}
+{/snippet}
 {#snippet rowsBlock()}
       <!-- Bon à savoir : infos notées par les contributeurs OSM, rien de déduit -->
       {#if app.info?.good?.length}
@@ -115,10 +121,10 @@
           <h2>{tx('fiche.details')}</h2>
           <dl class="details">
             {#if app.info?.phone}
-              <div><dt>{tx('fiche.telephone')}</dt><dd><a href={`tel:${app.info.phone.replace(/\s/g, '')}`}>{app.info.phone}</a></dd></div>
+              <div><dt>{tx('fiche.telephone')}</dt><dd><a href={`tel:${app.info.phone.replace(/\s/g, '')}`}>{app.info.phone}</a>{@render src(app.info.sources?.phone)}</dd></div>
             {/if}
             {#if app.info?.website}
-              <div><dt>{tx('fiche.site_web')}</dt><dd><a href={href(app.info.website)} target="_blank" rel="noopener">{host(app.info.website)}</a></dd></div>
+              <div><dt>{tx('fiche.site_web')}</dt><dd><a href={href(app.info.website)} target="_blank" rel="noopener">{host(app.info.website)}</a>{@render src(app.info.sources?.website)}</dd></div>
             {/if}
             {#if app.address}
               <div><dt>{tx('fiche.adresse')}</dt><dd class="selectable">{app.address}</dd></div>
@@ -342,6 +348,7 @@
   .details dt { font-size: 13px; color: var(--muted); }
   .details dd { margin: 2px 0 0; font-size: 15.5px; overflow-wrap: anywhere; }
   .details a { color: var(--accent); text-decoration: none; }
+  .details .src { display: block; font-size: 12.5px; color: var(--muted); margin-top: 1px; }
   .sc-note { margin: 14px 0 0; font-size: 14.5px; color: var(--muted); }
   .end-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 22px; }
   .end-btn { display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 46px; border: 0; border-radius: 14px; background: var(--fill);

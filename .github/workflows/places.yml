@@ -38,9 +38,11 @@ jobs:
           curl -sSfL -o paris.osm.pbf $B/paris.osm.pbf
           curl -sSfL $B/paris.osm.pbf.md5 | awk '{print $1"  paris.osm.pbf"}' | md5sum -c -
       - if: steps.fresh.outputs.skip != 'true'
-        run: curl -sSfL -o facades.json https://untrackedmaps.app/data/facades.json || echo '{}' > facades.json
+        run: |
+          curl -sSfL -o facades.json https://untrackedmaps.app/data/facades.json || echo '{}' > facades.json
+          curl -sSfL -o extras.json https://untrackedmaps.app/data/extras.json || echo '{}' > extras.json
       - if: steps.fresh.outputs.skip != 'true'
-        run: python app/scripts/build_places.py paris.osm.pbf --out out/places --facades facades.json
+        run: python app/scripts/build_places.py paris.osm.pbf --out out/places --facades facades.json --extras extras.json
       - if: steps.fresh.outputs.skip != 'true'
         name: "Garde-fou : si l'extrait paraît tronqué ou vide, on ne publie pas"
         run: python -c "import json,sys; i=json.load(open('out/places/index.json')); n=len(i['tiles']); print(n,'tuiles'); sys.exit(0 if n >= 50 else 1)"
