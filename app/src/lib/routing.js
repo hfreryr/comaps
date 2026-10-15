@@ -1,3 +1,4 @@
+import { rankTransit } from '#lib/transitrank.js';
 import { tx } from '#lib/i18n/index.js';
 import { city, inBox } from './cities/index.js';
 import { dataBase } from './config.js';
@@ -223,7 +224,8 @@ export async function transitRoutes(from, to, signal, when = new Date(), modes =
     if (!g) { it.next = []; groups.set(key, it); }
     else if (g.next.length < 3 && +it.board.start !== +g.board.start) g.next.push(it.board.start);
   }
-  return [...groups.values()].sort((a, b) => a.end - b.end).slice(0, 4);
+  // le plus simple d'abord, sauf si une correspondance fait vraiment gagner du temps (transitrank.js)
+  return rankTransit([...groups.values()]).slice(0, 4);
 }
 
 /**
@@ -257,7 +259,7 @@ export async function transitWithStop(from, via, to, signal, when = new Date(), 
     seen.add(key);
     out.push(it);
   }
-  return out.sort((a, b) => a.end - b.end);
+  return rankTransit(out);
 }
 
 // ——— Prochains passages à une station ———
