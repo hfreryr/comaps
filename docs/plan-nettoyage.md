@@ -58,8 +58,8 @@ Surface d'attaque réduite (site statique, ni serveur, ni comptes, données sur 
 - [ ] **Côté porteur du projet** (je ne peux pas le faire) :
   - [ ] double authentification sur le compte GitHub ;
   - [ ] double authentification et verrou de transfert chez le registraire de `untrackedmaps.app` ;
-  - [ ] protection de la branche `main` (pas de suppression, pas de réécriture d'historique) ;
-  - [ ] activer le signalement privé de failles (Settings → Security → Private vulnerability reporting), annoncé dans `SECURITY.md`.
+  - [x] protection de la branche `main` (pas de suppression, pas de réécriture d'historique) ;
+  - [x] activer le signalement privé de failles (Settings → Security → Private vulnerability reporting), annoncé dans `SECURITY.md`.
 - [x] Page « Qui voit quoi » : y ajouter une ligne « Sécurité » (ce qui est protégé, comment signaler une faille).
 
 ## Étape 3 : rangement du code (4 à 6 h)
