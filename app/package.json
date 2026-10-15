@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "e2e": "node tests/e2e/run.mjs",
     "test": "TZ=Europe/Paris node --test \"tests/unit/*.test.js\"",
-    "check": "node tests/check-names.mjs"
+    "check": "node tests/check-names.mjs",
+    "search-eval": "node tests/search/eval.mjs"
   },
   "devDependencies": {
     "@sveltejs/adapter-static": "^4.0.0",
