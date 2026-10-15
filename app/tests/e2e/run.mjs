@@ -3,7 +3,7 @@
 // avant une publication, pas en intégration continue.   Usage : npm run e2e
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 const AXE = readFileSync(createRequire(import.meta.url).resolve('axe-core/axe.min.js'), 'utf8');
 import { packList, pack, snapshot, DEFAULT_LISTS } from '../../src/lib/myplaces.js';
@@ -358,6 +358,20 @@ const tests = {
     assert(/incorrect/.test(await p.textContent('.toast')), 'mauvais mot de passe non signalé');
     await p.fill('label.pw input', 'secret'); await p.click('button:has-text("Restaurer")'); await p.waitForTimeout(2500);
     assert(/1 lieu restauré/.test(await p.textContent('.toast')), 'restauration non confirmée');
+    await ctx.close();
+  },
+  async 'import Google : listes sans position retrouvées par leur nom'() {
+    const { p, ctx } = await page();
+    await p.click('.chip:has-text("Mes lieux")'); await p.waitForTimeout(1000);
+    await p.click('.row-btn:has-text("Importer depuis Google Maps")'); await p.waitForTimeout(600);
+    assert(/Enregistré/.test(await p.textContent('.howto')), 'consigne : cocher « Enregistré » (les listes)');
+    const file = `/tmp/untracked-e2e-Restos-${Date.now()}.csv`;
+    writeFileSync(file, 'Title,Note,URL,Comment\nCafé de Flore,,https://www.google.com/maps/place/x/data=!4m2!3m1!1s0x1:0x2,\n');
+    await p.setInputFiles('label.import-btn input[type=file]', file);
+    await p.waitForSelector('.toast', { timeout: 15000 });
+    assert(/1 lieu importé/.test(await p.textContent('.toast')), 'lieu de liste non importé : ' + await p.textContent('.toast'));
+    const saved = await p.evaluate(() => localStorage.getItem('lieux-favoris') || '');
+    assert(/Café de Flore/.test(saved) && /48\.85/.test(saved), 'position du lieu non retrouvée');
     await ctx.close();
   },
   async 'lien de liste partagée et lien de transfert'() {

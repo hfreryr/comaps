@@ -61,12 +61,12 @@ function fromGeopf(f) {
 const PHOTON_TIMEOUT = 4000;
 
 /** Photon, ou à défaut nos données de lieux (même forme de résultats). */
-async function byName(query, near, signal, limit = 7) {
+async function byName(query, near, signal, limit = 7, anywhere = false) {
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), PHOTON_TIMEOUT);
   signal?.addEventListener('abort', () => ctl.abort());
   try {
-    const r = await photon(query, near, ctl.signal, limit);
+    const r = await photon(query, near, ctl.signal, limit, anywhere);
     return r.length ? r : (await searchLocal(query, near)).slice(0, limit);
   } catch (e) {
     if (signal?.aborted) throw e;                       // recherche remplacée par une plus récente
@@ -76,12 +76,11 @@ async function byName(query, near, signal, limit = 7) {
   }
 }
 
-async function photon(query, near, signal, limit = 7) {
+async function photon(query, near, signal, limit = 7, anywhere = false) {
   const url = new URL(`${PHOTON}/api/`);
-  url.search = new URLSearchParams({
-    q: query, lang: 'fr', limit: String(limit), lat: String(near.lat), lon: String(near.lon),
-    location_bias_scale: '0.4', bbox: city.searchBbox.join(',')
-  });
+  const params = { q: query, lang: 'fr', limit: String(limit), lat: String(near.lat), lon: String(near.lon), location_bias_scale: '0.4' };
+  // « anywhere » : sans limite à la zone de la ville (lieux importés d'une liste de voyage, par exemple)
+  url.search = new URLSearchParams(anywhere ? params : { ...params, bbox: city.searchBbox.join(',') });
   const res = await fetch(url, { signal });
   if (!res.ok) throw new Error(`Photon ${res.status}`);
   const seen = new Set();
@@ -121,6 +120,9 @@ export async function search(query, at = city.center, signal) {
   }
   return byName(q, at, signal);
 }
+
+/** Lieux portant ce nom, partout (proches de « at » d'abord) : pour retrouver un lieu importé dont on n'a que le nom. */
+export const searchAnywhere = (query, at = city.center, signal) => byName(query.trim(), at, signal, 7, true);
 
 /** Adresse la plus proche d'un point (nom de rue ou lieu). */
 export async function reverse(lat, lon) {

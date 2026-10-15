@@ -5,6 +5,7 @@ import { PARIS } from '#lib/places.js';
 import { mergeInto } from '#lib/myplaces.js';
 import { readGoogleExport } from '#lib/importgoogle.js';
 import { search } from '#lib/geocode.js';
+import { resolvePlace, eachLimited } from '#lib/importresolve.js';
 
 /** @param {any} app */
 export function createImport(app) {
@@ -15,8 +16,8 @@ export function createImport(app) {
     if (!file) return;
     app.importing = tx('import.lecture_du_fichier');
     try {
-      const { places, home, work } = await readGoogleExport(file);
-      let added = 0, missed = 0;
+      const { places, home, work, listsMissing } = await readGoogleExport(file);
+      let added = 0, missed = 0, unsure = 0, done = 0;
       // chaque liste Google retrouve son équivalent : Favoris, À tester (« À visiter »), ou une liste à son nom
       const listFor = (name) => {
         if (!name || /favori|favorite/i.test(name)) return 'fav';
@@ -25,18 +26,23 @@ export function createImport(app) {
         if (l && /suivi|starred/i.test(name) && l.icon !== 'star') { app.lists = app.lists.map((x) => (x.id === l.id ? { ...x, icon: 'star', color: '#C7972B' } : x)); }
         return l?.id || 'fav';
       };
-      const todo = places;
+      const lost = places.filter((p) => !p.lat || !p.lon);
+      const found = new Map();
+      // Les listes Google n'ont pas de position : on retrouve chaque lieu par son nom (nos données d'abord), quatre à la fois.
+      await eachLimited(lost, 4, async (p) => {
+        const r = await resolvePlace(p, PARIS);
+        done++;
+        app.importing = tx('import.recherche_des_lieux_sans_position', { i: done, n: lost.length });
+        if (r) { found.set(p, r); if (!r.sure) unsure++; } else missed++;
+      });
       const kept = [];
-      for (const [i, p] of todo.entries()) {
-        let { lat, lon } = p;
-        if (!lat || !lon) {
-          // L'export n'a pas toujours la position : on cherche le lieu par son nom, comme dans la barre de recherche.
-          app.importing = tx('import.recherche_des_lieux_sans_position', { i: i + 1, n: todo.length });
-          const r = (await search(p.address || p.name, PARIS).catch(() => []))[0];
-          if (!r) { missed++; continue; }
-          ({ lat, lon } = r);
-        }
-        kept.push({ id: `g${lat},${lon}`, name: p.name || p.address, type: tx('import.importe_de_google_maps'), address: p.address || '', lat, lon, lists: [listFor(p.listName)] });
+      for (const p of places) {
+        const r = p.lat && p.lon ? { place: p, sure: true } : found.get(p);
+        if (!r) continue;
+        const { lat, lon, address } = r.place;
+        // un lieu retrouvé seulement par son nom, parmi plusieurs homonymes, est marqué pour être vérifié
+        const type = r.sure ? tx('import.importe_de_google_maps') : tx('import.importe_a_verifier');
+        kept.push({ id: `g${lat},${lon}`, name: p.name || p.address, type, address: p.address || address || '', lat, lon, lists: [listFor(p.listName)] });
       }
       const m = mergeInto({ lists: app.lists, places: app.favorites }, { lists: [], places: kept }, app.sameSpot);
       app.favorites = m.places;
@@ -53,8 +59,8 @@ export function createImport(app) {
       }
       app.importing = '';
       app.importOpen = false;
-      if (!added && !extra) app.say(places.length ? tx('import.ces_lieux_sont_deja_dans_vos_favoris') : tx('import.aucun_lieu_trouve_dans_ce_fichier'));
-      else app.say(tx('import.lieu_importe', { n: added, extra, manquants: missed ? tx('import.introuvable', { n: missed }) : '' }));
+      if (!added && !extra) app.say((places.length ? tx('import.ces_lieux_sont_deja_dans_vos_favoris') : tx('import.aucun_lieu_trouve_dans_ce_fichier')) + (listsMissing ? tx('import.listes_absentes') : ''));
+      else app.say(tx('import.lieu_importe', { n: added, extra, manquants: (missed ? tx('import.introuvable', { n: missed }) : '') + (unsure ? tx('import.a_verifier', { n: unsure }) : '') + (listsMissing ? tx('import.listes_absentes') : '') }));
     } catch {
       app.importing = '';
       app.say(tx('import.ce_fichier_a_pas_pu_etre_lu'));
