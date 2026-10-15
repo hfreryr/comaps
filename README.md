@@ -44,7 +44,7 @@ L'objectif : que l'app affiche « vérifié il y a 3 semaines » plutôt que des
 | Étape | Objectif | État |
 |---|---|---|
 | App : carte, recherche, fiche lieu, itinéraires, guidage | Prototype en ligne | ✅ |
-| Tests utilisateurs | 5 personnes face à Google Maps | 2 faites, 3 prévues |
+| Tests utilisateurs | 5 personnes face à Google Maps | 4 faites, 1 prévue (+ 2 mini-séances icône) |
 | Comparaison chiffrée | 20 recherches types, Untracked vs Google | À faire |
 | Fraîcheur des lieux | Détection Paris 6e, puis vérification de 50 cas sur le terrain | Détection ✅, vérification à faire |
 | Questions sur place | Vérification par les utilisateurs, avec leur compte OSM | Après l'annonce à la communauté |
@@ -59,7 +59,7 @@ Piste testée : l'image que le **site web du lieu** propose pour les partages (`
 → **≈ 90 lieux, soit 7 % de la zone**. Qualité bonne quand elle existe, couverture trop faible pour en faire la source principale ; question juridique (réutilisation hors aperçu de lien) non tranchée.
 Même test avec les sites connus d'**Overture** (6e) : 882 restaurants / cafés / bars, **713 ont un site (81 %)** contre 38 % dans OSM ; sur 698 sites testés : 136 images retenues (**15 %** des lieux), 253 sites injoignables depuis notre environnement de test (filtrage réseau probable, plafond réel estimé ≈ 25 %).
 
-**En cours** : [plan de nettoyage](docs/plan-nettoyage.md) (tests, sécurité, rangement du code, textes), décidé le 14/10/2026.
+**Terminé le 15/10/2026** : [plan de nettoyage](docs/plan-nettoyage.md) (tests, sécurité, rangement du code, textes) ; restent les actions du porteur du projet listées à la fin du plan.
 
 ## Valeurs
 
