@@ -136,7 +136,7 @@
               <div><dt>{tx('fiche.site_web')}</dt><dd><a href={href(app.info.website)} target="_blank" rel="noopener">{host(app.info.website)}</a>{@render src(app.info.sources?.website)}</dd></div>
             {/if}
             {#if app.address}
-              <div><dt>{tx('fiche.adresse')}</dt><dd class="selectable">{app.address}</dd></div>
+              <div><dt>{tx('fiche.adresse')}</dt><dd class="selectable">{app.address}{@render src(app.info?.sources?.['addr:street'])}</dd></div>
             {/if}
           </dl>
         </section>

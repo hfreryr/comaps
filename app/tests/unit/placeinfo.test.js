@@ -23,3 +23,8 @@ test('bon à savoir et type précis', () => {
   assert.deepEqual(g, ['Terrasse', 'Espèces refusées', '100 % végétalien'].sort((a, b) => g.indexOf(a) - g.indexOf(b)));
   assert.equal(kindOf({ amenity: 'place_of_worship', religion: 'christian' }), 'Église');
 });
+
+test('ancienne église devenue lieu de visite (Panthéon, P5) : Monument ; église en service : Église', () => {
+  assert.equal(kindOf({ building: 'church', tourism: 'attraction', religion: 'christian' }), 'Monument');
+  assert.equal(kindOf({ building: 'church', amenity: 'place_of_worship', religion: 'christian' }), 'Église');
+});

@@ -102,6 +102,14 @@ def add_extras(tags, extra, today=None):
     alt = {"website": "contact:website", "phone": "contact:phone"}
     added = False
     for k, (value, source, *until) in extra.items():
+        if k == "addr":  # adresse (numéro, rue, code postal) : seulement si OSM n'en a aucune
+            if tags.get("addr:street") or not value or not value[1]:
+                continue
+            num, street, pc = (list(value) + [None, None, None])[:3]
+            tags.update({k2: v for k2, v in (("addr:housenumber", num), ("addr:street", street), ("addr:postcode", pc)) if v})
+            tags.setdefault("_src", {})["addr:street"] = source
+            added = True
+            continue
         if k in tags or alt.get(k) in tags or (until and until[0] < today):
             continue
         tags[k] = value

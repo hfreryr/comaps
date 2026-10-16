@@ -102,7 +102,7 @@
         </button>
       </li>
     {/each}
-    {#if app.activeQuery.trim().length >= 2 && !app.searching && !app.results.length && !app.searchError}
+    {#if app.activeQuery.trim().length >= 2 && !app.searching && !app.results.length && !app.searchError && !app.catHit}
       <li class="note">{tx('resultats.aucun_resultat_pour_essayez_un_nom', { recherche: app.activeQuery.trim() })}</li>
     {/if}
     {#if app.searchError}<li class="note">{app.searchError}</li>{/if}

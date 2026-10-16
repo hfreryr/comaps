@@ -42,6 +42,8 @@ export function kindOf(t) {
   if (t.place === 'square') return tx('types.place');
   if (t.man_made === 'tower') return tx('types.tour');
   if (t.man_made === 'bridge' || t.bridge === 'yes' && t.name) return tx('types.pont');
+  // bâtiment d'église qui n'est plus un lieu de culte mais un lieu de visite (le Panthéon, P5) : un monument
+  if ((building === 'church' || building === 'cathedral') && tourism === 'attraction') return tx('types.monument');
   if (building === 'cathedral') return tx('types.cathedrale');
   if (building === 'church') return tx('types.eglise');
   if (tourism === 'attraction') return tx('types.lieu_touristique');

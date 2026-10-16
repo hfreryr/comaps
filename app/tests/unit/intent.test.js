@@ -45,3 +45,15 @@ test('catégories : mots courants, mots de remplissage, refus', () => {
   assert.equal(categoryFor('Café de Flore'), null);  // nom propre : pas une catégorie
   assert.equal(categoryFor(''), null);
 });
+
+test('régime : « restaurant végétarien 11e », « vegan paris 11 » (P6, P7)', async () => {
+  const { parseIntent, fitsDiet, dietHit } = await import('#lib/intent.js');
+  const a = parseIntent('restaurant végétarien 11e');
+  assert.deepEqual([a.words, a.area, a.diet], [['restaurant'], { arr: 11 }, 'veg']);
+  const b = parseIntent('vegan paris 11');
+  assert.deepEqual([b.words, b.area, b.diet], [[], { arr: 11 }, 'vegan']);
+  assert.equal(parseIntent('ligne 11').area, null);
+  assert.equal(fitsDiet('veg', { 'diet:vegan': 'only' }), true);
+  assert.equal(fitsDiet('vegan', { 'diet:vegetarian': 'yes' }), false);
+  assert.equal(dietHit({ label: 'Restaurants' }, 'veg').label, 'Restaurants végétariens');
+});
