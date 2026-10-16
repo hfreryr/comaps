@@ -1,5 +1,6 @@
 // Mise en place de la carte : style clair/sombre, liens partagés à l'ouverture, écouteurs.
 // Code sorti de +page.svelte : il lit et modifie l'état de l'écran par l'objet « app » (bloc « app » de la page).
+import { applyTheme, isDark } from '#lib/theme.js';
 import { tx } from '#lib/i18n/index.js';
 import { PARIS } from '#lib/places.js';
 import { mapStyle, provideImage } from '#lib/mapstyle.js';
@@ -15,7 +16,8 @@ export function createMapSetup(app) {
     const fresh = !location.hash.includes('carte='); // ouverture « à neuf » (pas un lien vers un endroit précis)
     // Mode sombre : suit le réglage du téléphone, y compris s'il change pendant l'utilisation.
     const darkMQ = matchMedia('(prefers-color-scheme: dark)');
-    app.dark = darkMQ.matches;
+    applyTheme(app.themePref);              // choix « Clair » / « Sombre » retenu sur l'appareil (theme.js)
+    app.dark = isDark(app.themePref);
     const base = new URL('.', location.href).href;
     app.map = new maplibregl.Map({
       container: app.mapEl,
@@ -32,7 +34,8 @@ export function createMapSetup(app) {
     if (location.hostname === 'localhost') window.__nav = () => app.nav && { k: app.nav.k, s: app.nav.s, total: app.nav.total, coords: $state.snapshot(app.nav.coords) };
     // Nos calques (trajet, favoris) sont à rajouter à chaque changement de style (clair ↔ sombre).
     app.map.on('style.load', app.addCustomLayers);
-    darkMQ.addEventListener('change', (e) => { app.dark = e.matches; app.map.setStyle(mapStyle(base, app.dark)); });
+    darkMQ.addEventListener('change', () => { if (app.themePref === 'auto') app.restyle(); });
+    app.restyle = () => { app.dark = isDark(app.themePref); app.map.setStyle(mapStyle(base, app.dark)); };
     app.map.once('load', () => {
       document.querySelector('.maplibregl-ctrl-attrib')?.classList.remove('maplibregl-compact-show');
       if (fresh) app.startupLocate();

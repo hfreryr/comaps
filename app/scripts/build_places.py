@@ -35,7 +35,7 @@ KEEP = (
     "outdoor_seating", "diet:vegetarian", "diet:vegan", "diet:gluten_free", "takeaway", "delivery", "reservation",
     "internet_access", "internet_access:fee", "air_conditioning", "toilets", "toilets:wheelchair", "changing_table", "dog",
     "self_service", "second_hand", "organic", "religion", "building", "church:type", "artwork_type", "memorial", "station", "subway",
-    "network", "operator", "brand", "level", "entrance", "ref",
+    "network", "operator", "brand", "level", "entrance", "ref", "website:menu",
 )
 # Lieux sans nom qu'on garde quand même (toilettes, distributeurs, bornes, parkings, points d'eau)
 UNNAMED_OK = {("amenity", "toilets"), ("amenity", "atm"), ("amenity", "charging_station"), ("amenity", "drinking_water"),

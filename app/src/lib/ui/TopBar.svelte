@@ -34,6 +34,11 @@
           <button class="icon-btn" onclick={app.clearSearch} aria-label={tx('recherche.effacer_la_recherche')}>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" /></svg>
           </button>
+        {:else}
+          <!-- itinéraire sans choisir d'abord un lieu (P5) -->
+          <button class="icon-btn route-btn" onclick={app.openDirections} aria-label={tx('recherche.itineraire')}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 20v-6.5a3 3 0 0 1 3-3h8" /><path d="m14.5 7 3.5 3.5-3.5 3.5" /></svg>
+          </button>
         {/if}
         {#if app.showList}<ResultList />{/if}
       </div>
@@ -118,6 +123,7 @@
   .icon-btn { border: 0; background: none; width: 46px; height: 46px; cursor: pointer; display: grid; place-items: center; color: var(--muted); }
   .icon-btn svg { width: 20px; height: 20px; stroke-width: 2; }
   .icon-btn:disabled { opacity: 0.35; cursor: default; }
+  .route-btn { color: var(--accent); }
 
   /* La zone qui défile garde de la place autour des boutons pour ne pas rogner leur ombre,
      et s'estompe à droite pour indiquer qu'on peut faire défiler. */

@@ -77,6 +77,7 @@ export function fromTags(t) {
     hours: t.opening_hours,
     phone: t.phone || t['contact:phone'],
     website: t.website || t['contact:website'],
+    menu: t['website:menu'] || null,      // carte du restaurant (P6), quand OSM la connaît
     // compléments hors OSM (sites, téléphones…) : leur source, affichée sous l'information (docs/sources-donnees.md)
     sources: t._src || {},
     wheelchair: t.wheelchair,

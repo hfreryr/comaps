@@ -2,7 +2,7 @@
 // Code sorti de +page.svelte : il lit et modifie l'état de l'écran par l'objet « app » (bloc « app » de la page).
 import { tx } from '#lib/i18n/index.js';
 import { empty } from '#lib/maplayers.js';
-import { streetRoute, trafficEstimate, transitRoutes, transitWithStop, TRANSIT_PREFS } from '#lib/routing.js';
+import { streetRoute, trafficEstimate, transitRoutes, transitWithStop, transitModesFor } from '#lib/routing.js';
 import { tick } from 'svelte';
 
 /** @param {any} app */
@@ -28,6 +28,23 @@ export function createDirections(app) {
       app.from = null;
       editField('from');
     }
+  }
+  /** Itinéraire sans lieu choisi d'abord (P5 : « pas de bouton pour faire un itinéraire ? ») : départ = votre position
+   *  si elle est connue, et l'on tape tout de suite la destination. */
+  function openDirections() {
+    app.directions = true;
+    app.dimPlaces(true);
+    app.clearSelection?.();
+    app.to = null;
+    app.via = null;
+    app.showVia = false;
+    app.when = null;
+    app.routes = { walk: null, bike: null, transit: null };
+    app.picked = 0;
+    app.mode = 'transit';
+    app.from = app.me || null;
+    if (!app.from) app.getPosition().then((p) => { if (app.directions && !app.from) { app.from = p; app.computeRoutes(); } }).catch(() => {});
+    editField('to');
   }
   function closeDirections() {
     app.directions = false;
@@ -95,7 +112,7 @@ export function createDirections(app) {
     const v = app.showVia ? app.via : null;
     run('walk', () => streetRoute(app.from, app.to, 'walk', signal, v));
     run('bike', () => streetRoute(app.from, app.to, 'bike', signal, v));
-    const modes = TRANSIT_PREFS[app.transitPref] || null;
+    const modes = transitModesFor(app.transitPref);
     // heure choisie (when.js) : maintenant, partir à, ou arriver à
     const w = app.when, at = new Date(w ? w.t : Date.now()), arrive = !!w?.arrive;
     run('transit', () => (v ? transitWithStop(app.from, v, app.to, signal, at, modes, arrive) : transitRoutes(app.from, app.to, signal, at, modes, arrive)));
@@ -127,10 +144,11 @@ export function createDirections(app) {
     sheetToTop();
   }
 
-  /** Modes de transport en commun choisis (P4 : « je ne peux pas sélectionner uniquement le métro »). */
-  function setTransitPref(p) {
-    if (app.transitPref === p) return;
-    app.transitPref = p;
+  /** Retirer ou remettre une famille de transports (P4 : « seulement le métro » ; P5 : « pas de bus »). Il en reste toujours une. */
+  function setTransitPref(kind) {
+    const on = app.transitPref.includes(kind);
+    if (on && app.transitPref.length === 1) return;
+    app.transitPref = on ? app.transitPref.filter((k) => k !== kind) : [...app.transitPref, kind];
     app.picked = 0;
     computeRoutes();
   }
@@ -140,5 +158,5 @@ export function createDirections(app) {
     app.picked = 0;
     computeRoutes();
   }
-  return { startDirections, closeDirections, pointOf, setPoint, addStop, removeStop, editField, useMyPosition, swap, computeRoutes, chooseMode, sheetToTop, pickStreet, pickTransit, setTransitPref, setWhen };
+  return { startDirections, openDirections, closeDirections, pointOf, setPoint, addStop, removeStop, editField, useMyPosition, swap, computeRoutes, chooseMode, sheetToTop, pickStreet, pickTransit, setTransitPref, setWhen };
 }

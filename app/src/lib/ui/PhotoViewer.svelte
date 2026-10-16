@@ -30,7 +30,7 @@
         ontouchstart={app.zoomStart} ontouchmove={app.zoomMove} ontouchend={app.zoomEnd} ondblclick={(e) => app.toggleZoom(e.clientX, e.clientY)}
         onscroll={(e) => { const i = Math.round(e.currentTarget.scrollLeft / e.currentTarget.clientWidth); if (i !== app.viewerIdx) { app.viewerIdx = i; app.zoom = { s: 1, x: 0, y: 0 }; } }}>
         {#each app.wiki.photos as p, i (p.src)}
-          <div class="viewer-slide"><img src={Math.abs(i - app.viewerIdx) <= 1 ? p.full : p.src} alt={i === 0 ? app.title : ''} draggable="false"
+          <div class="viewer-slide"><img src={Math.abs(i - app.viewerIdx) <= 1 ? p.full : p.src} alt={i === 0 ? app.title : ''} draggable="false" crossorigin="anonymous" referrerpolicy="no-referrer"
             style:transform={i === app.viewerIdx && app.zoom.s > 1 ? `translate(${app.zoom.x}px, ${app.zoom.y}px) scale(${app.zoom.s})` : null} /></div>
         {/each}
       </div>

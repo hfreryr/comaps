@@ -2,6 +2,7 @@
 // Intention : une carte calme et nette. Îlots crème, rues grises pleines sans liseré (comme Plans),
 // voies rapides ambrées, parcs et eau doux, bâtiments en léger relief, et des lieux
 // signalés par une pastille colorée à pictogramme blanc. Police : Inter (SIL OFL), hébergée avec l'app.
+import { isDark } from '#lib/theme.js';
 
 export const C = {
   land: '#F4EFDF',
@@ -484,7 +485,7 @@ export function provideImage(map, id) {
   }
   if (id === 'tag-sel' || id === 'tag-alt') {   // bulle étirable des étiquettes de trajet
     const sel = id === 'tag-sel';
-    const dark = document.documentElement && matchMedia('(prefers-color-scheme: dark)').matches;
+    const dark = document.documentElement && isDark();
     const s = 2, w = 40 * s, h = 28 * s, r = 9 * s, c = document.createElement('canvas');
     c.width = w; c.height = h;
     const g = c.getContext('2d');

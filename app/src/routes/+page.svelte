@@ -21,6 +21,7 @@
   import { dataDate } from '#lib/placestore.js';
   import { hoursStatus, hoursTable, momentLabel } from '#lib/hours.js';
   import { parseIntent, arrName, dietHit } from '#lib/intent.js';
+  import { themePref as loadTheme } from '#lib/theme.js';
   import { FAMILIES, GLYPHS } from '#lib/mapstyle.js';
   import { streetRoute, MODE_NAMES, fmtDuration, fmtTime, fmtDistance } from '#lib/routing.js';
   import { bestExit } from '#lib/exits.js';
@@ -170,7 +171,9 @@
   let fieldEl = $state();
   let routes = $state({ walk: null, bike: null, transit: null }); // { status, data?, error? }
   let picked = $state(0);            // proposition de transport choisie
-  let mapMode = $state('plan');      // 'plan' | 'transit'
+  let mapMode = $state('plan');      // 'plan' | 'transit' | 'satellite'
+  let themePref = $state(loadTheme()); // 'auto' | 'light' | 'dark' (theme.js)
+  let restyle = () => {};
   let showModes = $state(false);
   let lastEdit = { which: null, at: 0 }; // champ quitté juste avant un toucher sur la carte
 
@@ -450,7 +453,7 @@
 
 
   let when = $state(null);           // heure du trajet : null (maintenant) ou { t, arrive } (when.js)
-  let transitPref = $state('all');   // modes de transport en commun choisis (tous, métro, métro et RER, bus et tram)
+  let transitPref = $state(['metro', 'rail', 'tram', 'bus']);   // familles de transports gardées (routing.js TRANSIT_KINDS)
   let lastFix = $state(null);   // dernière position reçue pendant le guidage (sans elle : étapes à la main)
 
 
@@ -533,7 +536,8 @@
   // <app> État et actions partagés avec les composants et modules de l'écran (getContext('app')). Bloc généré.
   const app = {
     get transitPref() { return transitPref; }, set transitPref(v) { transitPref = v; }, get setTransitPref() { return setTransitPref; },
-    get when() { return when; }, set when(v) { when = v; }, get setWhen() { return setWhen; },
+    get themePref() { return themePref; }, set themePref(v) { themePref = v; }, get restyle() { return restyle; }, set restyle(v) { restyle = v; },
+    get when() { return when; }, set when(v) { when = v; }, get setWhen() { return setWhen; }, get openDirections() { return openDirections; },
     get setListStyle() { return setListStyle; },
     get BACKUP_KEY() { return BACKUP_KEY; }, get BIKE_COLOR() { return BIKE_COLOR; }, get FAVS_KEY() { return FAVS_KEY; },
     get LISTS_KEY() { return LISTS_KEY; }, get NAV() { return NAV; }, get PINS_KEY() { return PINS_KEY; },
@@ -675,7 +679,7 @@
   const { clearSearch, hitFilter, catIcon, applyHit, displayName, collectCategory, applyOpenFilter, setOpenAt, momentFrom, quickMoment, nearView, reloadCategoryHere, pickCategory, clearCategory, dist, openCategoryFromSearch, onKey, pickResult } = createSearch(app);
   const { say, isolate, closeTop, onPopState, onKeyDown, undoToast, showMe } = createScreen(app);
   const { setHeading, onOrientation, startCompass, startWatch, stopWatch, getPosition, startupLocate, locError, locDetail, locate, pickOnMap } = createLocation(app);
-  const { startDirections, closeDirections, pointOf, setPoint, addStop, removeStop, editField, useMyPosition, swap, computeRoutes, chooseMode, sheetToTop, pickStreet, pickTransit, setTransitPref, setWhen } = createDirections(app);
+  const { startDirections, openDirections, closeDirections, pointOf, setPoint, addStop, removeStop, editField, useMyPosition, swap, computeRoutes, chooseMode, sheetToTop, pickStreet, pickTransit, setTransitPref, setWhen } = createDirections(app);
   const { speak, transitSteps, startNav, onFix, updateNav, stepBy, reroute, endNav } = createNav(app);
   const { importFile } = createImport(app);
 </script>

@@ -134,7 +134,7 @@ const tests = {
     await p.click('.action.primary'); await p.waitForTimeout(8000);
     assert((await ctx.cookies()).length === 0, `cookies déposés : ${JSON.stringify(await ctx.cookies())}`);
     assert((await p.evaluate(() => document.cookie)) === '', 'document.cookie non vide');
-    const allowed = /^(localhost(:\d+)?|tiles\.openfreemap\.org|photon\.komoot\.io|data\.geopf\.fr|valhalla1\.openstreetmap\.de|api\.transitous\.org|www\.wikidata\.org|fr\.wikipedia\.org|commons\.wikimedia\.org|upload\.wikimedia\.org|[a-z0-9.-]*panoramax[a-z0-9.-]*|[a-z0-9.-]*\.ign\.fr|[a-z0-9.-]*ovh[a-z0-9.-]*)$/;
+    const allowed = /^(localhost(:\d+)?|tiles\.openfreemap\.org|photon\.komoot\.io|data\.geopf\.fr|valhalla1\.openstreetmap\.de|api\.transitous\.org|www\.wikidata\.org|fr\.wikipedia\.org|commons\.wikimedia\.org|upload\.wikimedia\.org|thumb\.wikimedia\.org|[a-z0-9.-]*panoramax[a-z0-9.-]*|[a-z0-9.-]*\.ign\.fr|[a-z0-9.-]*ovh[a-z0-9.-]*)$/;
     const other = [...hosts].filter((h) => !allowed.test(h));
     assert(!other.length, `services non listés contactés : ${other.join(', ')}`);
     assert(!errors.length, errors.join(' | '));
@@ -492,7 +492,8 @@ const tests = {
     assert(/\d,\d\d €/.test(await p.$eval('.route-sheet .sum', (e) => e.innerText)), 'prix absent du résumé');
     // départs comme Citymapper : « dans 1, 4, 7 min de Station » (minutes avant de partir), ou l'heure du train
     assert(/dans [\d, ]+ min de |\d\d:\d\d.* de /.test(await p.$eval('.route-sheet .sum .depart', (e) => e.innerText)), 'départs absents du résumé');
-    await p.click('.t-pref:has-text("Bus et tram")'); await p.waitForTimeout(1000);
+    // « pas de métro, pas de RER » (P5 : liste excluante) : il reste bus et tram
+    await p.click('.t-pref:has-text("Métro")'); await p.waitForTimeout(400); await p.click('.t-pref:has-text("RER")'); await p.waitForTimeout(1000);
     await p.waitForSelector('.route-sheet .sum.transit', { timeout: 25000 }); await p.waitForTimeout(1500);
     const metas = await p.$$eval('.legs .leg:not(.walk):not(.stop)', (els) => els.map((e) => e.querySelector('.leg-meta')?.textContent || '').filter((t) => t.trim()));
     assert(metas.length && metas.every((m) => /Bus|Tram/.test(m)), `autre mode que bus ou tram : ${metas.join(' | ')}`);
@@ -548,6 +549,39 @@ const tests = {
     await p.dispatchEvent('.results li button >> nth=0', 'mousedown'); await p.waitForTimeout(5000);
     const names = await p.$$eval('.nearby .r-name', (els) => els.map((e) => e.textContent));
     assert(names.length >= 3, `trop peu de lieux : ${names.join(', ')}`);
+    assert(!errors.length, errors.join(' | '));
+    await ctx.close();
+  },
+  async 'itinéraire sans choisir de lieu avant : bouton dans la barre (P5)'() {
+    const { p, ctx, errors } = await page({ geolocation: { latitude: 48.8867, longitude: 2.3431 } });
+    await p.click('.route-btn'); await p.waitForSelector('#field-to', { timeout: 5000 });
+    assert(/Votre position|position/i.test(await p.textContent('.dir-card')), 'départ « Votre position » absent');
+    await p.fill('#field-to', 'Panthéon'); await p.waitForSelector('.results li.opt button', { timeout: 15000 }); await pick(p);
+    await p.waitForSelector('.route-sheet .mode-tabs', { timeout: 15000 });
+    assert(/Panthéon/.test(await p.textContent('.dir-card')), 'destination non retenue');
+    assert(!errors.length, errors.join(' | '));
+    await ctx.close();
+  },
+  async 'vue satellite (IGN) et thème au choix, retenu sur l’appareil (P5, P6)'() {
+    const { p, ctx, errors } = await page();
+    await p.click('button[aria-label="Type de carte"]'); await p.click('.modes-pop button:has-text("Satellite")'); await p.waitForTimeout(1500);
+    assert(await p.evaluate(() => !!window.__map.getLayer('satellite')), 'couche satellite absente');
+    await p.click('button[aria-label="Type de carte"]'); await p.click('.modes-pop button:has-text("Plan")'); await p.waitForTimeout(500);
+    assert(await p.evaluate(() => !window.__map.getLayer('satellite')), 'couche satellite restée après retour au plan');
+    await p.click('button[aria-label="Type de carte"]'); await p.click('.theme button:has-text("Sombre")'); await p.waitForTimeout(1500);
+    await p.reload({ waitUntil: 'networkidle' }); await p.waitForTimeout(2000);
+    assert(await p.evaluate(() => document.documentElement.dataset.theme === 'dark' && getComputedStyle(document.documentElement).getPropertyValue('--card').trim() === '#1c1f24'), 'thème sombre non retenu');
+    assert(!errors.length, errors.join(' | '));
+    await ctx.close();
+  },
+  async 'sorties de la station sur la carte (P5)'() {
+    const { p, ctx, errors } = await page();
+    await p.click('.chip:has-text("Métro")'); await p.waitForTimeout(4000);
+    await p.click('.nearby li button >> nth=0'); await p.waitForSelector('.exits', { timeout: 15000 });
+    const n = await p.evaluate(() => window.__map.getSource('exits')?.serialize()?.data?.features?.length || 0);
+    assert(n > 0, 'aucune sortie dessinée sur la carte');
+    await p.click('.sheet .close'); await p.waitForTimeout(800);
+    assert(await p.evaluate(() => (window.__map.getSource('exits')?.serialize()?.data?.features?.length || 0) === 0), 'sorties restées après fermeture');
     assert(!errors.length, errors.join(' | '));
     await ctx.close();
   },
