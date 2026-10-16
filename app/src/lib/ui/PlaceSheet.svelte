@@ -74,7 +74,7 @@
         <div class="photos" class:single={app.wiki.photos.length === 1}>
           {#each app.wiki.photos as ph, i (ph.src)}
             <button class="ph" onclick={() => (app.viewer = i)} aria-label={tx('fiche.voir_la_photo_sur_en_plein_ecran', { i: i + 1, n: app.wiki.photos.length })}>
-              <img src={ph.src} alt={i === 0 ? app.title : ''} loading="lazy" />
+              <img src={ph.src} alt={i === 0 ? app.title : ''} loading="lazy" crossorigin="anonymous" referrerpolicy="no-referrer" />
               {#if i === 0 && app.wiki.photos.length > 1}<span class="ph-count">{tx('fiche.photos', { n: app.wiki.photos.length })}</span>{/if}
             </button>
           {/each}

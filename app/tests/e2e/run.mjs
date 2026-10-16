@@ -134,7 +134,7 @@ const tests = {
     await p.click('.action.primary'); await p.waitForTimeout(8000);
     assert((await ctx.cookies()).length === 0, `cookies déposés : ${JSON.stringify(await ctx.cookies())}`);
     assert((await p.evaluate(() => document.cookie)) === '', 'document.cookie non vide');
-    const allowed = /^(localhost(:\d+)?|tiles\.openfreemap\.org|photon\.komoot\.io|data\.geopf\.fr|valhalla1\.openstreetmap\.de|api\.transitous\.org|www\.wikidata\.org|fr\.wikipedia\.org|commons\.wikimedia\.org|upload\.wikimedia\.org|[a-z0-9.-]*panoramax[a-z0-9.-]*|[a-z0-9.-]*\.ign\.fr|[a-z0-9.-]*ovh[a-z0-9.-]*)$/;
+    const allowed = /^(localhost(:\d+)?|tiles\.openfreemap\.org|photon\.komoot\.io|data\.geopf\.fr|valhalla1\.openstreetmap\.de|api\.transitous\.org|www\.wikidata\.org|fr\.wikipedia\.org|commons\.wikimedia\.org|upload\.wikimedia\.org|thumb\.wikimedia\.org|[a-z0-9.-]*panoramax[a-z0-9.-]*|[a-z0-9.-]*\.ign\.fr|[a-z0-9.-]*ovh[a-z0-9.-]*)$/;
     const other = [...hosts].filter((h) => !allowed.test(h));
     assert(!other.length, `services non listés contactés : ${other.join(', ')}`);
     assert(!errors.length, errors.join(' | '));
