@@ -4,11 +4,17 @@
   import { draggable } from '#lib/sheet.js';
   import ModeIcon from './ModeIcon.svelte';
   import { exitLabel } from '#lib/exits.js';
+  import { showExits } from '#lib/exitlayer.js';
   import { fmtWait } from '#lib/routing.js';
   import { host, href } from '#lib/links.js';
 
   // État et actions de la page (voir le bloc « app » de +page.svelte)
   const app = getContext('app');
+  // sorties de la station ouverte, aussi sur la carte (P5) ; retirées quand la fiche se ferme
+  $effect(() => {
+    showExits(app.map, app.exits?.status === 'ok' ? app.exits.data : []);
+    return () => showExits(app.map, []);
+  });
   // menu « ⋯ » : se ferme quand on touche ailleurs (P5 ne savait pas le refermer)
   let fabBar = $state();
   $effect(() => {
@@ -53,7 +59,7 @@
           <h2>{tx('fiche.sorties')}</h2>
           <ul>
             {#each app.allExits ? app.exits.data : app.exits.data.slice(0, 4) as e}
-              <li><span class="exit-sq" aria-hidden="true"></span><span>{exitLabel(e)}</span>
+              <li><button class="exit-go" onclick={() => app.map.easeTo({ center: [e.lon, e.lat], zoom: Math.max(17, app.map.getZoom()), duration: 600 })}><span class="exit-sq" aria-hidden="true"></span><span>{exitLabel(e)}</span></button>
                 {#if e.wheelchair}<span class="exit-tag">{tx('fiche.accessible')}</span>{:else if e.escalator}<span class="exit-tag">{tx('fiche.escalier_mecanique')}</span>{/if}</li>
             {/each}
           </ul>
@@ -379,6 +385,7 @@
   .fab button.on { color: var(--fav); }
   .fab button.on path { fill: currentColor; }
   .fab button.saved path { fill: currentColor; }
+  .exit-go { display: inline-flex; align-items: baseline; border: 0; background: none; padding: 0; font: inherit; color: inherit; text-align: left; cursor: pointer; }
   .pmenu { position: absolute; bottom: 62px; right: -6px; min-width: 220px; background: var(--card); border-radius: 14px; overflow: hidden;
     box-shadow: 0 6px 24px rgb(0 0 0 / 0.2), 0 0 0 0.5px rgb(0 0 0 / 0.08); }
   .pmenu button { display: block; width: 100%; text-align: left; border: 0; background: none; font: inherit; font-size: 15.5px; color: var(--ink);

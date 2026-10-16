@@ -573,6 +573,17 @@ const tests = {
     assert(!errors.length, errors.join(' | '));
     await ctx.close();
   },
+  async 'sorties de la station sur la carte (P5)'() {
+    const { p, ctx, errors } = await page();
+    await p.click('.chip:has-text("Métro")'); await p.waitForTimeout(4000);
+    await p.click('.nearby li button >> nth=0'); await p.waitForSelector('.exits', { timeout: 15000 });
+    const n = await p.evaluate(() => window.__map.getSource('exits')?.serialize()?.data?.features?.length || 0);
+    assert(n > 0, 'aucune sortie dessinée sur la carte');
+    await p.click('.sheet .close'); await p.waitForTimeout(800);
+    assert(await p.evaluate(() => (window.__map.getSource('exits')?.serialize()?.data?.features?.length || 0) === 0), 'sorties restées après fermeture');
+    assert(!errors.length, errors.join(' | '));
+    await ctx.close();
+  },
   async 'la liste se recharge quand on déplace la carte'() {
     const { p, ctx } = await page({ viewport: { width: 1280, height: 800 }, isMobile: false, hasTouch: false });
     await p.click('.chip:has-text("Restaurants")'); await p.waitForTimeout(4000);
