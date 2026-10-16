@@ -19,6 +19,7 @@ Untracked Maps est une app web de cartographie grand public, construite sur [Ope
 - **Itinéraires** à pied, à vélo, en transports et en voiture : choix entre plusieurs trajets, départ ou arrivée à l'heure choisie, arrêt intermédiaire, guidage pas à pas vocal.
 - **Mes lieux** sans compte ni serveur : listes, Maison et Travail, import depuis Google Takeout, transfert vers un autre appareil par lien ou QR code, sauvegarde chiffrée.
 - **Position** : direction façon boussole, carte qui tourne avec vous.
+- **À propos (bouton ⓘ)** : la promesse (montrée une seule fois, à la première ouverture), l'origine de chaque information et ses licences, signaler une erreur. La mention « © OpenStreetMap » s'affiche 5 s à chaque ouverture, comme le permettent les règles d'attribution d'OSM.
 
 Détails techniques et sources de données : [`app/README.md`](app/README.md).
 

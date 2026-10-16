@@ -25,8 +25,7 @@ export function createMapSetup(app) {
       center: [PARIS.lon, PARIS.lat],
       zoom: 13,
       hash: 'carte',
-      attributionControl: { compact: true, customAttribution:
-        'Recherche <a href="https://photon.komoot.io" target="_blank" rel="noopener">Photon / komoot</a> · Itinéraires <a href="https://valhalla1.openstreetmap.de" target="_blank" rel="noopener">Valhalla / FOSSGIS</a>, <a href="https://transitous.org/sources/" target="_blank" rel="noopener">Transitous</a> · <a href="https://github.com/hfreryr/untracked" target="_blank" rel="noopener">Projet libre</a> · <a href="confidentialite">Qui voit quoi</a>' },
+      attributionControl: false,   // mention « © OpenStreetMap » 5 s (MapCredit.svelte), crédits complets dans ⓘ (AboutDialog.svelte)
       fadeDuration: 200
     });
     app.map.setMissingStyleImageResolver((id) => provideImage(app.map, id));
@@ -37,7 +36,6 @@ export function createMapSetup(app) {
     darkMQ.addEventListener('change', () => { if (app.themePref === 'auto') app.restyle(); });
     app.restyle = () => { app.dark = isDark(app.themePref); app.map.setStyle(mapStyle(base, app.dark)); };
     app.map.once('load', () => {
-      document.querySelector('.maplibregl-ctrl-attrib')?.classList.remove('maplibregl-compact-show');
       if (fresh) app.startupLocate();
       // Liste partagée (…#liste=…) ou transfert depuis un autre appareil (…#transfert=…) : tout est dans le lien.
       const lm = /[#&]liste=([\w-]+)/.exec(location.hash), tm = /[#&]transfert=([\w-]+)/.exec(location.hash);

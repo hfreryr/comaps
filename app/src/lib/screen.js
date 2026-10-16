@@ -23,7 +23,8 @@ export function createScreen(app) {
   // Fermer « ce qui est au-dessus » : Échap, ou le bouton Retour du téléphone.
   function closeTop() {
     if (closeAll()) return true;                       // un menu ouvert se ferme en premier (règles d'interface)
-    if (app.viewer != null) app.viewer = null;
+    if (app.aboutOpen) app.aboutOpen = false;
+    else if (app.viewer != null) app.viewer = null;
     else if (app.placeMenu) app.placeMenu = false;
     else if (app.listPicker) app.listPicker = false;
     else if (app.hubPanel) app.hubPanel = null;

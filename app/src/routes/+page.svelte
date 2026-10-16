@@ -144,6 +144,7 @@
     showPromise = false;
     try { localStorage.setItem('promesse-vue', '1'); } catch { /* rien */ }
   }
+  let aboutOpen = $state(false);     // fenêtre « À propos » (bouton ⓘ de la carte)
 
   // Panorama plein écran : on l'ouvre centré sur le lieu (rel : degrés depuis le centre de la photo)
   function panoScroll(node, rel) {
@@ -535,6 +536,7 @@
 
   // <app> État et actions partagés avec les composants et modules de l'écran (getContext('app')). Bloc généré.
   const app = {
+    get aboutOpen() { return aboutOpen; }, set aboutOpen(v) { aboutOpen = v; },
     get transitPref() { return transitPref; }, set transitPref(v) { transitPref = v; }, get setTransitPref() { return setTransitPref; },
     get themePref() { return themePref; }, set themePref(v) { themePref = v; }, get restyle() { return restyle; }, set restyle(v) { restyle = v; },
     get when() { return when; }, set when(v) { when = v; }, get setWhen() { return setWhen; }, get openDirections() { return openDirections; },
