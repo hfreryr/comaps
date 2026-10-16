@@ -3,6 +3,9 @@
 // Règle (CLAUDE.md) : tout nouveau texte affiché passe par ce fichier ; un test vérifie qu'aucun texte n'est écrit en dur.
 import { pluriel } from './plural.js';
 
+// cuisines d'OSM (étiquette cuisine) : les plus fréquentes à Paris ; une valeur inconnue n'est pas affichée en anglais
+const CUISINES = { french: 'française', italian: 'italienne', japanese: 'japonaise', pizza: 'pizzas', asian: 'asiatique', chinese: 'chinoise', burger: 'burgers', coffee_shop: 'coffee shop', kebab: 'kebab', sandwich: 'sandwichs', vietnamese: 'vietnamienne', indian: 'indienne', lebanese: 'libanaise', thai: 'thaïe', korean: 'coréenne', crepe: 'crêpes', sushi: 'sushis', bubble_tea: 'bubble tea', chicken: 'poulet', african: 'africaine', regional: 'régionale', greek: 'grecque', salad: 'salades', turkish: 'turque', mexican: 'mexicaine', mediterranean: 'méditerranéenne', moroccan: 'marocaine', seafood: 'fruits de mer', brasserie: 'brasserie', fine_dining: 'gastronomique', couscous: 'couscous', ramen: 'ramen', bagel: 'bagels', portuguese: 'portugaise', poke: 'poke', international: 'internationale', peruvian: 'péruvienne', american: 'américaine', argentinian: 'argentine', arab: 'arabe', tea: 'thé', fish: 'poisson', steak_house: 'grillades', teahouse: 'salon de thé', tapas: 'tapas', tibetan: 'tibétaine', oriental: 'orientale', french_tacos: 'tacos', italian_pizza: 'pizzas', breakfast: 'petit-déjeuner', noodle: 'nouilles', bistro: 'bistrot', ice_cream: 'glaces', spanish: 'espagnole', donut: 'donuts', barbecue: 'barbecue', pasta: 'pâtes', brazilian: 'brésilienne', persian: 'persane', brunch: 'brunch', cake: 'gâteaux', cambodian: 'cambodgienne', ethiopian: 'éthiopienne', caribbean: 'antillaise', georgian: 'géorgienne', pancake: 'pancakes', juice: 'jus', local: 'locale', tunisian: 'tunisienne', taiwanese: 'taïwanaise', traditional: 'traditionnelle', indonesian: 'indonésienne', bowl: 'bowls', healthy: 'healthy', 'tex-mex': 'tex-mex', latin_american: 'latino-américaine', corsican: 'corse', syrian: 'syrienne', algerian: 'algérienne', hot_dog: 'hot-dogs', kurdish: 'kurde', nepalese: 'népalaise', pastry: 'pâtisserie', fusion: 'fusion', senegalese: 'sénégalaise', colombian: 'colombienne', friture: 'friture', middle_eastern: 'moyen-orientale', grill: 'grillades', lao: 'laotienne', vegan: 'végane', vegetarian: 'végétarienne', polish: 'polonaise', russian: 'russe', ukrainian: 'ukrainienne', german: 'allemande', british: 'britannique', irish: 'irlandaise', israeli: 'israélienne', jewish: 'juive', armenian: 'arménienne', afghan: 'afghane', pakistani: 'pakistanaise', sri_lankan: 'sri-lankaise', malaysian: 'malaisienne', filipino: 'philippine', hawaiian: 'hawaïenne', cuban: 'cubaine', venezuelan: 'vénézuélienne', chilean: 'chilienne', basque: 'basque', alsatian: 'alsacienne', savoyard: 'savoyarde', breton: 'bretonne', fondue: 'fondue', soup: 'soupes', dumpling: 'raviolis', dim_sum: 'dim sum', udon: 'udon', yakitori: 'yakitori', sichuan: 'sichuanaise', cantonese: 'cantonaise', hot_pot: 'fondue chinoise', tacos: 'tacos', falafel: 'falafels', crêpe: 'crêpes', galette: 'galettes', creperie: 'crêpes', fast_food: 'restauration rapide', coffee: 'café', wine: 'vin', beer: 'bière', cocktails: 'cocktails' };
+
 export default {
   // ——— Bannière « Une carte qui ne vous piste pas » ———
   'promesse.une_carte_qui_ne_vous_piste_pas': 'Une carte qui ne vous piste pas.',
@@ -165,6 +168,13 @@ export default {
   'source.site': 'site du lieu',
   'fiche.site_web': 'Site web',
   'fiche.menu': 'Menu',
+  'fiche.cuisine': ({ v }) => CUISINES[String(v || '').trim().toLowerCase()] || '',
+  'fiche.que_veut_dire_verifiees': 'Que veut dire « vérifiées » ?',
+  'fiche.verifiees_titre': 'Infos vérifiées',
+  'fiche.verifiees_qui': 'Un contributeur d\'OpenStreetMap, la carte libre que nous utilisons, a confirmé à cette date les informations de ce lieu (horaires, adresse, téléphone…), le plus souvent en passant sur place.',
+  'fiche.verifiees_pas_un_avis': 'C\'est une indication de fraîcheur, pas un avis sur la qualité du lieu.',
+  'fiche.verifiees_corriger': 'Une information vous semble fausse ? Touchez « Signaler » en bas de la fiche.',
+  'fiche.verifiees_ancien': 'Personne ne les a confirmées depuis : elles ont pu changer. Touchez « Signaler » en bas de la fiche si vous voyez une erreur.',
   'fiche.voir_le_menu': 'Voir le menu',
   'fiche.adresse': 'Adresse',
   'fiche.votre': 'Votre {raccourci} ·',
@@ -416,8 +426,8 @@ export default {
   'ecran.carte': 'Carte',
 
   // « vérifié par qui ? » (P6), « pas comparable à des avis » (P5) : on dit qui, et ce que c'est
-  'ecran.infos_verifiees_en': 'Infos confirmées en {when} par un contributeur OpenStreetMap',
-  'ecran.infos_non_verifiees_depuis': 'Infos pas reconfirmées depuis {getFullYear}',
+  'ecran.infos_verifiees_en': 'Infos vérifiées en {when}',
+  'ecran.infos_non_verifiees_depuis': 'Infos non vérifiées depuis {getFullYear}',
   'ecran.distance': 'Distance',
   'ecran.oui': 'Oui',
   'ecran.partiel': 'Partiel',

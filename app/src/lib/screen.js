@@ -1,6 +1,7 @@
 // Écran : messages, retour arrière, touche Échap, couches visibles.
 // Code sorti de +page.svelte : il lit et modifie l'état de l'écran par l'objet « app » (bloc « app » de la page).
 import * as maplibregl from 'maplibre-gl';
+import { closeAll } from '#lib/popover.js';
 
 /** @param {any} app */
 export function createScreen(app) {
@@ -21,6 +22,7 @@ export function createScreen(app) {
   }
   // Fermer « ce qui est au-dessus » : Échap, ou le bouton Retour du téléphone.
   function closeTop() {
+    if (closeAll()) return true;                       // un menu ouvert se ferme en premier (règles d'interface)
     if (app.viewer != null) app.viewer = null;
     else if (app.placeMenu) app.placeMenu = false;
     else if (app.listPicker) app.listPicker = false;

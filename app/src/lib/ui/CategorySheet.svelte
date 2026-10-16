@@ -1,4 +1,5 @@
 <script>
+  import { popover } from '#lib/popover.js';
   import { tx } from '#lib/i18n/index.js';
   import { getContext } from 'svelte';
   import ListDot from '#lib/ui/ListDot.svelte';
@@ -11,6 +12,7 @@
 
   // État et actions de la page (voir le bloc « app » de +page.svelte)
   const app = getContext('app');
+  let momentBtn = $state();
 </script>
 
 
@@ -137,7 +139,7 @@
       {#if !app.category.transit}
         <div class="open-pills">
           <button class="opill" class:on={app.openAt?.now} aria-pressed={!!app.openAt?.now} onclick={() => app.setOpenAt(app.openAt?.now ? null : { now: true })}>{tx('liste.ouvert_maintenant')}</button>
-          <button class="opill" class:on={!!app.openAt?.at} aria-expanded={app.momentPicker} onclick={() => (app.momentPicker = !app.momentPicker)}>
+          <button class="opill" bind:this={momentBtn} class:on={!!app.openAt?.at} aria-expanded={app.momentPicker} onclick={() => (app.momentPicker = !app.momentPicker)}>
             {app.openAt?.at ? momentLabel(app.openAt.at).replace(/^./, (x) => x.toUpperCase()) : tx('liste.ouvert_a')}
             <svg viewBox="0 0 24 24" aria-hidden="true" class="chev" class:flip={app.momentPicker}><path d="m7 10 5 5 5-5" /></svg>
           </button>
@@ -145,7 +147,7 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" /></svg></button>{/if}
         </div>
         {#if app.momentPicker}
-          <div class="moment">
+          <div class="moment" use:popover={{ trigger: () => momentBtn, close: () => (app.momentPicker = false), place: 'below', align: 'start' }}>
             <div class="moment-quick">
               <button onclick={() => app.quickMoment('midi')}>{tx('liste.midi')}</button>
               <button onclick={() => app.quickMoment('soir')}>{tx('liste.ce_soir')}</button>
@@ -294,11 +296,13 @@
   .opill.on .chev { color: #fff; }
   .opill-x { width: 34px; height: 34px; border-radius: 50%; border: 0; background: var(--fill); color: var(--muted); display: grid; place-items: center; cursor: pointer; }
   .opill-x svg { width: 15px; height: 15px; stroke-width: 2.4; }
-  .moment { margin: 8px 0 4px; padding: 10px; background: var(--fill); border-radius: 14px; display: grid; gap: 8px; }
+  /* menu flottant (popover.js) : entier à l'écran, au-dessus de la fiche */
+  .moment { width: min(360px, calc(100vw - 32px)); box-sizing: border-box; padding: 12px; background: var(--card); border-radius: 16px;
+    box-shadow: var(--shadow-float); display: grid; gap: 8px; }
   .moment-quick { display: flex; gap: 6px; flex-wrap: wrap; }
-  .moment-quick button { height: 32px; padding: 0 12px; border-radius: 16px; border: 0; background: var(--card); color: var(--accent); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .moment-quick button { height: 32px; padding: 0 12px; border-radius: 16px; border: 0; background: var(--fill); color: var(--accent); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
   .moment-sel { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .moment-sel select { font: inherit; font-size: 16px; color: var(--ink); background: var(--card); border: 0; border-radius: 10px; padding: 9px 10px; }
+  .moment-sel select { font: inherit; font-size: 16px; color: var(--ink); background: var(--fill); border: 0; border-radius: 10px; padding: 9px 10px; }
   .unknown-row { display: block; width: 100%; text-align: left; border: 0; border-top: 1px solid var(--line); background: none; padding: 14px 0 4px;
     font: inherit; font-size: 15px; font-weight: 600; color: var(--accent); cursor: pointer; }
   .unknown-row small { display: block; font-weight: 400; font-size: 13px; color: var(--muted); margin-top: 3px; }

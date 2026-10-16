@@ -2,6 +2,8 @@
   import { tx } from '#lib/i18n/index.js';
   import { getContext } from 'svelte';
   import { applyTheme } from '#lib/theme.js';
+  import { popover } from '#lib/popover.js';
+  let layersBtn = $state();
 
   // État et actions de la page (voir le bloc « app » de +page.svelte)
   const app = getContext('app');
@@ -22,7 +24,7 @@
         </button>
       {/if}
       {#if app.showModes}
-        <div class="modes-pop" role="menu" aria-label={tx('carte.type_de_carte')}>
+        <div class="modes-pop" role="menu" aria-label={tx('carte.type_de_carte')} use:popover={{ trigger: () => layersBtn, close: () => (app.showModes = false), place: 'above', align: 'end' }}>
           <button role="menuitemradio" aria-checked={app.mapMode === 'plan'} class:on={app.mapMode === 'plan'} onclick={() => app.setMapMode('plan')}>
             <span class="thumb plan" aria-hidden="true"></span>{tx('carte.plan')}
           </button>
@@ -44,7 +46,7 @@
           </label>
         </div>
       {/if}
-      <button class="round-btn" onclick={() => (app.showModes = !app.showModes)} aria-label={tx('carte.type_de_carte')} aria-expanded={app.showModes}>
+      <button class="round-btn" bind:this={layersBtn} onclick={() => (app.showModes = !app.showModes)} aria-label={tx('carte.type_de_carte')} aria-expanded={app.showModes} aria-haspopup="menu">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3.5 8.5 4.5L12 12.5 3.5 8z" /><path d="m3.5 12 8.5 4.5 8.5-4.5M3.5 16l8.5 4.5 8.5-4.5" /></svg>
       </button>
     </div>
