@@ -51,15 +51,15 @@ Elles s'appliquent à **toute** modification de l'app. Une règle marquée 🔒 
 
 ## Cohérence
 
-21. **Un même geste fait la même chose partout.** Croix en haut à droite, glisser vers le bas, bouton principal bleu plein.
+21. **Un même geste fait la même chose partout.** Les boutons ronds de la carte ont tous la même taille (48 px). Croix en haut à droite, glisser vers le bas, bouton principal bleu plein.
 22. **Inspiré des cartes de référence (Google Maps, Plans, Citymapper), jamais copié** : ni icônes, ni logos, ni éléments propres à ces apps.
 
 ## Tests qui font respecter ces règles
 
 - `npm run e2e`, test « règles d'interface » :
-  - menu ⋯ d'une fiche, menu des cartes et choix de l'heure d'un trajet ;
+  - menu ⋯ d'une fiche, menu des cartes, fenêtre « À propos » (bouton ⓘ) et choix de l'heure d'un trajet ;
   - petit écran (375 × 667) ;
   - chaque menu est vérifié entier et non masqué, puis fermé en touchant ailleurs (sans effet dessous) et par Échap.
-- `npm run e2e`, test « accessibilité » : axe-core, WCAG 2.2 AA, sur 7 écrans, en clair et en sombre (règles 13 à 15).
+- `npm run e2e`, test « accessibilité » : axe-core, WCAG 2.2 AA, sur 8 écrans, en clair et en sombre (règles 13 à 15).
 - `npm test`, `popover.test.js` : placement des menus (règle 4).
 - `npm test`, `textes.test.js` : aucun texte écrit en dur (règle 12, en partie).

@@ -59,7 +59,7 @@ const tests = {
     assert(!errors.length, errors.join(' | '));
     await ctx.close();
   },
-  async 'accessibilité (WCAG 2.2 AA, axe-core) : 7 écrans, clair et sombre'() {
+  async 'accessibilité (WCAG 2.2 AA, axe-core) : 8 écrans, clair et sombre'() {
     // Audit automatique : ne voit qu'une partie des problèmes (pas le clavier ni VoiceOver), mais bloque les régressions.
     const resto = async (p) => { await p.click('.chip:has-text("Restaurants")'); await p.waitForTimeout(6000); await p.click('.nearby li button >> nth=0'); await p.waitForTimeout(4000); };
     const screens = {
@@ -68,6 +68,7 @@ const tests = {
       catégorie: async (p) => { await p.click('.chip:has-text("Restaurants")'); await p.waitForTimeout(6000); },
       fiche: resto,
       itinéraire: async (p) => { await resto(p); await p.click('.action.primary'); await p.waitForTimeout(10000); },
+      'À propos': async (p) => { await p.click('.about-btn'); await p.waitForSelector('.dlg'); await p.waitForTimeout(400); },
       'Mes lieux': async (p) => { await p.click('.chip:has-text("Mes lieux")'); await p.waitForTimeout(1500); },
       'Qui voit quoi': async (p) => { await p.evaluate(() => { const a = document.createElement('a'); a.href = 'confidentialite'; document.body.appendChild(a); a.click(); a.remove(); }); await p.waitForSelector('main h1'); },
     };
@@ -125,7 +126,7 @@ const tests = {
     await ctx.close();
   },
   async 'preuve affichée : 0 cookie, seuls les services de « Qui voit quoi » sont contactés'() {
-    // Ce que dit la ligne « 0 traceur · 0 cookie » sous la recherche : vérifié sur un parcours complet.
+    // Ce que dit le bandeau « 0 traceur · 0 cookie » de la première ouverture : vérifié sur un parcours complet.
     const { p, ctx, errors } = await page();
     const hosts = new Set(); p.on('request', (r) => hosts.add(new URL(r.url()).host));
     await p.fill('#search', 'Panthéon'); await p.waitForTimeout(5000); await pick(p).catch(() => {}); await p.waitForTimeout(4000);
@@ -552,13 +553,52 @@ const tests = {
     assert(!errors.length, errors.join(' | '));
     await ctx.close();
   },
-  async 'itinéraire sans choisir de lieu avant : bouton dans la barre (P5)'() {
+  async 'itinéraire sans bouton dédié : chercher la destination, puis « Itinéraire » sur sa fiche (comme Citymapper)'() {
     const { p, ctx, errors } = await page({ geolocation: { latitude: 48.8867, longitude: 2.3431 } });
-    await p.click('.route-btn'); await p.waitForSelector('#field-to', { timeout: 5000 });
-    assert(/Votre position|position/i.test(await p.textContent('.dir-card')), 'départ « Votre position » absent');
-    await p.fill('#field-to', 'Panthéon'); await p.waitForSelector('.results li.opt button', { timeout: 15000 }); await pick(p);
+    assert(!(await p.$('.route-btn')), 'bouton itinéraire encore dans la barre');
+    await p.fill('#search', 'Panthéon'); await p.waitForSelector('.results li.opt button', { timeout: 15000 }); await pick(p);
+    await p.waitForSelector('.action.primary', { timeout: 15000 }); await p.click('.action.primary');
     await p.waitForSelector('.route-sheet .mode-tabs', { timeout: 15000 });
-    assert(/Panthéon/.test(await p.textContent('.dir-card')), 'destination non retenue');
+    const card = await p.textContent('.dir-card');
+    assert(/position/i.test(card) && /Panthéon/.test(card), `départ ou arrivée absents : ${card}`);
+    assert(!errors.length, errors.join(' | '));
+    await ctx.close();
+  },
+  async 'première ouverture : promesse et preuve une seule fois ; ⓘ ouvre « À propos » ; mention OSM repliée après 5 s'() {
+    const ctx = await browser.newContext({ viewport: { width: 375, height: 667 }, isMobile: true, hasTouch: true, locale: 'fr-FR' });
+    const p = await ctx.newPage(); const errors = []; p.on('pageerror', (e) => errors.push(e.message));
+    await p.goto(`http://localhost:${PORT}/`); await p.waitForSelector('.promise', { timeout: 10000 });
+    const txt = await p.textContent('.promise');
+    assert(/0 traceur/.test(txt) && /0 cookie/.test(txt) && /Pour en savoir plus/.test(txt), `bandeau incomplet : ${txt}`);
+    // rien de caché sous le bandeau : il est au-dessus des trois boutons ronds
+    const [ban, btn] = await Promise.all(['.promise', '.modes-ctl'].map((s) => p.$eval(s, (e) => e.getBoundingClientRect().toJSON())));
+    assert(ban.bottom <= btn.top, `le bandeau recouvre les boutons : ${ban.bottom} > ${btn.top}`);
+    assert(await p.isVisible('.credit'), 'mention © OpenStreetMap absente au démarrage');
+    await p.tap('.promise .info'); await p.waitForSelector('.dlg');
+    assert(/Untracked Maps/.test(await p.textContent('.dlg')), 'fenêtre À propos non ouverte');
+    await p.keyboard.press('Escape'); await p.waitForTimeout(300);
+    assert(!(await p.$('.dlg')) && !(await p.$('.promise')), 'fenêtre ou bandeau restés ouverts');
+    await p.reload(); await p.waitForTimeout(2500);
+    assert(!(await p.$('.promise')), 'bandeau réaffiché à la deuxième ouverture');
+    assert(!(await p.$('.privacy-line')), 'ancienne ligne « 0 traceur » encore sous la recherche');
+    assert(await p.isVisible('.credit'), 'mention © OpenStreetMap absente à la deuxième ouverture');
+    await p.waitForTimeout(5500);
+    assert(!(await p.$('.credit')), 'mention OSM pas repliée après 5 s');
+    // les trois boutons ronds ont la même taille
+    const sizes = await p.$$eval('.modes-ctl .round-btn, .locate, .about-btn', (els) => els.map((e) => `${e.offsetWidth}x${e.offsetHeight}`));
+    assert(new Set(sizes).size === 1, `tailles différentes : ${sizes}`);
+    assert(!errors.length, errors.join(' | '));
+    await ctx.close();
+  },
+  async 'exemples touchables seulement tant qu’on n’a rien cherché, sans titre « Essayez »'() {
+    const { p, ctx, errors } = await page();
+    await p.click('#search'); await p.waitForSelector('.results li.example', { timeout: 5000 });
+    assert(!/Essayez/.test(await p.textContent('.results')), 'titre « Essayez » encore là');
+    await p.fill('#search', 'Panthéon'); await p.waitForSelector('.results li.opt button', { timeout: 15000 }); await pick(p);
+    await p.waitForSelector('.sheet h1', { timeout: 15000 }); await p.click('.sheet .close'); await p.waitForTimeout(500);
+    await p.click('#search'); await p.waitForTimeout(500);
+    assert((await p.locator('.results li.example').count()) === 0, 'exemples encore affichés après une recherche');
+    assert(/Panthéon/.test(await p.textContent('.results')), 'recherche récente absente');
     assert(!errors.length, errors.join(' | '));
     await ctx.close();
   },
@@ -630,12 +670,20 @@ const tests = {
     const layers = 'button[aria-label="Type de carte"]';
     await p.click(layers); await p.waitForSelector('.modes-pop');
     assert((await visibleWhole('.modes-pop')) === 'ok', `menu des cartes : ${await visibleWhole('.modes-pop')}`);
-    await p.mouse.click(120, 300); await p.waitForTimeout(400);
+    await p.mouse.click(100, 190); await p.waitForTimeout(400);
     assert(!(await p.$('.modes-pop')), 'toucher la carte ne ferme pas le menu des cartes');
     assert(!(await p.$('section.sheet')), 'le toucher qui ferme le menu a ouvert une fiche');
+    // fenêtre « À propos » (bouton ⓘ) : entière à l'écran, vue « Sources », fermée par Échap
+    await p.click('.about-btn'); await p.waitForSelector('.dlg'); await p.waitForTimeout(300);
+    assert((await visibleWhole('.dlg')) === 'ok', `fenêtre À propos : ${await visibleWhole('.dlg')}`);
+    await p.click('.about-sources'); await p.waitForSelector('.dlg .back');
+    assert(/All The Places/.test(await p.textContent('.dlg')), 'vue des sources absente');
+    await p.keyboard.press('Escape'); await p.waitForTimeout(200);
+    assert(!(await p.$('.dlg')), 'Échap ne ferme pas la fenêtre À propos');
     // 3. le choix de l'heure d'un trajet
     await p.click('button[aria-label="Effacer la recherche"]').catch(() => {}); await p.mouse.click(120, 300); await p.waitForTimeout(300);
-    await p.click('.route-btn'); await p.fill('#field-to', 'Panthéon'); await p.waitForSelector('.results li.opt button', { timeout: 15000 }); await pick(p);
+    await p.fill('#search', 'Panthéon'); await p.waitForSelector('.results li.opt button', { timeout: 15000 }); await pick(p);
+    await p.waitForSelector('.action.primary', { timeout: 15000 }); await p.click('.action.primary');
     await p.waitForSelector('.when-btn', { timeout: 15000 });
     await p.click('.when-btn'); await p.waitForSelector('.when-panel'); await p.waitForTimeout(500);
     assert((await visibleWhole('.when-panel')) === 'ok', `heure du trajet : ${await visibleWhole('.when-panel')}`);

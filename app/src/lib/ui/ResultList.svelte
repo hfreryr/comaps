@@ -29,9 +29,9 @@
       <li class="note">{tx('resultats.tapez_adresse_de_votre_puis', { lieu: app.assigning === 'home' ? tx('resultats.maison') : tx('resultats.travail') })}
         <button class="link" onmousedown={(e) => { e.preventDefault(); app.assigning = null; }}>{tx('resultats.annuler')}</button></li>
     {/if}
-    {#if app.activeQuery.trim().length < 2 && !app.editing && !app.assigning}
-      <!-- exemples touchables : on ne devine pas qu'on peut écrire « restaurant ouvert demain dans le 8e » (retour du porteur) -->
-      <li class="note recents-head"><span>{tx('resultats.essayez')}</span></li>
+    {#if app.activeQuery.trim().length < 2 && !app.editing && !app.assigning && !app.recents.length}
+      <!-- exemples touchables, pour un nouvel utilisateur seulement : on ne devine pas qu'on peut écrire « restaurant ouvert
+           demain dans le 8e » (retour du porteur). Ils laissent la place aux recherches récentes dès la première (16/10). -->
       {#each [tx('resultats.exemple_1'), tx('resultats.exemple_2'), tx('resultats.exemple_3')] as ex}
         <li class="opt example">
           <button onmousedown={(e) => { e.preventDefault(); app.query = ex; }}>
@@ -111,8 +111,6 @@
       <li class="list-foot">
         <button class="link" onmousedown={(e) => { e.preventDefault(); app.importOpen = true; app.focused = false; document.activeElement?.blur(); }}>{tx('resultats.importer_vos_lieux_depuis_google')}</button>
         <button class="link" onmousedown={(e) => { e.preventDefault(); app.editChips = true; app.focused = false; document.activeElement?.blur(); }}>{tx('recherche.personnaliser_les_raccourcis')}</button>
-        <!-- une preuve vérifiable plutôt qu'une promesse (test P3 : « aucune certitude que ça ne me suit pas ») -->
-        <a class="privacy-line" href="confidentialite#verifier" onmousedown={(e) => e.preventDefault()}>{tx('resultats.preuve')} <span class="privacy-check">{tx('resultats.verifier')}</span></a>
       </li>
     {/if}
   </ul>
@@ -145,7 +143,4 @@
   .results .pinned-li { padding: 4px 14px 2px; }
   .list-foot { display: grid; justify-items: start; gap: 2px; padding: 10px 16px 6px 48px; border-top: 1px solid var(--line); margin-top: 6px; }
   .results .list-foot .link { font-size: 14.5px; }
-  .privacy-line { font-size: 12.5px; color: var(--muted); padding-top: 6px; text-decoration: none; }
-  /* « je ne sais pas où trouver plus d'infos » (P6) : un vrai lien, souligné */
-  .privacy-check { color: var(--accent); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
 </style>

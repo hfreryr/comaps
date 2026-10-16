@@ -3,7 +3,7 @@
 <script>
   import { tx } from '#lib/i18n/index.js';
   import { closeAll } from '#lib/popover.js';
-  let { title, onclose, children } = $props();
+  let { title, sub = '', icon, sheet = false, onclose, children } = $props();
   let box = $state();
   let node = $state();
   let back = null;
@@ -18,12 +18,19 @@
   });
 </script>
 
-<div class="dlg-back" bind:this={node} onclick={(e) => { if (e.target === e.currentTarget) onclose(); }} role="presentation">
+<div class="dlg-back" class:bottom-sheet={sheet} bind:this={node} onclick={(e) => { if (e.target === e.currentTarget) onclose(); }} role="presentation">
   <div class="dlg" role="dialog" aria-modal="true" aria-labelledby="dlg-title" tabindex="-1" bind:this={box}>
     <button class="dlg-close" onclick={onclose} aria-label={tx('photos.fermer')}>
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" /></svg>
     </button>
-    <h2 id="dlg-title">{title}</h2>
+    {#if icon || sub}
+      <div class="dlg-head">
+        {#if icon}<span class="dlg-icon" aria-hidden="true">{@render icon()}</span>{/if}
+        <div><h2 id="dlg-title">{title}</h2>{#if sub}<p class="dlg-sub">{sub}</p>{/if}</div>
+      </div>
+    {:else}
+      <h2 id="dlg-title">{title}</h2>
+    {/if}
     {@render children?.()}
   </div>
 </div>
@@ -37,5 +44,15 @@
   .dlg-close { position: absolute; top: 12px; right: 12px; width: 32px; height: 32px; border-radius: 50%; border: 0; background: var(--fill);
     color: var(--muted); display: grid; place-items: center; cursor: pointer; }
   .dlg-close::after { content: ''; position: absolute; inset: -6px; }
+  /* en-tête avec pictogramme et sous-titre (fenêtre « À propos ») */
+  .dlg-head { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: center; margin: 0 40px 14px 0; }
+  .dlg-head h2 { margin: 0; }
+  .dlg .dlg-sub { margin: 2px 0 0; font-size: 14px; color: var(--muted); }
+  .dlg-icon { width: 44px; height: 44px; border-radius: 12px; background: var(--accent-btn); color: #fff; display: grid; place-items: center; }
+  /* fiche qui monte du bas sur téléphone (comme les autres fiches), fenêtre centrée sur grand écran */
+  @media (max-width: 767px) {
+    .dlg-back.bottom-sheet { place-items: end stretch; padding: 0; }
+    .dlg-back.bottom-sheet .dlg { width: 100%; max-height: 92dvh; border-radius: 22px 22px 0 0; padding-bottom: calc(22px + env(safe-area-inset-bottom)); }
+  }
   .dlg-close svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; }
 </style>

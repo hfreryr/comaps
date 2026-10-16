@@ -3,6 +3,8 @@
   import { getContext } from 'svelte';
   import { applyTheme } from '#lib/theme.js';
   import { popover } from '#lib/popover.js';
+  import AboutDialog from '#lib/ui/AboutDialog.svelte';
+  import MapCredit from '#lib/ui/MapCredit.svelte';
   let layersBtn = $state();
 
   // État et actions de la page (voir le bloc « app » de +page.svelte)
@@ -59,6 +61,12 @@
       <svg viewBox="0 0 24 24" aria-hidden="true" class:hollow={app.followMode === 'none'}><path d="M20 4 4 11l7 2 2 7z" class="solid" /></svg>
     {/if}
   </button>
+  <!-- 3e bouton, même taille que les deux autres (choix du porteur, 16/10) : la promesse, les sources, aider -->
+  <button class="about-btn" onclick={() => (app.aboutOpen = true)} aria-label={tx('apropos.bouton')} aria-haspopup="dialog">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M12 11v5" /><circle cx="12" cy="8" r=".9" class="solid" /></svg>
+  </button>
+  <MapCredit />
+  {#if app.aboutOpen}<AboutDialog onclose={() => (app.aboutOpen = false)} />{/if}
 
 <style>
   svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
@@ -72,13 +80,21 @@
 
 
   /* ——— Localisation et messages ——— */
+  /* trois boutons ronds empilés à droite : types de carte, position, À propos */
+  .about-btn {
+    position: absolute; z-index: 2; right: 12px; bottom: calc(20px + env(safe-area-inset-bottom));
+    width: 48px; height: 48px; border-radius: 50%; border: 0; background: var(--card); box-shadow: var(--shadow-float);
+    display: grid; place-items: center; cursor: pointer; color: var(--ink);
+  }
+  .about-btn svg { width: 22px; height: 22px; }
+  :global(.routing) .about-btn, :global(.navigating) .about-btn { display: none; }
   .locate {
-    position: absolute; z-index: 2; right: 12px; bottom: calc(52px + env(safe-area-inset-bottom));
+    position: absolute; z-index: 2; right: 12px; bottom: calc(78px + env(safe-area-inset-bottom));
     width: 48px; height: 48px; border-radius: 50%; border: 0; background: var(--card); box-shadow: var(--shadow-float);
     display: grid; place-items: center; cursor: pointer; color: var(--accent);
   }
   :global(.routing) .locate { display: none; }
-  .modes-ctl { position: absolute; z-index: 2; right: 12px; bottom: calc(110px + env(safe-area-inset-bottom)); display: grid; justify-items: end; gap: 10px; }
+  .modes-ctl { position: absolute; z-index: 2; right: 12px; bottom: calc(136px + env(safe-area-inset-bottom)); display: grid; justify-items: end; gap: 10px; }
   .round-btn {
     width: 48px; height: 48px; border-radius: 50%; border: 0; background: var(--card); box-shadow: var(--shadow-float);
     display: grid; place-items: center; cursor: pointer; color: var(--ink);
@@ -118,8 +134,9 @@
   /* ——— Grand écran : panneaux à gauche ——— */
   @media (min-width: 768px) {
 
-    .locate { bottom: 40px; right: 16px; }
-    .modes-ctl { bottom: 100px; right: 16px; }
+    .about-btn { bottom: 16px; right: 16px; }
+    .locate { bottom: 74px; right: 16px; }
+    .modes-ctl { bottom: 132px; right: 16px; }
   }
 
   @media (prefers-reduced-motion: reduce) {
