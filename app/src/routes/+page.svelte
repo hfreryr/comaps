@@ -20,7 +20,7 @@
   import { search } from '#lib/geocode.js';
   import { dataDate } from '#lib/placestore.js';
   import { hoursStatus, hoursTable, momentLabel } from '#lib/hours.js';
-  import { parseIntent, arrName } from '#lib/intent.js';
+  import { parseIntent, arrName, dietHit } from '#lib/intent.js';
   import { FAMILIES, GLYPHS } from '#lib/mapstyle.js';
   import { streetRoute, MODE_NAMES, fmtDuration, fmtTime, fmtDistance } from '#lib/routing.js';
   import { bestExit } from '#lib/exits.js';
@@ -218,13 +218,15 @@
     if (editing) return null;
     const direct = catFor(query, chipList);
     if (direct && !intent?.any) return direct;
-    if (!intent?.any || !intent.words.length) return direct;
+    // un régime sans catégorie (« vegan paris 11 ») : des restaurants
+    const words = intent?.diet && !intent.words.some((w) => catFor(w, chipList)) ? ['restaurant', ...intent.words] : intent?.words || [];
+    if (!intent?.any || !words.length || (intent.diet && !intent.area && !intent.when && words.length === 1 && !intent.words.length)) return direct;
     // une catégorie parmi les mots restants ; les autres mots forment un nom de quartier
-    for (const w of intent.words) {
+    for (const w of words) {
       const c = catFor(w, chipList);
       if (c) {
-        const rest = intent.words.filter((x) => !CATEGORY_WORDS[c.key].includes(x) && !FILLER.has(x));
-        return { ...c, when: intent.when, area: intent.area || (rest.length ? { text: rest.join(' ') } : null) };
+        const rest = words.filter((x) => !CATEGORY_WORDS[c.key].includes(x) && !FILLER.has(x));
+        return { ...c, when: intent.when, area: intent.area || (rest.length ? { text: rest.join(' ') } : null), ...dietHit(c, intent.diet) };
       }
     }
     return direct;

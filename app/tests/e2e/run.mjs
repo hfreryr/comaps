@@ -538,6 +538,19 @@ const tests = {
     assert(!(await p.$('.pmenu')), 'le menu ⋯ reste ouvert après un toucher ailleurs');
     await ctx.close();
   },
+  async 'recherche « restaurant végétarien 11e » : seulement des lieux végétariens, dans le 11e (P6, P7)'() {
+    const { p, ctx, errors } = await page();
+    await p.fill('#search', 'restaurant ouvert demain dans le 8e'); await p.waitForTimeout(3000);
+    assert(!/Aucun résultat/.test(await p.textContent('.results')), '« Aucun résultat » sous une catégorie trouvée');
+    await p.fill('#search', 'restaurant végétarien 11e'); await p.waitForTimeout(2500);
+    const first = await p.$eval('.results li', (e) => e.innerText);
+    assert(/Restaurants végétariens/.test(first) && /11e/.test(first), `ligne de catégorie : ${first}`);
+    await p.dispatchEvent('.results li button >> nth=0', 'mousedown'); await p.waitForTimeout(5000);
+    const names = await p.$$eval('.nearby .r-name', (els) => els.map((e) => e.textContent));
+    assert(names.length >= 3, `trop peu de lieux : ${names.join(', ')}`);
+    assert(!errors.length, errors.join(' | '));
+    await ctx.close();
+  },
   async 'la liste se recharge quand on déplace la carte'() {
     const { p, ctx } = await page({ viewport: { width: 1280, height: 800 }, isMobile: false, hasTouch: false });
     await p.click('.chip:has-text("Restaurants")'); await p.waitForTimeout(4000);

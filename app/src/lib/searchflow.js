@@ -1,7 +1,7 @@
 // Recherche et catégories : résultats, filtres « ouvert », liste autour de la carte.
 // Code sorti de +page.svelte : il lit et modifie l'état de l'écran par l'objet « app » (bloc « app » de la page).
 import { tx } from '#lib/i18n/index.js';
-import { ARR_CENTERS } from '#lib/intent.js';
+import { ARR_CENTERS, fitsDiet } from '#lib/intent.js';
 import { FAMILIES } from '#lib/mapstyle.js';
 import { departures } from '#lib/routing.js';
 import { empty } from '#lib/maplayers.js';
@@ -72,9 +72,14 @@ export function createSearch(app) {
       const zone = { west: o.lon - span, east: o.lon + span, south: o.lat - span * 0.66, north: o.lat + span * 0.66 };
       const extra = c.inc ? await searchCategory(c.inc, zone, c.q).catch(() => []) : [];
       if (stale()) return;
+      // régime demandé (« restaurant végétarien ») : seuls les lieux des tuiles portent l'information
+      if (c.diet) {
+        list.length = 0;
+        for (const f of extra) if (fitsDiet(c.diet, f.tags)) list.push({ f, d: dist(o.lat, o.lon, f.geometry.coordinates[1], f.geometry.coordinates[0]) });
+      }
       const near = (a, b) => dist(a[1], a[0], b[1], b[0]) < 80;
       const byName = new Map(extra.map((f) => [f.properties.name, f]));
-      for (const f of extra) {
+      for (const f of c.diet ? [] : extra) {
         const xy = f.geometry.coordinates;
         if (list.some((n) => n.f.properties.name === f.properties.name && near(n.f.geometry.coordinates, xy))) continue;
         list.push({ f, d: dist(o.lat, o.lon, xy[1], xy[0]) });

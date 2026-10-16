@@ -30,6 +30,8 @@ export default {
   'resultats.exemple_2': 'boulangerie ouverte dimanche',
   'resultats.exemple_3': 'métro le plus proche',
   'resultats.preuve': '0 traceur · 0 cookie · code ouvert ·',
+  'resultats.vegetariens': 'végétariens',
+  'resultats.vegans': 'végans',
   'resultats.verifier': 'En savoir plus ›',
   'resultats.ville_ou_arrondissement': 'Ville ou arrondissement',
   'resultats.liste_aria': 'Résultats de la recherche',
