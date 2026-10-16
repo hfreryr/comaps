@@ -59,7 +59,7 @@ const tests = {
     assert(!errors.length, errors.join(' | '));
     await ctx.close();
   },
-  async 'accessibilité (WCAG 2.1 AA, axe-core) : 7 écrans, clair et sombre'() {
+  async 'accessibilité (WCAG 2.2 AA, axe-core) : 7 écrans, clair et sombre'() {
     // Audit automatique : ne voit qu'une partie des problèmes (pas le clavier ni VoiceOver), mais bloque les régressions.
     const resto = async (p) => { await p.click('.chip:has-text("Restaurants")'); await p.waitForTimeout(6000); await p.click('.nearby li button >> nth=0'); await p.waitForTimeout(4000); };
     const screens = {
@@ -76,7 +76,7 @@ const tests = {
       const { p, ctx } = await page({ bypassCSP: true, colorScheme: dark ? 'dark' : 'light' });
       await go(p);
       await p.addScriptTag({ content: AXE });
-      const v = await p.evaluate(async () => (await window.axe.run(document, { runOnly: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] })).violations
+      const v = await p.evaluate(async () => (await window.axe.run(document, { runOnly: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'] })).violations
         .map((x) => `${x.id} (${x.nodes.length}) : ${x.nodes[0].target.join(' ')}`));
       bad.push(...v.map((x) => `${name}${dark ? ' (sombre)' : ''} — ${x}`));
       await ctx.close();
@@ -582,6 +582,65 @@ const tests = {
     assert(n > 0, 'aucune sortie dessinée sur la carte');
     await p.click('.sheet .close'); await p.waitForTimeout(800);
     assert(await p.evaluate(() => (window.__map.getSource('exits')?.serialize()?.data?.features?.length || 0) === 0), 'sorties restées après fermeture');
+    assert(!errors.length, errors.join(' | '));
+    await ctx.close();
+  },
+  async 'règles d’interface : menus entiers à l’écran, un seul ouvert, fermés en touchant ailleurs ou par Échap'() {
+    // docs/regles-interface.md — vérifié sur chaque menu de l'app ; un nouveau menu doit être ajouté ici
+    const { p, ctx, errors } = await page({ viewport: { width: 375, height: 667 } });   // petit écran : le cas le plus dur
+    const visibleWhole = (sel) => p.$eval(sel, (el) => {
+      const r = el.getBoundingClientRect();
+      if (r.top < 0 || r.left < 0 || r.bottom > innerHeight || r.right > innerWidth) return `hors écran ${JSON.stringify(r)}`;
+      for (const [x, y] of [[r.left + 6, r.top + 6], [r.right - 6, r.top + 6], [r.left + 6, r.bottom - 6], [r.right - 6, r.bottom - 6]]) {
+        const hit = document.elementFromPoint(x, y);
+        if (!hit || !el.contains(hit)) return `masqué en ${Math.round(x)},${Math.round(y)} par ${hit?.className || hit?.tagName}`;
+      }
+      return 'ok';
+    });
+    // 1. menu « ⋯ » d'une fiche, fiche à mi-hauteur (bug du 16/10 : première ligne rognée par la fiche)
+    await p.fill('#search', 'Panthéon'); await p.waitForSelector('.results li.opt button', { timeout: 15000 }); await pick(p);
+    await p.waitForSelector('.fab', { timeout: 10000 }); await p.waitForTimeout(800);
+    const more = 'button[aria-label="Plus d\'options"]';
+    await p.click(more); await p.waitForSelector('.pmenu');
+    assert((await visibleWhole('.pmenu')) === 'ok', `menu ⋯ : ${await visibleWhole('.pmenu')}`);
+    assert(await p.getAttribute(more, 'aria-expanded') === 'true', 'aria-expanded du bouton ⋯');
+    await p.keyboard.press('Escape'); await p.waitForTimeout(200);
+    assert(!(await p.$('.pmenu')), 'Échap ne ferme pas le menu ⋯');
+    await p.click(more); await p.waitForSelector('.pmenu');
+    await p.mouse.click(187, 90); await p.waitForTimeout(400);
+    assert(!(await p.$('.pmenu')), 'toucher ailleurs ne ferme pas le menu ⋯');
+    assert((await p.locator('.sheet h1').textContent()).includes('Panthéon'), 'le toucher qui ferme le menu a déclenché autre chose');
+    // fenêtre (i) « Infos vérifiées » quand le lieu a une date de vérification
+    if (await p.$('.info-btn')) {
+      await p.click('.info-btn'); await p.waitForSelector('.dlg');
+      assert((await visibleWhole('.dlg')) === 'ok', `fenêtre (i) : ${await visibleWhole('.dlg')}`);
+      await p.keyboard.press('Escape'); await p.waitForTimeout(200);
+      assert(!(await p.$('.dlg')), 'Échap ne ferme pas la fenêtre (i)');
+    }
+    await p.click('.sheet .close'); await p.waitForTimeout(600);
+    // 1 bis. « Ouvert à » dans une liste de restaurants
+    await p.click('.chip:has-text("Restaurants")'); await p.waitForTimeout(3000);
+    const openAt = '.opill[aria-expanded]';
+    await p.click(openAt); await p.waitForSelector('.moment'); await p.waitForTimeout(300);
+    assert((await visibleWhole('.moment')) === 'ok', `ouvert à : ${await visibleWhole('.moment')}`);
+    await p.keyboard.press('Escape'); await p.waitForTimeout(200);
+    assert(!(await p.$('.moment')), 'Échap ne ferme pas « Ouvert à »');
+    await p.click('.sheet .close').catch(() => {}); await p.waitForTimeout(600);
+    // 2. menu des cartes
+    const layers = 'button[aria-label="Type de carte"]';
+    await p.click(layers); await p.waitForSelector('.modes-pop');
+    assert((await visibleWhole('.modes-pop')) === 'ok', `menu des cartes : ${await visibleWhole('.modes-pop')}`);
+    await p.mouse.click(120, 300); await p.waitForTimeout(400);
+    assert(!(await p.$('.modes-pop')), 'toucher la carte ne ferme pas le menu des cartes');
+    assert(!(await p.$('section.sheet')), 'le toucher qui ferme le menu a ouvert une fiche');
+    // 3. le choix de l'heure d'un trajet
+    await p.click('button[aria-label="Effacer la recherche"]').catch(() => {}); await p.mouse.click(120, 300); await p.waitForTimeout(300);
+    await p.click('.route-btn'); await p.fill('#field-to', 'Panthéon'); await p.waitForSelector('.results li.opt button', { timeout: 15000 }); await pick(p);
+    await p.waitForSelector('.when-btn', { timeout: 15000 });
+    await p.click('.when-btn'); await p.waitForSelector('.when-panel'); await p.waitForTimeout(500);
+    assert((await visibleWhole('.when-panel')) === 'ok', `heure du trajet : ${await visibleWhole('.when-panel')}`);
+    await p.keyboard.press('Escape'); await p.waitForTimeout(200);
+    assert(!(await p.$('.when-panel')), 'Échap ne ferme pas le choix de l’heure');
     assert(!errors.length, errors.join(' | '));
     await ctx.close();
   },

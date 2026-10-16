@@ -5,24 +5,21 @@
   import ModeIcon from './ModeIcon.svelte';
   import { exitLabel } from '#lib/exits.js';
   import { showExits } from '#lib/exitlayer.js';
+  import Dialog from './Dialog.svelte';
+  import { popover } from '#lib/popover.js';
   import { fmtWait } from '#lib/routing.js';
   import { host, href } from '#lib/links.js';
 
   // État et actions de la page (voir le bloc « app » de +page.svelte)
   const app = getContext('app');
+  let freshInfo = $state(false);
   // sorties de la station ouverte, aussi sur la carte (P5) ; retirées quand la fiche se ferme
   $effect(() => {
     showExits(app.map, app.exits?.status === 'ok' ? app.exits.data : []);
     return () => showExits(app.map, []);
   });
-  // menu « ⋯ » : se ferme quand on touche ailleurs (P5 ne savait pas le refermer)
-  let fabBar = $state();
-  $effect(() => {
-    if (!app.placeMenu) return;
-    const away = (e) => { if (fabBar && !fabBar.contains(e.target)) app.placeMenu = false; };
-    document.addEventListener('pointerdown', away, true);
-    return () => document.removeEventListener('pointerdown', away, true);
-  });
+  // menu « ⋯ » : règles communes des menus (popover.js) — un seul ouvert, fermé en touchant ailleurs, toujours entier à l'écran
+  let moreBtn = $state();
   // Sources des compléments hors OSM (app/scripts/build_extras.py) ; une source inconnue n'est pas affichée
   const SOURCES = { overture: () => tx('source.overture'), paris: () => tx('source.paris'), atp: () => tx('source.atp'), annuaire: () => tx('source.annuaire'), site: () => tx('source.site') };
 </script>
@@ -191,7 +188,7 @@
         <h1>{app.title}</h1>
         <p class="kind">{app.isAddress
           ? (app.place.name.split(',').slice(1).join(',').trim() || app.place.address || tx('fiche.adresse'))
-          : [app.stationKind || app.info?.kind || app.place.type, app.info?.cuisine && app.info.cuisine.split(';')[0].replace(/_/g, ' ')].filter(Boolean).join(' · ') || tx('fiche.lieu')}</p>
+          : [app.stationKind || app.info?.kind || app.place.type, app.info?.cuisine && tx('fiche.cuisine', { v: app.info.cuisine.split(';')[0] })].filter(Boolean).join(' · ') || tx('fiche.lieu')}</p>
       </div>
 
       <!-- En un coup d'œil : ouvert ? loin ? encore à jour ? -->
@@ -201,8 +198,19 @@
       </p>
       {#if app.freshness}
         <p class="fresh" class:old={!app.freshness.ok}>
-          {#if app.freshness.ok}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>{/if}{app.freshness.text}
+          {#if app.freshness.ok}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>{/if}<span>{app.freshness.text}</span>
+          <!-- « vérifié par qui ? » (P6) : le détail dans une fenêtre, la ligne reste courte -->
+          <button class="info-btn" onclick={() => (freshInfo = true)} aria-label={tx('fiche.que_veut_dire_verifiees')}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M12 11v5" /><circle cx="12" cy="8" r="0.6" class="solid" /></svg>
+          </button>
         </p>
+        {#if freshInfo}
+          <Dialog title={tx('fiche.verifiees_titre')} onclose={() => (freshInfo = false)}>
+            <p>{tx('fiche.verifiees_qui')}</p>
+            <p>{tx('fiche.verifiees_pas_un_avis')}</p>
+            <p>{app.freshness.ok ? tx('fiche.verifiees_corriger') : tx('fiche.verifiees_ancien')}</p>
+          </Dialog>
+        {/if}
       {/if}
 
       <div class="actions" class:solo={!app.info?.phone && !app.info?.website}>
@@ -245,10 +253,12 @@
         {@render photoBlock()}{@render aboutBlock()}{@render rowsBlock()}
       {/if}
 
+      <!-- règle d'interface : la barre flottante ne cache jamais définitivement le contenu (place réservée en fin de fiche) -->
+      <div class="fab-space" aria-hidden="true"></div>
       <!-- Barre flottante : favori, listes, plus -->
-      <div class="fab-bar" bind:this={fabBar}>
+      <div class="fab-bar">
         {#if app.placeMenu}
-          <div class="pmenu" role="menu">
+          <div class="pmenu" role="menu" use:popover={{ trigger: () => moreBtn, close: () => (app.placeMenu = false), place: 'above', align: 'end' }}>
             {#if !app.isStation}
               {#each ['home', 'work'] as k}
                 <button role="menuitem" onclick={() => { app.placeMenu = false; if (app.placeShortcut === k) { const old = app.shortcuts[k]; app.setShortcut(k, null); app.say(tx('fiche.retire', { nom: app.SHORT_NAMES[k] }), { label: tx('resultats.annuler'), run: () => app.setShortcut(k, old) }); } else { app.setShortcut(k, app.place); app.say(tx('fiche.enregistre_garde_sur_cet_appareil', { nom: app.SHORT_NAMES[k] })); } }}>
@@ -274,7 +284,7 @@
           <button class:saved={app.isFav && app.savedEntry.lists.some((x) => x !== 'fav')} onclick={() => (app.listPicker = true)} aria-label={tx('fiche.ajouter_a_une_liste')}>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.5 4h9a1 1 0 0 1 1 1v15l-5.5-3.8L6.5 20V5a1 1 0 0 1 1-1z" /></svg>
           </button>
-          <button onclick={() => (app.placeMenu = !app.placeMenu)} aria-expanded={app.placeMenu} aria-label={tx('fiche.plus_options')}>
+          <button bind:this={moreBtn} onclick={() => (app.placeMenu = !app.placeMenu)} aria-expanded={app.placeMenu} aria-haspopup="menu" aria-label={tx('fiche.plus_options')}>
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="1.4" class="solid" /><circle cx="12" cy="12" r="1.4" class="solid" /><circle cx="18" cy="12" r="1.4" class="solid" /></svg>
           </button>
         </div>
@@ -332,7 +342,11 @@
   .glance .is-open { color: var(--open); }
   .glance .is-closed { color: var(--closed); }
   .fresh { margin: 3px 0 0; text-align: center; font-size: 13px; color: var(--open); display: flex; justify-content: center; align-items: center; gap: 4px; }
-  .fresh svg { width: 14px; height: 14px; stroke-width: 2.6; }
+  .fresh svg { width: 14px; height: 14px; stroke-width: 2.6; flex: none; }
+  .info-btn { position: relative; border: 0; background: none; padding: 0; width: 22px; height: 22px; display: grid; place-items: center; color: var(--muted); cursor: pointer; }
+  .info-btn svg { width: 17px; height: 17px; stroke-width: 1.8; }
+  .info-btn .solid { fill: currentColor; }
+  .info-btn::after { content: ''; position: absolute; inset: -11px; }   /* zone tactile de 44 px */
   .fresh.old { color: var(--muted); }
   /* Boutons d'action : même largeur, pictogramme au-dessus du texte ; un seul bouton prend toute la largeur */
   .actions { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 8px; margin: 14px 0 0; }
@@ -378,6 +392,7 @@
   .contrib { margin: 14px 0 52px; font-size: 13px; line-height: 1.45; color: var(--muted); }
   .contrib a { color: var(--accent); text-decoration: none; font-weight: 600; }
   /* Barre flottante en bas à droite de la fiche */
+  .fab-space { height: 64px; }
   .fab-bar { position: sticky; bottom: 0; height: 0; display: flex; justify-content: flex-end; z-index: 2; pointer-events: none; }
   .fab, .pmenu { pointer-events: auto; }
   .fab { position: absolute; bottom: 4px; right: -6px; display: flex; gap: 2px; padding: 4px; border-radius: 26px; background: var(--card);
