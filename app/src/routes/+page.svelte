@@ -453,7 +453,7 @@
 
 
   let when = $state(null);           // heure du trajet : null (maintenant) ou { t, arrive } (when.js)
-  let transitPref = $state('all');   // modes de transport en commun choisis (tous, métro, métro et RER, bus et tram)
+  let transitPref = $state(['metro', 'rail', 'tram', 'bus']);   // familles de transports gardées (routing.js TRANSIT_KINDS)
   let lastFix = $state(null);   // dernière position reçue pendant le guidage (sans elle : étapes à la main)
 
 

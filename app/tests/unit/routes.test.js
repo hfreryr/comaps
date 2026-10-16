@@ -72,3 +72,10 @@ test('départs comme Citymapper : partir dans 1, 4, 7 min ; trains à l’heure 
   assert.equal(departText(departInfo(rer('10:43', '10:35'), null, now)), '10:35 (Retardé 10:43) Saint-Rémy-lès-Chevreuse de Gare du Nord');
   assert.equal(departText(departInfo(rer('10:50', '10:50'), null, now)), '10:50 (À l\'heure) Saint-Rémy-lès-Chevreuse de Gare du Nord');
 });
+
+test('modes de transport : on retire ce qu’on ne veut pas (P5 « pas de bus »)', async () => {
+  const { transitModesFor } = await import('#lib/routing.js');
+  assert.equal(transitModesFor(['metro', 'rail', 'tram', 'bus']), null);
+  assert.deepEqual(transitModesFor(['metro', 'rail', 'tram']), ['SUBWAY', 'FUNICULAR', 'RAIL', 'TRAM']);
+  assert.deepEqual(transitModesFor(['bus']), ['BUS']);
+});

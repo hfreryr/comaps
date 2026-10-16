@@ -131,7 +131,7 @@
         </section>
       {/if}
 
-      {#if app.info?.phone || app.info?.website || app.address}
+      {#if app.info?.phone || app.info?.website || app.info?.menu || app.address}
         <section class="psec">
           <h2>{tx('fiche.details')}</h2>
           <dl class="details">
@@ -140,6 +140,9 @@
             {/if}
             {#if app.info?.website}
               <div><dt>{tx('fiche.site_web')}</dt><dd><a href={href(app.info.website)} target="_blank" rel="noopener">{host(app.info.website)}</a>{@render src(app.info.sources?.website)}</dd></div>
+            {/if}
+            {#if app.info?.menu}
+              <div><dt>{tx('fiche.menu')}</dt><dd><a href={href(app.info.menu)} target="_blank" rel="noopener">{tx('fiche.voir_le_menu')}</a></dd></div>
             {/if}
             {#if app.address}
               <div><dt>{tx('fiche.adresse')}</dt><dd class="selectable">{app.address}{@render src(app.info?.sources?.['addr:street'])}</dd></div>

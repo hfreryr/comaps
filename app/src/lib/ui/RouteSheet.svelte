@@ -12,7 +12,7 @@
   import WhenPicker from './WhenPicker.svelte';
 
   let { from, to, mode, routes, picked, pickedStreet, showVia, legExits,
-    chooseMode, pickStreet, pickTransit, startNav, addStop, computeRoutes, transitPref = 'all', setTransitPref, when = null } = $props();
+    chooseMode, pickStreet, pickTransit, startNav, addStop, computeRoutes, transitPref = ['metro', 'rail', 'tram', 'bus'], setTransitPref, when = null } = $props();
   const current = $derived(routes[mode]);
   // les comptes à rebours des départs (« dans 1, 4, 7 min ») avancent tout seuls, comme sur Citymapper
   let now = $state(Date.now());
@@ -44,10 +44,12 @@
   </div>
   <WhenPicker />
   {#if mode === 'transit' && setTransitPref}
-    <!-- choisir ses modes (P4 : « je ne peux pas sélectionner uniquement le métro ») -->
-    <div class="t-prefs" role="radiogroup" aria-label={tx('itin.modes_de_transport')}>
-      {#each [['all', tx('itin.tous')], ['metro', tx('itin.metro')], ['rail', tx('itin.metro_et_rer')], ['road', tx('itin.bus_et_tram')]] as [id, label]}
-        <button class="t-pref" class:on={transitPref === id} role="radio" aria-checked={transitPref === id} onclick={() => setTransitPref(id)}>{label}</button>
+    <!-- chaque mode se retire d'un toucher (P4 : « seulement le métro » ; P5 : « je ne veux pas prendre le bus ») -->
+    <div class="t-prefs" role="group" aria-label={tx('itin.modes_de_transport')}>
+      {#each [['metro', tx('itin.metro')], ['rail', tx('itin.rer_et_train')], ['tram', tx('itin.tram')], ['bus', tx('itin.bus')]] as [id, label]}
+        <button class="t-pref" class:on={transitPref.includes(id)} aria-pressed={transitPref.includes(id)} onclick={() => setTransitPref(id)}>
+          {#if transitPref.includes(id)}<svg class="tick" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>{/if}{label}
+        </button>
       {/each}
     </div>
   {/if}
@@ -245,5 +247,8 @@
   .route-sheet :global(.legs) { margin: 0 calc(-1 * var(--gutter)); padding: 4px var(--gutter) 6px; background: none; }
   .t-prefs { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 10px 16px 2px; margin: 0 -16px; }
   .t-pref { flex: none; height: 30px; padding: 0 12px; border-radius: 15px; border: 1px solid var(--line); background: var(--card); color: var(--ink); font: inherit; font-size: 13.5px; font-weight: 500; cursor: pointer; }
-  .t-pref.on { background: var(--accent-btn); border-color: var(--accent-btn); color: #fff; }
+  .t-pref { display: inline-flex; align-items: center; gap: 4px; }
+  .t-pref:not(.on) { color: var(--muted); text-decoration: line-through; }
+  .t-pref.on { background: var(--soft-accent); border-color: var(--accent); color: var(--accent); }
+  .t-pref .tick { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
 </style>

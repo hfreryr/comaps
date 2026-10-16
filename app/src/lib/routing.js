@@ -173,7 +173,11 @@ export async function trafficEstimate(from, to, when = new Date()) {
 }
 
 /** Choix des modes de transport en commun (Transitous, paramètre transitModes vérifié le 15/10/2026). */
-export const TRANSIT_PREFS = { all: null, metro: ['SUBWAY'], rail: ['SUBWAY', 'RAIL'], road: ['BUS', 'TRAM'] };
+// Chaque mode s'active ou se retire (P5 : « une liste excluante, par exemple je ne veux pas prendre le bus »).
+export const TRANSIT_KINDS = { metro: ['SUBWAY', 'FUNICULAR'], rail: ['RAIL'], tram: ['TRAM'], bus: ['BUS'] };
+export const ALL_KINDS = Object.keys(TRANSIT_KINDS);
+/** Modes Transitous des familles gardées ; null = toutes (aucun filtre). */
+export const transitModesFor = (kept) => (!kept || kept.length >= ALL_KINDS.length ? null : kept.flatMap((k) => TRANSIT_KINDS[k] || []));
 
 /**
  * Transports en commun : plusieurs propositions, triées par heure d'arrivée. modes : null (tous) ou liste Transitous.
