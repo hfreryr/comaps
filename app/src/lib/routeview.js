@@ -18,6 +18,39 @@ export const inMinutes = (d) => {
   // au-delà d'une heure (départ choisi plus tard), l'heure affichée juste avant suffit
   return m <= 0 ? tx('horaires.maintenant') : m < 60 ? tx('itin.dans_min', { m }) : '';
 };
+// ——— Départs d'un trajet en transports, comme Citymapper (relevé sur citymapper.com le 16/10/2026) ———
+// Métro, bus, tram : « dans 1, 4, 7 min de Château Rouge » = dans combien de minutes il faut PARTIR (marche comprise)
+// pour attraper chacun des 3 prochains passages. Trains (RER, Transilien) : l'heure du train en gare, son état et
+// sa destination : « 10:35 (Retardé 10:43) Saint-Rémy-lès-Chevreuse de Gare du Nord ».
+const TRAINS = new Set(['RAIL', 'REGIONAL_RAIL', 'SUBURBAN', 'REGIONAL_FAST_RAIL', 'HIGHSPEED_RAIL', 'LONG_DISTANCE', 'NIGHT_RAIL']);
+
+/**
+ * @param {{start: Date, board: object, next: {board: Date, leave: Date}[]}} it  @param {object|null} when  heure choisie (when.js)
+ * @returns {{ kind: 'train', time: string, status: string, headsign: string, from: string, live: boolean }
+ *   | { kind: 'countdown', mins: number[], from: string, live: boolean } | { kind: 'clock', times: string[], from: string, live: boolean }}
+ */
+export function departInfo(it, when = null, now = Date.now()) {
+  const b = it.board;
+  const live = !!b.realTime;
+  if (TRAINS.has(b.mode)) {
+    const late = b.scheduled && b.start - b.scheduled >= 60000;
+    const status = !live ? '' : late ? tx('itin.retarde', { heure: fmtTime(b.start) }) : tx('itin.a_l_heure');
+    return { kind: 'train', time: fmtTime(late ? b.scheduled : b.start), status, headsign: b.headsign, from: b.from, live };
+  }
+  const leaves = [it.start, ...(it.next || []).map((n) => n.leave)].filter(Boolean).slice(0, 3);
+  // départ choisi plus tard : un compte à rebours depuis maintenant n'aurait pas de sens, on donne les heures où partir
+  if (when) return { kind: 'clock', times: leaves.map((t) => fmtTime(t)), from: b.from, live };
+  const mins = leaves.map((t) => Math.floor((t - now) / 60000)).filter((m) => m >= 0);
+  return { kind: 'countdown', mins: mins.length ? mins : [0], from: b.from, live };
+}
+
+/** Le texte : « dans 1, 4, 7 min de Château Rouge », « à 08:21, 08:24 de Château Rouge », « 10:50 (À l'heure) … de Gare du Nord ». */
+export function departText(d) {
+  if (d.kind === 'train') return tx('itin.depart_train', { heure: d.time, etat: d.status ? ` (${d.status})` : '', direction: d.headsign ? ` ${d.headsign}` : '', from: d.from });
+  if (d.kind === 'clock') return tx('itin.depart_heures', { heures: d.times.join(', '), from: d.from });
+  return tx('itin.depart_dans', { mins: d.mins.join(', '), from: d.from });
+}
+
 const PREFIX = { SUBWAY: 'M', METRO: 'M', TRAM: 'T', BUS: tx('itin.bus'), REGIONAL_RAIL: 'RER', SUBURBAN: 'RER' };
 /**
  * Étiquettes des propositions en transports : « Le plus rapide » (arrivée la plus tôt) et « Le plus simple »

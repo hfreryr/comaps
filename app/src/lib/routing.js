@@ -215,6 +215,8 @@ export async function transitRoutes(from, to, signal, when = new Date(), modes =
         distance: l.distance || 0,
         stops: (l.intermediateStops || []).length,
         realTime: l.realTime,
+        // heure prévue au départ de l'arrêt (le retard se lit par différence avec start)
+        scheduled: l.scheduledStartTime ? new Date(l.scheduledStartTime) : null,
         coords: l.legGeometry
           ? (l.mode === 'WALK' ? streetLine : (c) => smooth(c, 3))(decodePolyline(l.legGeometry.points, l.legGeometry.precision || 6))
           : []
@@ -226,9 +228,12 @@ export async function transitRoutes(from, to, signal, when = new Date(), modes =
     const key = it.legs.filter((l) => l.mode !== 'WALK').map((l) => `${l.mode}:${l.line}`).join('>');
     const g = groups.get(key);
     // « arriver à » : on garde le départ le plus tardif de chaque combinaison (les autres arrivent bien plus tôt)
+    // next : les départs suivants de la même combinaison, avec l'heure à laquelle partir (leave) pour chacun
     if (!g) { it.next = []; groups.set(key, it); }
     else if (arrive) { if (it.board.start > g.board.start) { it.next = []; groups.set(key, it); } }
-    else if (g.next.length < 3 && +it.board.start !== +g.board.start) g.next.push(it.board.start);
+    else if (g.next.length < 3 && +it.board.start !== +g.board.start && !g.next.some((n) => +n.board === +it.board.start)) {
+      g.next.push({ board: it.board.start, leave: it.start });
+    }
   }
   // le plus simple d'abord, sauf si une correspondance fait vraiment gagner du temps (transitrank.js)
   return rankTransit([...groups.values()], arrive).slice(0, 4);

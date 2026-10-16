@@ -490,6 +490,8 @@ const tests = {
     await p.click('.action.primary'); await p.waitForTimeout(2000);
     await p.click('.mode-tabs .mode-tab >> nth=2'); await p.waitForSelector('.route-sheet .sum.transit', { timeout: 25000 });
     assert(/\d,\d\d €/.test(await p.$eval('.route-sheet .sum', (e) => e.innerText)), 'prix absent du résumé');
+    // départs comme Citymapper : « dans 1, 4, 7 min de Station » (minutes avant de partir), ou l'heure du train
+    assert(/dans [\d, ]+ min de |\d\d:\d\d.* de /.test(await p.$eval('.route-sheet .sum .depart', (e) => e.innerText)), 'départs absents du résumé');
     await p.click('.t-pref:has-text("Bus et tram")'); await p.waitForTimeout(1000);
     await p.waitForSelector('.route-sheet .sum.transit', { timeout: 25000 }); await p.waitForTimeout(1500);
     const metas = await p.$$eval('.legs .leg:not(.walk):not(.stop)', (els) => els.map((e) => e.querySelector('.leg-meta')?.textContent || '').filter((t) => t.trim()));

@@ -50,3 +50,23 @@ test('transports : « Le plus rapide » et « Le plus simple »', async () => {
   assert.deepEqual(transitTags([b, a]), ['Le plus simple', 'Le plus rapide']);
   assert.deepEqual(transitTags([{ end: new Date(1), legs: [ride('1')] }, { end: new Date(2), legs: [ride('2')] }]), ['Le plus rapide', '']);
 });
+
+test('départs comme Citymapper : partir dans 1, 4, 7 min ; trains à l’heure ou retardés', async () => {
+  const { departInfo, departText } = await import('#lib/routeview.js');
+  const now = Date.parse('2026-10-16T10:25:00+02:00');
+  const at = (hm) => new Date(`2026-10-16T${hm}:00+02:00`);
+  // métro : on doit partir à 10:26, 10:29, 10:32 (10 min de marche jusqu'à Château Rouge)
+  const metro = { start: at('10:26'), board: { mode: 'SUBWAY', from: 'Château Rouge', start: at('10:36'), realTime: true },
+    next: [{ board: at('10:39'), leave: at('10:29') }, { board: at('10:42'), leave: at('10:32') }] };
+  const d = departInfo(metro, null, now);
+  assert.equal(departText(d), 'dans 1, 4, 7 min de Château Rouge');
+  assert.equal(d.live, true);
+  // un départ déjà manqué disparaît
+  assert.equal(departText(departInfo(metro, null, Date.parse('2026-10-16T10:27:30+02:00'))), 'dans 1, 4 min de Château Rouge');
+  // départ choisi plus tard : les heures où partir
+  assert.equal(departText(departInfo(metro, { t: +at('10:20'), arrive: false }, now)), 'à 10:26, 10:29, 10:32 de Château Rouge');
+  // RER : heure prévue, état, destination, gare
+  const rer = (start, scheduled) => ({ start: at('10:20'), next: [], board: { mode: 'SUBURBAN', from: 'Gare du Nord', headsign: 'Saint-Rémy-lès-Chevreuse', start: at(start), scheduled: at(scheduled), realTime: true } });
+  assert.equal(departText(departInfo(rer('10:43', '10:35'), null, now)), '10:35 (Retardé 10:43) Saint-Rémy-lès-Chevreuse de Gare du Nord');
+  assert.equal(departText(departInfo(rer('10:50', '10:50'), null, now)), '10:50 (À l\'heure) Saint-Rémy-lès-Chevreuse de Gare du Nord');
+});

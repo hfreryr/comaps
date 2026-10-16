@@ -6,7 +6,7 @@
   import { draggable } from '#lib/sheet.js';
   import { MODE_NAMES, fmtDuration, fmtTime, fmtDistance } from '#lib/routing.js';
   import { placeLabel } from '#lib/rame.js';
-  import { MODES, arrival, departure, inMinutes, transitTags, badge, streetOpts, altTag, exitPhrase } from '#lib/routeview.js';
+  import { MODES, arrival, departure, departInfo, departText, transitTags, badge, streetOpts, altTag, exitPhrase } from '#lib/routeview.js';
   import ModeIcon from './ModeIcon.svelte';
   import LegChain from './LegChain.svelte';
   import WhenPicker from './WhenPicker.svelte';
@@ -14,7 +14,16 @@
   let { from, to, mode, routes, picked, pickedStreet, showVia, legExits,
     chooseMode, pickStreet, pickTransit, startNav, addStop, computeRoutes, transitPref = 'all', setTransitPref, when = null } = $props();
   const current = $derived(routes[mode]);
+  // les comptes à rebours des départs (« dans 1, 4, 7 min ») avancent tout seuls, comme sur Citymapper
+  let now = $state(Date.now());
+  $effect(() => { const t = setInterval(() => (now = Date.now()), 15000); return () => clearInterval(t); });
 </script>
+
+{#snippet depart(o)}
+  <!-- comme Citymapper : signe « temps réel » devant, puis « dans 1, 4, 7 min de Château Rouge » ou l'heure du train -->
+  {@const d = departInfo(o, when, now)}
+  <span class="sum-sub depart">{#if d.live}<span class="live" title={tx('itin.horaire_en_temps_reel')}>●</span>{' '}{/if}{departText(d)}</span>
+{/snippet}
 
 <section class="sheet route-sheet" aria-label={tx('fiche.itineraire')} use:draggable={{ key: `${from?.lat},${to?.lat},${mode}`, start: 'peek', min: true, tease: 58 }}>
   <button class="grip" aria-label={tx('liste.agrandir_la_fiche')}></button>
@@ -111,8 +120,8 @@
           <LegChain it={it} />
           <span class="sum-dur small">{fmtDuration(it.duration)}</span>
         </span>
-        <span class="sum-sub"><strong>{fmtTime(it.board.start)}</strong> à {it.board.from}{#if it.board.realTime}{' '}<span class="live" title={tx('itin.horaire_en_temps_reel')}>●</span>{' '}{:else if inMinutes(it.board.start)} · {/if}{inMinutes(it.board.start)}</span>
-        <span class="sum-sub">{#if it.next.length}{tx('itin.puis', { horaires: it.next.map(fmtTime).join(' · '), suite: ' · ' })}{/if}{tx('itin.arrivee_4', { fmtTime: fmtTime(it.end) })}{#if tripFare(it.legs) != null}<span title={tx('itin.prix_detail')}>{tx('itin.prix', { prix: fmtEuros(tripFare(it.legs)) })}</span>{/if}</span>
+        {@render depart(it)}
+        <span class="sum-sub">{tx('itin.arrivee_4', { fmtTime: fmtTime(it.end) })}{#if tripFare(it.legs) != null}<span title={tx('itin.prix_detail')}>{tx('itin.prix', { prix: fmtEuros(tripFare(it.legs)) })}</span>{/if}</span>
         {#if tags[picked]}<span class="sum-tag best">{tags[picked]}</span>{/if}
         <!-- l'info la plus attendue (test P3) dès le résumé : où se placer dans la rame et quelle sortie prendre à l'arrivée -->
         {#each [it.legs.map((leg, li) => ({ leg, tip: legExits[`${picked}|${li}|${leg.to}`] })).filter((x) => x.tip?.exit || x.tip?.place).at(-1)] as last}
@@ -184,8 +193,8 @@
           {#if i !== picked}
             <li><button onclick={() => pickTransit(i)}>
               <span class="opt-top"><LegChain it={o} /><span class="alt-dur">{fmtDuration(o.duration)}</span></span>
-              <span class="alt-sub">{tags[i] ? tx('itin.etiquette_puis', { etiquette: tags[i], suite: tx('itin.a_arrivee', { fmtTime: fmtTime(o.board.start), from: o.board.from, fmtTime2: fmtTime(o.end) }) })
-                : tx('itin.a_arrivee', { fmtTime: fmtTime(o.board.start), from: o.board.from, fmtTime2: fmtTime(o.end) })}</span>
+              {#if tags[i]}<span class="alt-sub tag">{tags[i]}</span>{/if}
+              {@render depart(o)}
             </button></li>
           {/if}
         {/each}
@@ -230,6 +239,7 @@
   .alt-list button:active { background: var(--fill); }
   .alt-dur { font-size: var(--fs-body); font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .alt-sub { font-size: var(--fs-small); color: var(--muted); font-variant-numeric: tabular-nums; }
+  .alt-sub.tag { color: var(--open); font-weight: 600; }
   /* étapes du trajet en transport : pleine largeur de la fiche, sans fond */
   .route-sheet :global(.legs) { margin: 0 calc(-1 * var(--gutter)); padding: 4px var(--gutter) 6px; background: none; }
   .t-prefs { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 10px 16px 2px; margin: 0 -16px; }
