@@ -146,5 +146,6 @@
   .list-foot { display: grid; justify-items: start; gap: 2px; padding: 10px 16px 6px 48px; border-top: 1px solid var(--line); margin-top: 6px; }
   .results .list-foot .link { font-size: 14.5px; }
   .privacy-line { font-size: 12.5px; color: var(--muted); padding-top: 6px; text-decoration: none; }
-  .privacy-check { color: var(--accent); font-weight: 600; }
+  /* « je ne sais pas où trouver plus d'infos » (P6) : un vrai lien, souligné */
+  .privacy-check { color: var(--accent); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
 </style>

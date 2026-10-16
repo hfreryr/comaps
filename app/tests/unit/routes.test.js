@@ -39,3 +39,14 @@ test('étiquettes de tracés : durée sur le choisi, écart sur les autres', () 
 test('tuile de Paris au zoom 14', () => {
   assert.deepEqual(tileXY(2.3488, 48.8534, 14), [8298, 5636]);
 });
+
+test('transports : « Le plus rapide » et « Le plus simple »', async () => {
+  const { transitTags } = await import('#lib/routeview.js');
+  const ride = (line) => ({ mode: 'SUBWAY', line });
+  const a = { end: new Date(1000), legs: [ride('10'), ride('4')] };
+  const b = { end: new Date(1300), legs: [ride('10')] };
+  const c = { end: new Date(1500), legs: [ride('12'), ride('4')] };
+  assert.deepEqual(transitTags([a, b, c]), ['Le plus rapide', 'Le plus simple', '']);
+  assert.deepEqual(transitTags([b, a]), ['Le plus simple', 'Le plus rapide']);
+  assert.deepEqual(transitTags([{ end: new Date(1), legs: [ride('1')] }, { end: new Date(2), legs: [ride('2')] }]), ['Le plus rapide', '']);
+});
