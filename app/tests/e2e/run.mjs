@@ -561,6 +561,18 @@ const tests = {
     assert(!errors.length, errors.join(' | '));
     await ctx.close();
   },
+  async 'vue satellite (IGN) et thème au choix, retenu sur l’appareil (P5, P6)'() {
+    const { p, ctx, errors } = await page();
+    await p.click('button[aria-label="Type de carte"]'); await p.click('.modes-pop button:has-text("Satellite")'); await p.waitForTimeout(1500);
+    assert(await p.evaluate(() => !!window.__map.getLayer('satellite')), 'couche satellite absente');
+    await p.click('button[aria-label="Type de carte"]'); await p.click('.modes-pop button:has-text("Plan")'); await p.waitForTimeout(500);
+    assert(await p.evaluate(() => !window.__map.getLayer('satellite')), 'couche satellite restée après retour au plan');
+    await p.click('button[aria-label="Type de carte"]'); await p.click('.theme button:has-text("Sombre")'); await p.waitForTimeout(1500);
+    await p.reload({ waitUntil: 'networkidle' }); await p.waitForTimeout(2000);
+    assert(await p.evaluate(() => document.documentElement.dataset.theme === 'dark' && getComputedStyle(document.documentElement).getPropertyValue('--card').trim() === '#1c1f24'), 'thème sombre non retenu');
+    assert(!errors.length, errors.join(' | '));
+    await ctx.close();
+  },
   async 'la liste se recharge quand on déplace la carte'() {
     const { p, ctx } = await page({ viewport: { width: 1280, height: 800 }, isMobile: false, hasTouch: false });
     await p.click('.chip:has-text("Restaurants")'); await p.waitForTimeout(4000);

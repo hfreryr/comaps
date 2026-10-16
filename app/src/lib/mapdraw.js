@@ -7,6 +7,7 @@ import * as maplibregl from 'maplibre-gl';
 import { reverseAddress } from '#lib/geocode.js';
 import { streetOpts } from '#lib/routeview.js';
 import { typeLabel } from '#lib/places.js';
+import { setSatellite } from '#lib/satellite.js';
 
 /** @param {any} app */
 export function createMapDraw(app) {
@@ -26,6 +27,7 @@ export function createMapDraw(app) {
     else if (app.place) showSelection(app.place);
     if (app.category) app.applyHit(app.category);
     if (app.mapMode === 'transit') for (const id of ['transit-case', 'transit-line', 'transit-label']) app.map.setLayoutProperty(id, 'visibility', 'visible');
+    if (app.mapMode === 'satellite') setSatellite(app.map, true);
   }
   function drawRoute(fit = true) {
     const src = app.map?.getSource('route');
@@ -77,6 +79,7 @@ export function createMapDraw(app) {
     app.mapMode = m;
     app.showModes = false;
     for (const id of ['transit-case', 'transit-line', 'transit-label']) app.map.setLayoutProperty(id, 'visibility', m === 'transit' ? 'visible' : 'none');
+    setSatellite(app.map, m === 'satellite');
     if (m === 'transit' && app.map.getZoom() > 14.5) app.map.easeTo({ zoom: 13.5, duration: 600 });
   }
   // Marges de cadrage : ce que cachent réellement le haut d'écran et la fiche (mesurés), pas des valeurs fixes.

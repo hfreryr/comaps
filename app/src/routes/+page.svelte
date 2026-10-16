@@ -21,6 +21,7 @@
   import { dataDate } from '#lib/placestore.js';
   import { hoursStatus, hoursTable, momentLabel } from '#lib/hours.js';
   import { parseIntent, arrName, dietHit } from '#lib/intent.js';
+  import { themePref as loadTheme } from '#lib/theme.js';
   import { FAMILIES, GLYPHS } from '#lib/mapstyle.js';
   import { streetRoute, MODE_NAMES, fmtDuration, fmtTime, fmtDistance } from '#lib/routing.js';
   import { bestExit } from '#lib/exits.js';
@@ -170,7 +171,9 @@
   let fieldEl = $state();
   let routes = $state({ walk: null, bike: null, transit: null }); // { status, data?, error? }
   let picked = $state(0);            // proposition de transport choisie
-  let mapMode = $state('plan');      // 'plan' | 'transit'
+  let mapMode = $state('plan');      // 'plan' | 'transit' | 'satellite'
+  let themePref = $state(loadTheme()); // 'auto' | 'light' | 'dark' (theme.js)
+  let restyle = () => {};
   let showModes = $state(false);
   let lastEdit = { which: null, at: 0 }; // champ quitté juste avant un toucher sur la carte
 
@@ -533,6 +536,7 @@
   // <app> État et actions partagés avec les composants et modules de l'écran (getContext('app')). Bloc généré.
   const app = {
     get transitPref() { return transitPref; }, set transitPref(v) { transitPref = v; }, get setTransitPref() { return setTransitPref; },
+    get themePref() { return themePref; }, set themePref(v) { themePref = v; }, get restyle() { return restyle; }, set restyle(v) { restyle = v; },
     get when() { return when; }, set when(v) { when = v; }, get setWhen() { return setWhen; }, get openDirections() { return openDirections; },
     get setListStyle() { return setListStyle; },
     get BACKUP_KEY() { return BACKUP_KEY; }, get BIKE_COLOR() { return BIKE_COLOR; }, get FAVS_KEY() { return FAVS_KEY; },

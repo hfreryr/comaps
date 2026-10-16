@@ -1,9 +1,16 @@
 <script>
   import { tx } from '#lib/i18n/index.js';
   import { getContext } from 'svelte';
+  import { applyTheme } from '#lib/theme.js';
 
   // État et actions de la page (voir le bloc « app » de +page.svelte)
   const app = getContext('app');
+  // Thème au choix (P5 n'avait pas vu le mode clair) : automatique, clair ou sombre, retenu sur l'appareil
+  function setTheme(pref) {
+    app.themePref = pref;
+    applyTheme(pref, true);
+    app.restyle();
+  }
 </script>
 
 
@@ -22,6 +29,15 @@
           <button role="menuitemradio" aria-checked={app.mapMode === 'transit'} class:on={app.mapMode === 'transit'} onclick={() => app.setMapMode('transit')}>
             <span class="thumb transit" aria-hidden="true"></span>{tx('carte.transports')}
           </button>
+          <button role="menuitemradio" aria-checked={app.mapMode === 'satellite'} class:on={app.mapMode === 'satellite'} onclick={() => app.setMapMode('satellite')}>
+            <span class="thumb satellite" aria-hidden="true"></span>{tx('carte.satellite')}
+          </button>
+          <div class="theme" role="radiogroup" aria-label={tx('carte.theme')}>
+            <span class="theme-label">{tx('carte.theme')}</span>
+            {#each [['auto', tx('carte.theme_auto')], ['light', tx('carte.theme_clair')], ['dark', tx('carte.theme_sombre')]] as [id, label]}
+              <button role="radio" aria-checked={app.themePref === id} class:on={app.themePref === id} onclick={() => setTheme(id)}>{label}</button>
+            {/each}
+          </div>
           <label class="saved-toggle">
             <input type="checkbox" checked={app.showSaved} onchange={(e) => { app.showSaved = e.currentTarget.checked; try { localStorage.setItem('mes-lieux-carte', app.showSaved ? 'oui' : 'non'); } catch { /* rien */ } }} />
             {tx('carte.mes_lieux_sur_la_carte')}
@@ -85,6 +101,13 @@
   :global(.navigating) .modes-ctl, :global(.navigating) .locate { display: none; }
   .saved-toggle { display: flex; align-items: center; gap: 10px; font-size: 15px; padding: 14px 0 6px; cursor: pointer; }
   .saved-toggle input { width: 20px; height: 20px; accent-color: var(--accent-btn); }
+  /* vignette de la photo aérienne : toits, cour, arbres (dessin, pas une capture) */
+  .thumb.satellite { background: radial-gradient(circle at 30% 35%, #4f6b3a 0 14%, transparent 15%), radial-gradient(circle at 72% 70%, #5b7445 0 12%, transparent 13%),
+    linear-gradient(115deg, transparent 44%, #9a9a94 44% 50%, transparent 50%), linear-gradient(25deg, #7d746a 0 30%, #a39686 30% 62%, #6f6a62 62%); }
+  .theme { grid-column: 1 / -1; flex-basis: 100%; display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
+  .theme-label { margin-right: auto; }
+  .modes-pop .theme button { display: inline-flex; align-items: center; flex: none; height: 32px; padding: 0 12px; border-radius: 16px; border: 1px solid var(--line); background: var(--card); font-size: 13px; }
+  .modes-pop .theme button.on { background: var(--accent-btn); border-color: var(--accent-btn); color: #fff; }
   .modes-pop .saved-toggle { grid-column: 1 / -1; font-size: 13px; font-weight: 600; padding: 4px 0 0; }
   .modes-pop { flex-wrap: wrap; }
   .compass svg { width: 24px; height: 24px; transition: transform 0.1s; }

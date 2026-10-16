@@ -115,9 +115,9 @@
   --gutter: 16px;
   color-scheme: light;
 }
-/* Mode sombre : suit le réglage du téléphone. */
+/* Mode sombre : suit le réglage du téléphone, sauf choix « Clair » ou « Sombre » dans le menu des cartes (theme.js). */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --accent: #6b9bff;
     --ink: #eceef1;
     --muted: #9aa0a7;
@@ -141,8 +141,30 @@
     --end: #ff6b61;
     color-scheme: dark;
   }
-
-
+}
+:root[data-theme="dark"] {
+  --accent: #6b9bff;
+  --ink: #eceef1;
+  --muted: #9aa0a7;
+  --line: #30343b;
+  --card: #1c1f24;
+  --fill: #2a2e35;
+  --fav: #f06ba0;
+  --open: #4cc46b;
+  --closed: #ff6b61;
+  --shadow-float: 0 0 0 0.5px rgb(255 255 255 / 0.06), 0 2px 8px rgb(0 0 0 / 0.5), 0 8px 24px rgb(0 0 0 / 0.4);
+  --shadow-chip: 0 0 0 0.5px rgb(255 255 255 / 0.08), 0 1px 4px rgb(0 0 0 / 0.5);
+  --shadow-sheet: 0 -1px 0 rgb(255 255 255 / 0.05), 0 -8px 30px rgb(0 0 0 / 0.5);
+  --page: #1e2126;
+  --accent-btn: #3a6fe0;
+  --soft-accent: #1f2836;
+  --me-bg: #22304a;
+  --grip: #4a4f57;
+  --faint: #5d636b;
+  --rail: #4a4f57;
+  --walk-rail: #6f7782;
+  --end: #ff6b61;
+  color-scheme: dark;
 }
 button { font: inherit; color: inherit; }
 :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
@@ -182,12 +204,14 @@ button { font: inherit; color: inherit; }
 
 .maplibregl-ctrl-attrib { font-family: var(--ui); font-size: 11px; }
 @media (prefers-color-scheme: dark) {
-  .maplibregl-ctrl-attrib { background: rgb(28 31 36 / 0.8) !important; color: var(--muted); }
-  .maplibregl-ctrl-attrib a { color: var(--muted) !important; }
-  .maplibregl-ctrl-attrib-button { filter: invert(1); }
-
-
+  :root:not([data-theme="light"]) .maplibregl-ctrl-attrib { background: rgb(28 31 36 / 0.8) !important; color: var(--muted); }
+  :root:not([data-theme="light"]) .maplibregl-ctrl-attrib a { color: var(--muted) !important; }
+  :root:not([data-theme="light"]) .maplibregl-ctrl-attrib-button { filter: invert(1); }
 }
+:root[data-theme="dark"] .maplibregl-ctrl-attrib { background: rgb(28 31 36 / 0.8) !important; color: var(--muted); }
+:root[data-theme="dark"] .maplibregl-ctrl-attrib a { color: var(--muted) !important; }
+:root[data-theme="dark"] .maplibregl-ctrl-attrib-button { filter: invert(1); }
+
 /* Flèche classique sur la carte, main fermée seulement pendant qu'on la fait glisser. */
 .maplibregl-canvas-container.maplibregl-interactive { cursor: default; }
 .maplibregl-canvas-container.maplibregl-interactive:active { cursor: grabbing; }
