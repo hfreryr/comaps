@@ -194,3 +194,18 @@ def test_cle_archive():
     assert surt("https://www.Resto.fr/") == "fr,resto)/"
     assert surt("resto.fr") == "fr,resto)/"
     assert surt("https://www.5asec.fr/fr/Magasin/pressing/") == "fr,5asec)/fr/magasin/pressing"
+
+
+def test_adresse_overture():
+    from build_extras import street_address
+    assert street_address("172 Bd Saint-Germain", "75006") == ("172", "Boulevard Saint-Germain", "75006")
+    assert street_address("5 bis Av. de la République", "") == ("5 bis", "Avenue de la République", None)
+    # adresses confuses : rien plutôt qu'une erreur
+    assert street_address("Issy Coeur De Ville Rue Du General Leclerc 92130", "92130") is None
+    assert street_address("Promenade Cœur de ville", None) is None
+    tags = {"name": "Café de Flore"}
+    add_extras(tags, {"addr": [["172", "Boulevard Saint-Germain", "75006"], "overture"]})
+    assert tags["addr:street"] == "Boulevard Saint-Germain" and tags["_src"]["addr:street"] == "overture"
+    osm = {"name": "X", "addr:street": "Rue Y"}
+    add_extras(osm, {"addr": [["1", "Rue Z", None], "overture"]})
+    assert osm["addr:street"] == "Rue Y"
