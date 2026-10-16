@@ -27,7 +27,7 @@ const TRAINS = new Set(['RAIL', 'REGIONAL_RAIL', 'SUBURBAN', 'REGIONAL_FAST_RAIL
 /**
  * @param {{start: Date, board: object, next: {board: Date, leave: Date}[]}} it  @param {object|null} when  heure choisie (when.js)
  * @returns {{ kind: 'train', time: string, status: string, headsign: string, from: string, live: boolean }
- *   | { kind: 'countdown', mins: number[], from: string, live: boolean } | { kind: 'clock', times: string[], from: string, live: boolean }}
+ *   | { kind: 'countdown', mins: number[], from: string, live: boolean } | { kind: 'leave' | 'arrive', time: string, live: boolean }}
  */
 export function departInfo(it, when = null, now = Date.now()) {
   const b = it.board;
@@ -37,9 +37,9 @@ export function departInfo(it, when = null, now = Date.now()) {
     const status = !live ? '' : late ? tx('itin.retarde', { heure: fmtTime(b.start) }) : tx('itin.a_l_heure');
     return { kind: 'train', time: fmtTime(late ? b.scheduled : b.start), status, headsign: b.headsign, from: b.from, live };
   }
+  // heure choisie (relevé Citymapper du 16/10) : « Partir à » → l'heure d'arrivée ; « Arriver à » → l'heure où partir
+  if (when) return when.arrive ? { kind: 'leave', time: fmtTime(it.start), live: false } : { kind: 'arrive', time: fmtTime(it.end), live: false };
   const leaves = [it.start, ...(it.next || []).map((n) => n.leave)].filter(Boolean).slice(0, 3);
-  // départ choisi plus tard : un compte à rebours depuis maintenant n'aurait pas de sens, on donne les heures où partir
-  if (when) return { kind: 'clock', times: leaves.map((t) => fmtTime(t)), from: b.from, live };
   const mins = leaves.map((t) => Math.floor((t - now) / 60000)).filter((m) => m >= 0);
   return { kind: 'countdown', mins: mins.length ? mins : [0], from: b.from, live };
 }
@@ -47,7 +47,8 @@ export function departInfo(it, when = null, now = Date.now()) {
 /** Le texte : « dans 1, 4, 7 min de Château Rouge », « à 08:21, 08:24 de Château Rouge », « 10:50 (À l'heure) … de Gare du Nord ». */
 export function departText(d) {
   if (d.kind === 'train') return tx('itin.depart_train', { heure: d.time, etat: d.status ? ` (${d.status})` : '', direction: d.headsign ? ` ${d.headsign}` : '', from: d.from });
-  if (d.kind === 'clock') return tx('itin.depart_heures', { heures: d.times.join(', '), from: d.from });
+  if (d.kind === 'leave') return tx('itin.depart_a', { heure: d.time });
+  if (d.kind === 'arrive') return tx('itin.arrivee_4', { fmtTime: d.time });
   return tx('itin.depart_dans', { mins: d.mins.join(', '), from: d.from });
 }
 
@@ -56,10 +57,12 @@ const PREFIX = { SUBWAY: 'M', METRO: 'M', TRAM: 'T', BUS: tx('itin.bus'), REGION
  * Étiquettes des propositions en transports : « Le plus rapide » (arrivée la plus tôt) et « Le plus simple »
  * (moins de correspondances), comme Citymapper. Une proposition qui est les deux est « Le plus rapide ».
  */
-export function transitTags(list) {
+export function transitTags(list, arrive = false) {
   const rides = (it) => it.legs.filter((l) => l.mode !== 'WALK' && l.mode !== 'STOP').length;
   if (list.length < 2) return list.map(() => '');
-  const fastest = list.reduce((b, it, i) => (it.end < list[b].end ? i : b), 0);
+  // « Arriver à » : toutes arrivent à l'heure ; le plus rapide est alors le plus court
+  const key = (it) => (arrive ? it.end - it.start : +it.end);
+  const fastest = list.reduce((b, it, i) => (key(it) < key(list[b]) ? i : b), 0);
   const fewest = list.reduce((b, it, i) => (rides(it) < rides(list[b]) ? i : b), 0);
   return list.map((_, i) => (i === fastest ? tx('itin.le_plus_rapide')
     : i === fewest && rides(list[i]) < rides(list[fastest]) ? tx('itin.le_plus_simple') : ''));

@@ -113,14 +113,15 @@
     </ol>
   {:else}
     {@const it = current.data[picked] || current.data[0]}
-    {@const tags = transitTags(current.data)}
+    {@const tags = transitTags(current.data, !!when?.arrive)}
     <div class="sum transit" data-peek-end>
       <div class="sum-text">
         <span class="opt-top">
           <LegChain it={it} />
           <span class="sum-dur small">{fmtDuration(it.duration)}</span>
         </span>
-        {@render depart(it)}
+        <!-- « Partir à » : l'arrivée est déjà sur la ligne suivante, pas de doublon -->
+        {#if !when || when.arrive}{@render depart(it)}{/if}
         <span class="sum-sub">{tx('itin.arrivee_4', { fmtTime: fmtTime(it.end) })}{#if tripFare(it.legs) != null}<span title={tx('itin.prix_detail')}>{tx('itin.prix', { prix: fmtEuros(tripFare(it.legs)) })}</span>{/if}</span>
         {#if tags[picked]}<span class="sum-tag best">{tags[picked]}</span>{/if}
         <!-- l'info la plus attendue (test P3) dès le résumé : où se placer dans la rame et quelle sortie prendre à l'arrivée -->

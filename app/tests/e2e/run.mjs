@@ -513,10 +513,11 @@ const tests = {
     assert(/Arrivée demain à 09:00/.test(await p.textContent('.when-btn')), 'heure choisie non affichée : ' + await p.textContent('.when-btn'));
     await p.waitForSelector('.route-sheet .sum.transit', { timeout: 25000 }); await p.waitForTimeout(1000);
     const sum = await p.$eval('.route-sheet .sum', (e) => e.innerText);
+    assert(/Départ \d\d:\d\d/.test(sum), `« Départ HH:MM » absent (comme Citymapper) : ${sum}`);
     const arr = /Arrivée (\d\d):(\d\d)/.exec(sum);
     assert(arr && +arr[1] * 60 + +arr[2] <= 9 * 60 && +arr[1] >= 7, `arrivée hors de 7 h – 9 h : ${sum}`);
     await p.click('.mode-tabs .mode-tab >> nth=0'); await p.waitForTimeout(1500);
-    assert(/Partez à \d\d:\d\d/.test(await p.$eval('.route-sheet .sum', (e) => e.innerText)), 'heure de départ à pied absente');
+    assert(/Départ \d\d:\d\d/.test(await p.$eval('.route-sheet .sum', (e) => e.innerText)), 'heure de départ à pied absente');
     assert(!errors.length, errors.join(' | '));
     await ctx.close();
   },

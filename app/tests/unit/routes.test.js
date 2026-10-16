@@ -63,8 +63,10 @@ test('départs comme Citymapper : partir dans 1, 4, 7 min ; trains à l’heure 
   assert.equal(d.live, true);
   // un départ déjà manqué disparaît
   assert.equal(departText(departInfo(metro, null, Date.parse('2026-10-16T10:27:30+02:00'))), 'dans 1, 4 min de Château Rouge');
-  // départ choisi plus tard : les heures où partir
-  assert.equal(departText(departInfo(metro, { t: +at('10:20'), arrive: false }, now)), 'à 10:26, 10:29, 10:32 de Château Rouge');
+  // heure choisie, comme Citymapper : « Partir à » → l'arrivée ; « Arriver à » → l'heure où partir
+  const trip = { ...metro, end: at('11:02') };
+  assert.equal(departText(departInfo(trip, { t: +at('10:20'), arrive: false }, now)), 'Arrivée 11:02');
+  assert.equal(departText(departInfo(trip, { t: +at('11:05'), arrive: true }, now)), 'Départ 10:26');
   // RER : heure prévue, état, destination, gare
   const rer = (start, scheduled) => ({ start: at('10:20'), next: [], board: { mode: 'SUBURBAN', from: 'Gare du Nord', headsign: 'Saint-Rémy-lès-Chevreuse', start: at(start), scheduled: at(scheduled), realTime: true } });
   assert.equal(departText(departInfo(rer('10:43', '10:35'), null, now)), '10:35 (Retardé 10:43) Saint-Rémy-lès-Chevreuse de Gare du Nord');
