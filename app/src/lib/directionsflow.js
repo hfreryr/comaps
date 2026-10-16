@@ -29,6 +29,23 @@ export function createDirections(app) {
       editField('from');
     }
   }
+  /** Itinéraire sans lieu choisi d'abord (P5 : « pas de bouton pour faire un itinéraire ? ») : départ = votre position
+   *  si elle est connue, et l'on tape tout de suite la destination. */
+  function openDirections() {
+    app.directions = true;
+    app.dimPlaces(true);
+    app.clearSelection?.();
+    app.to = null;
+    app.via = null;
+    app.showVia = false;
+    app.when = null;
+    app.routes = { walk: null, bike: null, transit: null };
+    app.picked = 0;
+    app.mode = 'transit';
+    app.from = app.me || null;
+    if (!app.from) app.getPosition().then((p) => { if (app.directions && !app.from) { app.from = p; app.computeRoutes(); } }).catch(() => {});
+    editField('to');
+  }
   function closeDirections() {
     app.directions = false;
     app.dimPlaces(false);
@@ -140,5 +157,5 @@ export function createDirections(app) {
     app.picked = 0;
     computeRoutes();
   }
-  return { startDirections, closeDirections, pointOf, setPoint, addStop, removeStop, editField, useMyPosition, swap, computeRoutes, chooseMode, sheetToTop, pickStreet, pickTransit, setTransitPref, setWhen };
+  return { startDirections, openDirections, closeDirections, pointOf, setPoint, addStop, removeStop, editField, useMyPosition, swap, computeRoutes, chooseMode, sheetToTop, pickStreet, pickTransit, setTransitPref, setWhen };
 }

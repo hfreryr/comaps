@@ -12,6 +12,7 @@ export default {
 
   // ——— Barre de recherche et départ / arrivée ———
   'recherche.rechercher_un_lieu_ou_une_adresse': 'Rechercher un lieu, une adresse',
+  'recherche.itineraire': 'Itinéraire',
   'recherche.effacer_la_recherche': 'Effacer la recherche',
   'recherche.categories': 'Catégories',
   'recherche.personnaliser_les_raccourcis': 'Personnaliser les raccourcis',

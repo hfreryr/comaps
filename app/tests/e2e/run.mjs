@@ -551,6 +551,16 @@ const tests = {
     assert(!errors.length, errors.join(' | '));
     await ctx.close();
   },
+  async 'itinéraire sans choisir de lieu avant : bouton dans la barre (P5)'() {
+    const { p, ctx, errors } = await page({ geolocation: { latitude: 48.8867, longitude: 2.3431 } });
+    await p.click('.route-btn'); await p.waitForSelector('#field-to', { timeout: 5000 });
+    assert(/Votre position|position/i.test(await p.textContent('.dir-card')), 'départ « Votre position » absent');
+    await p.fill('#field-to', 'Panthéon'); await p.waitForSelector('.results li.opt button', { timeout: 15000 }); await pick(p);
+    await p.waitForSelector('.route-sheet .mode-tabs', { timeout: 15000 });
+    assert(/Panthéon/.test(await p.textContent('.dir-card')), 'destination non retenue');
+    assert(!errors.length, errors.join(' | '));
+    await ctx.close();
+  },
   async 'la liste se recharge quand on déplace la carte'() {
     const { p, ctx } = await page({ viewport: { width: 1280, height: 800 }, isMobile: false, hasTouch: false });
     await p.click('.chip:has-text("Restaurants")'); await p.waitForTimeout(4000);
